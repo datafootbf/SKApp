@@ -15,7 +15,7 @@ import random
 
 
 # Chargement du fichier
-file_path = "/Users/favie/Desktop/Deposit/SkillCorner/Top5.csv"  # Utilisé ici pour notebook, sinon remplace par ton chemin local
+file_path = SK_All.csv
 
 df = pd.read_csv(file_path, sep=";")
 
