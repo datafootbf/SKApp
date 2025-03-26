@@ -17,7 +17,7 @@ import random
 # Chargement du fichier
 file_path = "SK_All.csv"
 
-df = pd.read_csv(file_path, sep=";")
+df = pd.read_csv(file_path, sep=",")
 
 
 # In[3]:
