@@ -278,6 +278,8 @@ fig.update_layout(
 
 st.plotly_chart(fig, use_container_width=False)
 
+st.write("---")
+
 # Section explicative des métriques
 st.markdown("### Explication des métriques")
 st.markdown("""
