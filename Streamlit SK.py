@@ -278,3 +278,24 @@ fig.update_layout(
 
 st.plotly_chart(fig, use_container_width=False)
 
+# Section explicative des métriques
+st.markdown("### Explication des métriques")
+st.markdown("""
+**PSV-99** : Peak sprint velocity 99th percentile. Cette métrique reflète la vitesse maximale atteinte par un joueur, et sa capacité à l’atteindre plusieurs fois ou à la maintenir suffisamment longtemps.  
+**TOP 5 PSV-99** : Moyenne des meilleures performances PSV-99 d’un joueur (les 5 meilleures).  
+**Distance P90** : Distance totale parcourue, ramenée à 90 minutes.  
+**M/min P90** : Distance totale parcourue divisée par le nombre de minutes. Pour TIP (resp. OTIP), divisé par le nombre de minutes TIP (resp. OTIP).  
+**Running Distance P90** : Distance parcourue entre 15 et 20 km/h.  
+**HSR Distance P90** : Distance parcourue entre 20 et 25 km/h.  
+**HSR Count P90** : Nombre d’actions au-dessus de 20 km/h (moyenne glissante sur 1 seconde), jusqu’à 25 km/h.  
+**Sprint Distance P90** : Distance parcourue au-dessus de 25 km/h.  
+**Sprint Count P90** : Nombre d’actions au-dessus de 25 km/h (moyenne glissante sur 1 seconde).  
+**HI Distance P90** : Distance parcourue au-dessus de 20 km/h.  
+**HI Count** : Somme de HSR Count et Sprint Count.  
+**Medium Acceleration Count P90** : Nombre d’accélérations comprises entre 1.5 et 3 m/s², durant au moins 0.7 seconde.  
+**High Acceleration Count P90** : Accélérations supérieures à 3 m/s², durant au moins 0.7 seconde.  
+**Medium Deceleration Count P90** : Décélérations entre -1.5 et -3 m/s², durant au moins 0.7 seconde.  
+**High Deceleration Count P90** : Décélérations inférieures à -3 m/s², durant au moins 0.7 seconde.  
+**Explosive Acceleration to HSR Count P90** : Nombre d’accélérations (cf. définition ci-dessus) démarrant sous 9 km/h et atteignant au moins 20 km/h.  
+**Explosive Acceleration to Sprint Count P90** : Nombre d’accélérations démarrant sous 9 km/h et atteignant au moins 25 km/h.
+""")
