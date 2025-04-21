@@ -377,6 +377,15 @@ elif page == "xPhysical":
         st.stop()
     row = df_p.iloc[0]
 
+    # Affichage centré des infos du joueur
+    info = (
+        f"<div style='text-align:center; font-size:16px; margin:10px 0;'>"
+        f"<b>{row['Short Name']}</b> – {row['Season']} – {row['Team']} "
+        f"(<i>{row['Competition']}</i>) – {int(row['Age'])} ans"
+        "</div>"
+    )
+    st.markdown(info, unsafe_allow_html=True)
+
     # 2) Barème complet
     threshold_dict = {
         'psv99_top5': {
