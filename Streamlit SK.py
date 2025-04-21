@@ -356,19 +356,24 @@ if page == "Visualisation":
 elif page == "xPhysical":
     st.title("Détail xPhysical")
 
-    # Sélection du joueur et de la saison sur une même ligne
+    # 1) Liste des saisons et calcul de l'index par défaut
+    seasons = sorted(df["Season"].dropna().unique().tolist())
+    default_idx = seasons.index("2024/2025") if "2024/2025" in seasons else len(seasons) - 1
+
+    # 2) Sélecteurs côte à côte
     col1, col2 = st.columns(2)
-    
+
     with col1:
         player = st.selectbox(
             "Sélectionner un joueur",
-            sorted(df["Short Name"].dropna().unique())
+            options=sorted(df["Short Name"].dropna().unique())
         )
-    
+
     with col2:
         season = st.selectbox(
             "Sélectionner une saison",
-            sorted(df["Season"].dropna().unique())
+            options=seasons,
+            index=default_idx
         )
 
     df_p = df[(df["Short Name"] == player) & (df["Season"] == season)]
