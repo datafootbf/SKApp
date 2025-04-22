@@ -831,6 +831,9 @@ elif page == "xPhysical":
     ]
     # Trier par xPhysical décroissant et ranker
     df_peers = df_peers.sort_values("xPhysical", ascending=False)
+
+    mean_peer = df_peers["xPhysical"].mean()
+
     # Rang (1 = meilleur)
     rank = int(df_peers.reset_index().index[df_peers["Short Name"] == player][0] + 1)
     total_peers = len(df_peers)
@@ -842,22 +845,28 @@ elif page == "xPhysical":
 
     # --- 2.3) Construction du gauge
     fig_gauge = go.Figure(go.Indicator(
-        mode="gauge+number",
-        value=index_xphy,
-        number={'font': {'size': 48}},
-        gauge={
-            'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
-            'bar': {'color': bar_color, 'thickness': 0.25},
-            'bgcolor': "rgba(255,255,255,0)",
-            'borderwidth': 0,
-            'shape': "angular",
-            'steps': [
-                {'range': [0, 100], 'color': 'rgba(100,100,100,0.3)'}
-            ]
-        },
-        domain={'x': [0, 1], 'y': [0, 1]},
-        title={'text': f"<b>{rank}ᵉ/{total_peers}</b>", 'font': {'size': 20}}
+    mode="gauge+number",
+    value=index_xphy,
+    number={'font': {'size': 48}},
+    gauge={
+        'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
+        'bar': {'color': bar_color, 'thickness': 0.25},
+        'bgcolor': "rgba(255,255,255,0)",
+        'borderwidth': 0,
+        'shape': "angular",
+        'steps': [
+            {'range': [0, 100], 'color': 'rgba(100,100,100,0.3)'}
+        ],
+        'threshold': {
+            'line': {'color': "black", 'width': 4},
+            'thickness': 0.75,
+            'value': mean_peer   # <-- ta moyenne ici
+        }
+    },
+    domain={'x': [0, 1], 'y': [0, 1]},
+    title={'text': f"<b>{rank}ᵉ/{total_peers}</b>", 'font': {'size': 20}}
     ))
+    
     fig_gauge.update_layout(
         margin={'t':40,'b':0,'l':0,'r':0},
         paper_bgcolor="rgba(0,0,0,0)",
@@ -866,7 +875,10 @@ elif page == "xPhysical":
 
     # --- 2.4) Affichage
     st.plotly_chart(fig_gauge, use_container_width=True)
-    st.markdown("<div style='text-align:center; font-size:18px; margin-top:-20px'><b>xPhy</b></div>",
+    st.markdown(f"<div style='text-align:center; font-size:14px; margin-top:-20px; color:grey'>"
+                f"Moyenne xPhysical ({position} en {row['Competition']}): {mean_peer:.1f}"
+                "</div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align:center; font-size:18px; margin-top:-10px'><b>xPhy</b></div>",
                 unsafe_allow_html=True)
 
     detail_df = pd.DataFrame(rows)
