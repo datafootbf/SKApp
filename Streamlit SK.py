@@ -858,7 +858,7 @@ elif page == "xPhysical":
             {'range': [0, 100], 'color': 'rgba(100,100,100,0.3)'}
         ],
         'threshold': {
-            'line': {'color': "black", 'width': 4},
+            'line': {'color': "white", 'width': 4},
             'thickness': 0.75,
             'value': mean_peer   # <-- ta moyenne ici
         }
