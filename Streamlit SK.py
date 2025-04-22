@@ -253,7 +253,7 @@ if page == "Visualisation":
         x=selected_xaxis,
         y=selected_yaxis,
         hover_name="Player_Label",
-        hover_data=["Team", "Age"],
+        hover_data=["Team", "Age", "Position Group"],
         color="color_marker",  # Utilise la colonne color_marker
         color_discrete_map={"blue":"blue", "yellow":"yellow", "red":"red"},
     )
