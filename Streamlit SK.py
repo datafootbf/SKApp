@@ -380,7 +380,18 @@ elif page == "xPhysical":
     if df_p.empty:
         st.warning("Pas de données pour ce joueur / cette saison.")
         st.stop()
+    positions = df_p["Position Group"].dropna().unique().tolist()
+    if len(positions) > 1:
+        chosen_position = st.selectbox(
+            "Choisir le poste pour xPhysical",
+            options=positions
+        )
+        df_p = df_p[df_p["Position Group"] == chosen_position]
+    else:
+        chosen_position = positions[0]
     row = df_p.iloc[0]
+    # On travaille ensuite sur 'position' pour tout le calcul
+    position = chosen_position
 
     # Affichage centré des infos du joueur
     info = (
