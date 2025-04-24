@@ -85,274 +85,502 @@ page = st.sidebar.radio(
 )
 
 if page == "Visualisation":
-    st.title("SkillCorner Viz - Streamlit")
-    with st.sidebar:
-        st.header("Filtres")
-        selected_seasons = st.multiselect(
-            "Saisons",
-            options=season_list,
-            default=[],
-            help="Sélectionne une ou plusieurs saisons"
+    
+    # Création des sous-onglets
+    tab1, tab2 = st.tabs(["Scatter Plot", "Radar"])
+    
+    # --- Onglet Scatter Plot ---
+    with tab1:
+        st.title("SkillCorner Viz - Streamlit")
+        with st.sidebar:
+            st.header("Filtres")
+            selected_seasons = st.multiselect(
+                "Saisons",
+                options=season_list,
+                default=[],
+                help="Sélectionne une ou plusieurs saisons"
+            )
+            
+            selected_competitions = st.multiselect(
+                "Compétitions",
+                options=competition_list,
+                default=[],
+                help="Sélectionne une ou plusieurs compétitions"
+            )
+            selected_positions = st.multiselect(
+                "Postes",
+                options=position_list,
+                default=[],
+                help="Sélectionne un ou plusieurs postes"
+            )
+            
+            age_min, age_max = int(df["Age"].min()), int(df["Age"].max())
+            selected_age = st.slider(
+                "Âge",
+                min_value=age_min,
+                max_value=age_max,
+                value=(age_min, age_max),
+                step=1
+            )
+            
+            # Joueur(s) ajouté(s)
+            selected_extra_players = st.multiselect(
+                "Joueur(s) ajouté(s)",
+                options=player_list,
+                default=[],
+                help="Permet d'ajouter des joueurs particuliers, hors filtre"
+            )
+        
+        st.write("---")
+        
+        st.subheader("Tableau filtré")
+        
+        # -- Application des filtres
+        filtered_df = df.copy()
+        if selected_seasons:
+            filtered_df = filtered_df[filtered_df["Season"].isin(selected_seasons)]
+        if selected_positions:
+            filtered_df = filtered_df[filtered_df["Position Group"].isin(selected_positions)]
+        if selected_competitions:
+            filtered_df = filtered_df[filtered_df["Competition"].isin(selected_competitions)]
+        
+        # Filtrage sur l'âge
+        filtered_df = filtered_df[
+            (filtered_df["Age"] >= selected_age[0]) &
+            (filtered_df["Age"] <= selected_age[1])
+        ]
+        
+        # Ajout de joueurs "hors filtre"
+        if selected_extra_players:
+            extra_df = df[df["Short Name"].isin(selected_extra_players)]
+            filtered_df = pd.concat([filtered_df, extra_df]).drop_duplicates()
+        
+        # Supprime la colonne index importée en trop, si elle existe
+        display_df = filtered_df.drop(columns=["Unnamed: 0"], errors="ignore")
+        st.dataframe(display_df)
+        
+        st.write("---")
+        
+        ############################
+        # 3. Sélection des axes + highlight
+        ############################
+        st.subheader("Paramètres du Graphe")
+        
+        # Sélection de l'axe X, Y
+        selected_xaxis = st.selectbox(
+            "Axe X",
+            options=graph_columns,
+            index=0
+        )
+        selected_yaxis = st.selectbox(
+            "Axe Y",
+            options=graph_columns,
+            index=1
         )
         
-        selected_competitions = st.multiselect(
-            "Compétitions",
-            options=competition_list,
-            default=[],
-            help="Sélectionne une ou plusieurs compétitions"
+        # Récupérer les joueurs filtrés
+        filtered_players = sorted(filtered_df["Short Name"].dropna().unique())
+        team_list = sorted(filtered_df["Team"].dropna().unique())
+        
+        # On positionne les deux filtres sur la même ligne
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            highlight_players = st.multiselect(
+                "Surligner Joueurs",
+                options=filtered_players,
+                default=[]
+            )
+        
+        with col2:
+            highlight_teams = st.multiselect(
+                "Surligner Équipe",
+                options=team_list,
+                default=[]
+            )
+        
+        st.write("---")
+        
+        ############################
+        # 4. Création du Scatter Plot
+        ############################
+        st.subheader("Graphique XY")
+        
+        # Copy/Convert
+        plot_df = filtered_df.copy()
+        # Ajout de la saison courte et du label complet
+        plot_df["season_short"] = plot_df["Season"].apply(shorten_season)
+        plot_df["Player_Label"] = plot_df["Short Name"] + " " + plot_df["season_short"]
+        
+        # Sécurité: vérifie colonnes
+        if (selected_xaxis not in plot_df.columns) or (selected_yaxis not in plot_df.columns):
+            st.warning("Colonnes invalides pour le graphe.")
+            st.stop()
+        
+        # Convert numeric
+        plot_df[selected_xaxis] = pd.to_numeric(plot_df[selected_xaxis], errors='coerce')
+        plot_df[selected_yaxis] = pd.to_numeric(plot_df[selected_yaxis], errors='coerce')
+        plot_df = plot_df.dropna(subset=[selected_xaxis, selected_yaxis])
+        
+        if plot_df.empty:
+            st.info("Aucune donnée à afficher.")
+            st.stop()
+        
+        # Calcul du nombre total de points
+        nb_points_total = len(plot_df)
+        point_size = 10 if nb_points_total < 300 else 5
+        
+        # -- GESTION DES ETIQUETTES (SAMPLING)
+        max_labels = 300
+        if nb_points_total > max_labels:
+            label_df = plot_df.sample(n=max_labels, random_state=42)
+        else:
+            label_df = plot_df
+        
+        # -- On crée un champ "color" pour distinguer les joueurs à highlight
+        plot_df["color_marker"] = "blue"
+        label_df["color_marker"] = "blue"  # initialise aussi pour les labels
+        
+        # 1) Surlignage joueurs en jaune
+        if highlight_players:
+            mask_p = plot_df["Short Name"].isin(highlight_players)
+            plot_df.loc[mask_p, "color_marker"] = "yellow"
+            label_df.loc[mask_p, "color_marker"] = "yellow"
+        
+        # 2) Surlignage équipes en rouge
+        if highlight_teams:
+            mask_t = plot_df["Team"].isin(highlight_teams)
+            plot_df.loc[mask_t, "color_marker"] = "red"
+            label_df.loc[mask_t, "color_marker"] = "red"
+        
+        # Scatter principal (points) avec Player_Label
+        fig = px.scatter(
+            plot_df,
+            x=selected_xaxis,
+            y=selected_yaxis,
+            hover_name="Player_Label",
+            hover_data=["Team", "Age", "Position Group"],
+            color="color_marker",  # Utilise la colonne color_marker
+            color_discrete_map={"blue":"blue", "yellow":"yellow", "red":"red"},
         )
-        selected_positions = st.multiselect(
-            "Postes",
-            options=position_list,
-            default=[],
-            help="Sélectionne un ou plusieurs postes"
+        # Supprime la légende
+        fig.update_layout(showlegend=False)
+        # Force la taille
+        fig.update_traces(marker=dict(size=point_size))
+        
+        # -- On gère maintenant l'échantillon qui aura les étiquettes
+        label_df = label_df.copy()
+        
+        # On reprend directement la couleur déjà calculée dans plot_df
+        label_df["color_marker"] = plot_df.loc[label_df.index, "color_marker"]
+        
+        #Trace des labels (texte = Player_Label)
+        fig_labels = px.scatter(
+            label_df,
+            x=selected_xaxis,
+            y=selected_yaxis,
+            text="Player_Label",
+            hover_name="Player_Label",
+            hover_data=["Team", "Age", "Position Group"],
+            color="color_marker",
+            color_discrete_map={"blue":"blue", "yellow":"yellow", "red":"red"},
+        )
+        fig_labels.update_traces(hoverinfo='skip', hovertemplate=None)
+        
+        # Position variable
+        possible_positions = [
+            "top left", "top center", "top right",
+            "middle left", "middle right",
+            "bottom left", "bottom center", "bottom right"
+        ]
+        text_positions = [random.choice(possible_positions) for _ in range(len(label_df))]
+        
+        fig_labels.update_traces(
+            textposition=text_positions,
+            textfont=dict(size=9, color="black"),
+            marker=dict(size=point_size+1),
+            cliponaxis=False
         )
         
-        age_min, age_max = int(df["Age"].min()), int(df["Age"].max())
-        selected_age = st.slider(
-            "Âge",
-            min_value=age_min,
-            max_value=age_max,
-            value=(age_min, age_max),
-            step=1
+        # On fusionne la seconde trace dans fig
+        for trace in fig_labels.data:
+            fig.add_trace(trace)
+        
+        # Ajout lignes de moyennes
+        mean_x = plot_df[selected_xaxis].mean()
+        mean_y = plot_df[selected_yaxis].mean()
+        
+        fig.add_vline(
+            x=mean_x,
+            line_dash="dash",
+            line_color="dimgrey",
+            line_width=2
+        )
+        fig.add_hline(
+            y=mean_y,
+            line_dash="dash",
+            line_color="dimgrey",
+            line_width=2
         )
         
-        # Joueur(s) ajouté(s)
-        selected_extra_players = st.multiselect(
-            "Joueur(s) ajouté(s)",
-            options=player_list,
-            default=[],
-            help="Permet d'ajouter des joueurs particuliers, hors filtre"
+        # Layout final
+        fig.update_layout(
+            width=1200,
+            height=700,
+            plot_bgcolor="white",
+            xaxis=dict(showgrid=True, gridcolor="gainsboro", zeroline=False),
+            yaxis=dict(showgrid=True, gridcolor="gainsboro", zeroline=False)
         )
-    
-    st.write("---")
-    
-    st.subheader("Tableau filtré")
-    
-    # -- Application des filtres
-    filtered_df = df.copy()
-    if selected_seasons:
-        filtered_df = filtered_df[filtered_df["Season"].isin(selected_seasons)]
-    if selected_positions:
-        filtered_df = filtered_df[filtered_df["Position Group"].isin(selected_positions)]
-    if selected_competitions:
-        filtered_df = filtered_df[filtered_df["Competition"].isin(selected_competitions)]
-    
-    # Filtrage sur l'âge
-    filtered_df = filtered_df[
-        (filtered_df["Age"] >= selected_age[0]) &
-        (filtered_df["Age"] <= selected_age[1])
-    ]
-    
-    # Ajout de joueurs "hors filtre"
-    if selected_extra_players:
-        extra_df = df[df["Short Name"].isin(selected_extra_players)]
-        filtered_df = pd.concat([filtered_df, extra_df]).drop_duplicates()
-    
-    # Supprime la colonne index importée en trop, si elle existe
-    display_df = filtered_df.drop(columns=["Unnamed: 0"], errors="ignore")
-    st.dataframe(display_df)
-    
-    st.write("---")
-    
-    ############################
-    # 3. Sélection des axes + highlight
-    ############################
-    st.subheader("Paramètres du Graphe")
-    
-    # Sélection de l'axe X, Y
-    selected_xaxis = st.selectbox(
-        "Axe X",
-        options=graph_columns,
-        index=0
-    )
-    selected_yaxis = st.selectbox(
-        "Axe Y",
-        options=graph_columns,
-        index=1
-    )
-    
-    # Récupérer les joueurs filtrés
-    filtered_players = sorted(filtered_df["Short Name"].dropna().unique())
-    team_list = sorted(filtered_df["Team"].dropna().unique())
-    
-    # On positionne les deux filtres sur la même ligne
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        highlight_players = st.multiselect(
-            "Surligner Joueurs",
-            options=filtered_players,
-            default=[]
-        )
-    
-    with col2:
-        highlight_teams = st.multiselect(
-            "Surligner Équipe",
-            options=team_list,
-            default=[]
-        )
-    
-    st.write("---")
-    
-    ############################
-    # 4. Création du Scatter Plot
-    ############################
-    st.subheader("Graphique XY")
-    
-    # Copy/Convert
-    plot_df = filtered_df.copy()
-    # Ajout de la saison courte et du label complet
-    plot_df["season_short"] = plot_df["Season"].apply(shorten_season)
-    plot_df["Player_Label"] = plot_df["Short Name"] + " " + plot_df["season_short"]
-    
-    # Sécurité: vérifie colonnes
-    if (selected_xaxis not in plot_df.columns) or (selected_yaxis not in plot_df.columns):
-        st.warning("Colonnes invalides pour le graphe.")
-        st.stop()
-    
-    # Convert numeric
-    plot_df[selected_xaxis] = pd.to_numeric(plot_df[selected_xaxis], errors='coerce')
-    plot_df[selected_yaxis] = pd.to_numeric(plot_df[selected_yaxis], errors='coerce')
-    plot_df = plot_df.dropna(subset=[selected_xaxis, selected_yaxis])
-    
-    if plot_df.empty:
-        st.info("Aucune donnée à afficher.")
-        st.stop()
-    
-    # Calcul du nombre total de points
-    nb_points_total = len(plot_df)
-    point_size = 10 if nb_points_total < 300 else 5
-    
-    # -- GESTION DES ETIQUETTES (SAMPLING)
-    max_labels = 300
-    if nb_points_total > max_labels:
-        label_df = plot_df.sample(n=max_labels, random_state=42)
-    else:
-        label_df = plot_df
-    
-    # -- On crée un champ "color" pour distinguer les joueurs à highlight
-    plot_df["color_marker"] = "blue"
-    label_df["color_marker"] = "blue"  # initialise aussi pour les labels
-    
-    # 1) Surlignage joueurs en jaune
-    if highlight_players:
-        mask_p = plot_df["Short Name"].isin(highlight_players)
-        plot_df.loc[mask_p, "color_marker"] = "yellow"
-        label_df.loc[mask_p, "color_marker"] = "yellow"
-    
-    # 2) Surlignage équipes en rouge
-    if highlight_teams:
-        mask_t = plot_df["Team"].isin(highlight_teams)
-        plot_df.loc[mask_t, "color_marker"] = "red"
-        label_df.loc[mask_t, "color_marker"] = "red"
-    
-    # Scatter principal (points) avec Player_Label
-    fig = px.scatter(
-        plot_df,
-        x=selected_xaxis,
-        y=selected_yaxis,
-        hover_name="Player_Label",
-        hover_data=["Team", "Age", "Position Group"],
-        color="color_marker",  # Utilise la colonne color_marker
-        color_discrete_map={"blue":"blue", "yellow":"yellow", "red":"red"},
-    )
-    # Supprime la légende
-    fig.update_layout(showlegend=False)
-    # Force la taille
-    fig.update_traces(marker=dict(size=point_size))
-    
-    # -- On gère maintenant l'échantillon qui aura les étiquettes
-    label_df = label_df.copy()
-    
-    # On reprend directement la couleur déjà calculée dans plot_df
-    label_df["color_marker"] = plot_df.loc[label_df.index, "color_marker"]
-    
-    #Trace des labels (texte = Player_Label)
-    fig_labels = px.scatter(
-        label_df,
-        x=selected_xaxis,
-        y=selected_yaxis,
-        text="Player_Label",
-        hover_name="Player_Label",
-        hover_data=["Team", "Age", "Position Group"],
-        color="color_marker",
-        color_discrete_map={"blue":"blue", "yellow":"yellow", "red":"red"},
-    )
-    fig_labels.update_traces(hoverinfo='skip', hovertemplate=None)
-    
-    # Position variable
-    possible_positions = [
-        "top left", "top center", "top right",
-        "middle left", "middle right",
-        "bottom left", "bottom center", "bottom right"
-    ]
-    text_positions = [random.choice(possible_positions) for _ in range(len(label_df))]
-    
-    fig_labels.update_traces(
-        textposition=text_positions,
-        textfont=dict(size=9, color="black"),
-        marker=dict(size=point_size+1),
-        cliponaxis=False
-    )
-    
-    # On fusionne la seconde trace dans fig
-    for trace in fig_labels.data:
-        fig.add_trace(trace)
-    
-    # Ajout lignes de moyennes
-    mean_x = plot_df[selected_xaxis].mean()
-    mean_y = plot_df[selected_yaxis].mean()
-    
-    fig.add_vline(
-        x=mean_x,
-        line_dash="dash",
-        line_color="dimgrey",
-        line_width=2
-    )
-    fig.add_hline(
-        y=mean_y,
-        line_dash="dash",
-        line_color="dimgrey",
-        line_width=2
-    )
-    
-    # Layout final
-    fig.update_layout(
-        width=1200,
-        height=700,
-        plot_bgcolor="white",
-        xaxis=dict(showgrid=True, gridcolor="gainsboro", zeroline=False),
-        yaxis=dict(showgrid=True, gridcolor="gainsboro", zeroline=False)
-    )
-    
-    st.plotly_chart(fig, use_container_width=False)
-    
-    st.write("---")
-    
-    # Section explicative des métriques
-    st.markdown("### Explication des métriques")
-    st.markdown("""
-    **PSV-99** : Peak sprint velocity 99th percentile. Cette métrique reflète la vitesse maximale atteinte par un joueur, et sa capacité à l’atteindre plusieurs fois ou à la maintenir suffisamment longtemps.  
-    **TOP 5 PSV-99** : Moyenne des meilleures performances PSV-99 d’un joueur (les 5 meilleures).  
-    **Total Distance P90** : Distance totale parcourue, ramenée à 90 minutes.  
-    **M/min P90** : Distance totale parcourue divisée par le nombre de minutes. Pour TIP (resp. OTIP), divisé par le nombre de minutes TIP (resp. OTIP).  
-    **Running Distance P90** : Distance parcourue entre 15 et 20 km/h.  
-    **HSR Distance P90** : Distance parcourue entre 20 et 25 km/h.  
-    **HSR Count P90** : Nombre d’actions au-dessus de 20 km/h (moyenne glissante sur 1 seconde), jusqu’à 25 km/h.  
-    **Sprinting Distance P90** : Distance parcourue au-dessus de 25 km/h.  
-    **Sprint Count P90** : Nombre d’actions au-dessus de 25 km/h (moyenne glissante sur 1 seconde).  
-    **HI Distance P90** : Distance parcourue au-dessus de 20 km/h.  
-    **HI Count** : Somme de HSR Count et Sprint Count.  
-    **Medium Acceleration Count P90** : Nombre d’accélérations comprises entre 1.5 et 3 m/s², durant au moins 0.7 seconde.  
-    **High Acceleration Count P90** : Accélérations supérieures à 3 m/s², durant au moins 0.7 seconde.  
-    **Medium Deceleration Count P90** : Décélérations entre -1.5 et -3 m/s², durant au moins 0.7 seconde.  
-    **High Deceleration Count P90** : Décélérations inférieures à -3 m/s², durant au moins 0.7 seconde.  
-    **Explosive Acceleration to HSR Count P90** : Nombre d’accélérations (cf. définition ci-dessus) démarrant sous 9 km/h et atteignant au moins 20 km/h.  
-    **Explosive Acceleration to Sprint Count P90** : Nombre d’accélérations démarrant sous 9 km/h et atteignant au moins 25 km/h.
-    """)
+        
+        st.plotly_chart(fig, use_container_width=False)
+        
+        st.write("---")
+        
+        # Section explicative des métriques
+        st.markdown("### Explication des métriques")
+        st.markdown("""
+        **PSV-99** : Peak sprint velocity 99th percentile. Cette métrique reflète la vitesse maximale atteinte par un joueur, et sa capacité à l’atteindre plusieurs fois ou à la maintenir suffisamment longtemps.  
+        **TOP 5 PSV-99** : Moyenne des meilleures performances PSV-99 d’un joueur (les 5 meilleures).  
+        **Total Distance P90** : Distance totale parcourue, ramenée à 90 minutes.  
+        **M/min P90** : Distance totale parcourue divisée par le nombre de minutes. Pour TIP (resp. OTIP), divisé par le nombre de minutes TIP (resp. OTIP).  
+        **Running Distance P90** : Distance parcourue entre 15 et 20 km/h.  
+        **HSR Distance P90** : Distance parcourue entre 20 et 25 km/h.  
+        **HSR Count P90** : Nombre d’actions au-dessus de 20 km/h (moyenne glissante sur 1 seconde), jusqu’à 25 km/h.  
+        **Sprinting Distance P90** : Distance parcourue au-dessus de 25 km/h.  
+        **Sprint Count P90** : Nombre d’actions au-dessus de 25 km/h (moyenne glissante sur 1 seconde).  
+        **HI Distance P90** : Distance parcourue au-dessus de 20 km/h.  
+        **HI Count** : Somme de HSR Count et Sprint Count.  
+        **Medium Acceleration Count P90** : Nombre d’accélérations comprises entre 1.5 et 3 m/s², durant au moins 0.7 seconde.  
+        **High Acceleration Count P90** : Accélérations supérieures à 3 m/s², durant au moins 0.7 seconde.  
+        **Medium Deceleration Count P90** : Décélérations entre -1.5 et -3 m/s², durant au moins 0.7 seconde.  
+        **High Deceleration Count P90** : Décélérations inférieures à -3 m/s², durant au moins 0.7 seconde.  
+        **Explosive Acceleration to HSR Count P90** : Nombre d’accélérations (cf. définition ci-dessus) démarrant sous 9 km/h et atteignant au moins 20 km/h.  
+        **Explosive Acceleration to Sprint Count P90** : Nombre d’accélérations démarrant sous 9 km/h et atteignant au moins 25 km/h.
+        """)
+    with tab2:
+        st.subheader("Physical Comparison")
 
-# === VOLET NOUVEAU VOLET ===
+        # 1) Choix des métriques  
+        default_metrics = [
+            "TOP 5 PSV-99",
+            "HI Distance P90",
+            "Total Distance P90",
+            "HSR Distance P90",
+            "Sprinting Distance P90",
+            "Sprint Count P90",
+            "High Acceleration Count P90"
+        ]
+        extra_metrics = [
+            "Explosive Acceleration to HSR Count P90",
+            "Explosive Acceleration to Sprint Count P90",
+            "Note xPhy TOP 5 PSV-99",
+            "Note xPhy HI Distance P90",
+            "Note xPhy Total Distance P90",
+            "Note xPhy HSR Distance P90",
+            "Note xPhy Sprinting Distance P90",
+            "Note xPhy Sprint Count P90",
+            "Note xPhy High Acceleration Count P90",
+            "xPhysical"
+        ]
+        metrics = st.multiselect(
+            "Sélectionner les métriques",
+            options=default_metrics + extra_metrics,
+            default=default_metrics
+        )
+        if not metrics:
+            st.warning("Au moins une métrique est nécessaire.")
+            st.stop()
+        
+        # 2) Joueur 1 + Saison 1
+        col1, col2 = st.columns(2)
+        with col1:
+            p1 = st.selectbox("Joueur 1", sorted(df["Short Name"].unique()), key="radar_p1")
+        with col2:
+            seasons1 = sorted(df[df["Short Name"] == p1]["Season"].unique().tolist())
+            s1 = st.selectbox("Saison 1", seasons1, key="radar_s1")
+        
+        df1 = df[(df["Short Name"] == p1) & (df["Season"] == s1)]
+        # Poste 1 (conditionnel)
+        poss1 = df1["Position Group"].dropna().unique().tolist()
+        pos1 = st.selectbox("Poste 1", poss1, key="radar_pos1") if len(poss1) > 1 else poss1[0]
+        df1 = df1[df1["Position Group"] == pos1]
+        # Compétition 1 (conditionnel)
+        comps1 = df1["Competition"].dropna().unique().tolist()
+        comp1 = st.selectbox("Compétition 1", comps1, key="radar_c1") if len(comps1) > 1 else comps1[0]
+        df1 = df1[df1["Competition"] == comp1]
+        row1 = df1.iloc[0]
+        
+        # 3) Comparaison Joueur 2 (optionnelle)
+        compare = st.checkbox("Comparer à un 2ᵉ joueur")
+        if compare:
+            col3, col4 = st.columns(2)
+            with col3:
+                p2 = st.selectbox("Joueur 2", sorted(df["Short Name"].unique()), key="radar_p2")
+            with col4:
+                seasons2 = sorted(df[df["Short Name"] == p2]["Season"].unique().tolist())
+                s2 = st.selectbox("Saison 2", seasons2, key="radar_s2")
+        
+            df2 = df[(df["Short Name"] == p2) & (df["Season"] == s2)]
+            poss2 = df2["Position Group"].dropna().unique().tolist()
+            pos2 = st.selectbox("Poste 2", poss2, key="radar_pos2") if len(poss2) > 1 else poss2[0]
+            df2 = df2[df2["Position Group"] == pos2]
+            comps2 = df2["Competition"].dropna().unique().tolist()
+            comp2 = st.selectbox("Compétition 2", comps2, key="radar_c2") if len(comps2) > 1 else comps2[0]
+            df2 = df2[df2["Competition"] == comp2]
+            row2 = df2.iloc[0]
+        
+        # 4) Préparer les peers (cinq ligues)
+        champions = [
+            "ENG - Premier League","FRA - Ligue 1",
+            "ESP - LaLiga","ITA - Serie A","GER - Bundesliga"
+        ]
+        peers = df[
+            (df["Position Group"] == pos1) &
+            (df["Season"] == s1) &
+            (df["Competition"].isin(champions))
+        ]
+        
+        # 5) Fonction fiable de percentile rank
+        def pct_rank(series, value):
+            """Retourne le percentile de value dans la série series (0–100)."""
+            arr = series.dropna().values
+            if len(arr) == 0:
+                return 0.0
+            # nombre de valeurs STRICTEMENT inférieures + moitié des égalités
+            lower = (arr < value).sum()
+            equal = (arr == value).sum()
+            rank = (lower + 0.5 * equal) / len(arr) * 100
+            return float(rank)
+        
+        # 6) Calcul des percentiles pour chaque métrique
+        r1 = [pct_rank(peers[m], row1[m]) for m in metrics]
+        if compare:
+            r2 = [pct_rank(peers[m], row2[m]) for m in metrics]
+        else:
+            mean_vals = peers[metrics].mean()
+            r2 = [pct_rank(peers[m], mean_vals[m]) for m in metrics]
+        
+        # 7) Fermer les boucles
+        metrics_closed = metrics + [metrics[0]]
+        r1_closed     = r1 + [r1[0]]
+        r2_closed     = r2 + [r2[0]]
+        # raw values pour le hover (tableau Nx1 pour Plotly)
+        raw1      = [row1[m] for m in metrics]
+        raw1_closed = raw1 + [raw1[0]]
+        cd1 = [[v] for v in raw1_closed]
+        if compare:
+            raw2 = [row2[m] for m in metrics]
+        else:
+            mean_vals = peers[metrics].mean()
+            raw2 = [mean_vals[m] for m in metrics]
+        raw2_closed = raw2 + [raw2[0]]
+        cd2 = [[v] for v in raw2_closed]
+        
+        # 8) Construction du radar Plotly
+        fig = go.Figure()
+        
+        # Construire les strings de hover
+        hover1 = [
+            f"<b>{theta}</b><br>"
+            f"Value: {raw:.2f}<br>"
+            f"Percentile: {r:.1f}%"
+            for theta, raw, r in zip(metrics_closed, raw1_closed, r1_closed)
+        ]
+        hover2 = [
+            f"<b>{theta}</b><br>"
+            f"Value: {raw:.2f}<br>"
+            f"Percentile: {r:.1f}%"
+            for theta, raw, r in zip(metrics_closed, raw2_closed, r2_closed)
+        ]
+
+        # Trace Joueur 1 avec text + hovertemplate
+        # 1) Calque principal “fill” (sans markers ni hover)
+        fig.add_trace(go.Scatterpolar(
+            r=r1_closed,
+            theta=metrics_closed,
+            mode='lines',
+            hoverinfo='skip',
+            fill='toself',
+            fillcolor='rgba(255,215,0,0.3)',
+            line=dict(color='gold', width=2),
+            name=p1
+        ))
+        # 2) Calque invisible de markers pour le hover
+        fig.add_trace(go.Scatterpolar(
+            r=r1_closed,
+            theta=metrics_closed,
+            mode='markers',
+            hoverinfo='text',
+            hovertext=[
+                f"<b>{theta}</b><br>Value: {raw:.2f}<br>Percentile: {r:.1f}%"
+                for theta, raw, r in zip(metrics_closed, raw1_closed, r1_closed)
+            ],
+            marker=dict(size=12, color='rgba(255,215,0,0)'),  # invisible
+            showlegend=False
+        ))
+                
+        # 1) Calque principal “fill”
+        fig.add_trace(go.Scatterpolar(
+            r=r2_closed,
+            theta=metrics_closed,
+            mode='lines',
+            hoverinfo='skip',
+            fill='toself',
+            fillcolor='rgba(144,238,144,0.3)',
+           line=dict(color=(compare and 'cyan') or 'lightgreen', width=2),
+            name=(compare and p2) or 'Top5 Average'
+        ))
+        # 2) Calque markers pour hover
+        fig.add_trace(go.Scatterpolar(
+            r=r2_closed,
+            theta=metrics_closed,
+            mode='markers',
+            hoverinfo='text',
+            hovertext=[
+                f"<b>{theta}</b><br>Value: {raw:.2f}<br>Percentile: {r:.1f}%"
+                for theta, raw, r in zip(metrics_closed, raw2_closed, r2_closed)
+            ],
+            marker=dict(size=12, color='rgba(144,238,144,0)'),  # invisible
+            showlegend=False
+        ))
+        
+        # 9) Mise en forme finale
+        # On récupère aussi les noms d’équipes
+        team1 = row1["Team"]
+        # Titre de base pour joueur 1
+        title_text = f"Physical Comparison - {p1} {s1} {team1} ({pos1})"
+        if compare:
+            team2 = row2["Team"]
+            # On ajoute joueur 2 au titre
+            title_text += f" vs {p2} {s2} {team2} ({pos2})"
+        
+        fig.update_layout(
+            hovermode='closest',
+            polar=dict(
+                bgcolor='rgba(0,0,0,0)',
+                radialaxis=dict(
+                    range=[0, 100],
+                    tickvals=[0, 25, 50, 75, 100],
+                    ticks='outside',
+                    showticklabels=True,
+                    ticksuffix='%',
+                    tickfont=dict(color='white'),
+                    gridcolor='gray'
+                )
+            ),
+            paper_bgcolor='rgba(0,0,0,0)',
+            font_color='white',
+            showlegend=True,
+            title={
+                'text': title_text,
+                'x': 0.5,
+                'xanchor': 'center'
+            }
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+    
+# === VOLET xPhysical ===
 elif page == "xPhysical":
     st.title("Détail xPhysical")
 
