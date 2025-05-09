@@ -417,17 +417,32 @@ if page == "xPhysical":
             df2 = df2[df2["Competition"] == comp2]
             row2 = df2.iloc[0]
         
-        # 4) Préparer les peers (cinq ligues)
+        # 4) Préparer les peers (cinq ligues), avec fallback pour libellés “AAAA/AAAA”
         champions = [
             "ENG - Premier League","FRA - Ligue 1",
             "ESP - LaLiga","ITA - Serie A","GER - Bundesliga"
         ]
+    
+        # 4.1) Peers sur même saison & grands championnats
         peers = df[
             (df["Position Group"] == pos1) &
             (df["Season"] == s1) &
             (df["Competition"].isin(champions))
         ]
-        # Fallback pour saisons hors Europe
+    
+        # 4.2) Si aucun peer et si la saison est du type AAAA/AAAA, on essaye AAAA-1/AAAA
+        if peers.empty:
+            parts = s1.split("/")
+            if len(parts) == 2 and parts[0] == parts[1]:
+                year = int(parts[0])
+                alt_season = f"{year-1}/{year}"
+                peers = df[
+                    (df["Position Group"] == pos1) &
+                    (df["Season"] == alt_season) &
+                    (df["Competition"].isin(champions))
+                ]
+    
+        # 4.3) Si toujours aucun peer, on élargit à toutes compétitions pour la même saison
         if peers.empty:
             peers = df[
                 (df["Position Group"] == pos1) &
