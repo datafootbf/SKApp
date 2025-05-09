@@ -30,34 +30,8 @@ file_path = "SK_All.csv"
 
 df = pd.read_csv(file_path, sep=",")
 
-
-# In[3]:
-
-
 # Nettoyage colonnes
 df.columns = df.columns.str.strip()
-
-# Suppression des colonnes non voulues (comme avant, si besoin)
-columns_to_remove = [
-    "Team ID", "Competition ID", "Season ID",
-    "Count Performances (Physical Check passed)", 
-    "Count Performances (Physical Check failed)",
-    "TOP 3 Time to HSR", "TOP 3 Time to Sprint", "Player ID"
-]
-df = df.drop(columns=[col for col in columns_to_remove if col in df.columns], errors="ignore")
-
-
-# In[6]:
-
-
-# Conversion birthdate → âge
-df["Birthdate"] = pd.to_datetime(df["Birthdate"], errors="coerce").dt.strftime("%Y-%m-%d")
-current_year = pd.Timestamp.now().year
-df["Age"] = df["Birthdate"].apply(lambda x: current_year - int(x[:4]) if isinstance(x, str) else None)
-
-
-# In[7]:
-
 
 # Listes pour les filtres
 season_list = sorted(df["Season"].dropna().unique().tolist())
@@ -81,13 +55,13 @@ graph_columns = [
 # === Sélecteur de page dans la sidebar ===
 page = st.sidebar.radio(
     "Choisir le volet",
-    ["Visualisation", "xPhysical"]
+    ["xPhysical", "xTechnical"]
 )
 
-if page == "Visualisation":
+if page == "xPhysical":
     
     # Création des sous-onglets
-    tab1, tab2 = st.tabs(["Scatter Plot", "Radar"])
+    tab1, tab2, tab3 = st.tabs(["Scatter Plot", "Radar", "Index"])
     
     # --- Onglet Scatter Plot ---
     with tab1:
@@ -400,6 +374,13 @@ if page == "Visualisation":
             s1 = st.selectbox("Saison 1", seasons1, key="radar_s1")
         
         df1 = df[(df["Short Name"] == p1) & (df["Season"] == s1)]
+        #  — Si plusieurs clubs, on filtre d’abord sur l’équipe
+        teams1 = df1["Team"].dropna().unique().tolist()
+        if len(teams1) > 1:
+            team1 = st.selectbox("Sélectionner un club", teams1, key="radar_team1")
+            df1 = df1[df1["Team"] == team1]
+        else:
+            team1 = teams1[0]
         # Poste 1 (conditionnel)
         poss1 = df1["Position Group"].dropna().unique().tolist()
         pos1 = st.selectbox("Poste 1", poss1, key="radar_pos1") if len(poss1) > 1 else poss1[0]
@@ -421,6 +402,13 @@ if page == "Visualisation":
                 s2 = st.selectbox("Saison 2", seasons2, key="radar_s2")
         
             df2 = df[(df["Short Name"] == p2) & (df["Season"] == s2)]
+            # Filtre Club 2 si plusieurs équipes
+            teams2 = df2["Team"].dropna().unique().tolist()
+            if len(teams2) > 1:
+                team2 = st.selectbox("Sélectionner un club (Joueur 2)", teams2, key="radar_team2")
+                df2 = df2[df2["Team"] == team2]
+            else:
+                team2 = teams2[0]
             poss2 = df2["Position Group"].dropna().unique().tolist()
             pos2 = st.selectbox("Poste 2", poss2, key="radar_pos2") if len(poss2) > 1 else poss2[0]
             df2 = df2[df2["Position Group"] == pos2]
@@ -439,6 +427,12 @@ if page == "Visualisation":
             (df["Season"] == s1) &
             (df["Competition"].isin(champions))
         ]
+        # Fallback pour saisons hors Europe
+        if peers.empty:
+            peers = df[
+                (df["Position Group"] == pos1) &
+                (df["Season"] == s1)
+            ]
         
         # 5) Fonction fiable de percentile rank
         def pct_rank(series, value):
@@ -580,440 +574,463 @@ if page == "Visualisation":
         
         st.plotly_chart(fig, use_container_width=True)
     
-# === VOLET xPhysical ===
-elif page == "xPhysical":
-    st.title("Détail xPhysical")
+    # --- Onglet Index ---
+    with tab3:
+        st.subheader("xPhysical Player Index")
 
-    # 1) Liste des saisons et calcul de l'index par défaut
-    seasons = sorted(df["Season"].dropna().unique().tolist())
-    default_idx = seasons.index("2024/2025") if "2024/2025" in seasons else len(seasons) - 1
+        # 1) Sélection Joueur & Saison (uniquement les saisons dispos pour ce joueur)
+        col1, col2 = st.columns(2)
+        with col1:
+            player = st.selectbox(
+                "Sélectionner un joueur",
+                sorted(df["Short Name"].dropna().unique()),
+                key="idx_p1"
+            )
+        with col2:
+            seasons = sorted(
+                df[df["Short Name"] == player]["Season"]
+                  .dropna().unique()
+            )
+            season = st.selectbox(
+                "Sélectionner une saison",
+                seasons,
+                index=len(seasons) - 1,
+                key="idx_s1"
+            )
 
-    # 2) Sélecteurs côte à côte
-    col1, col2 = st.columns(2)
+        # 2) Filtrer par Joueur + Saison
+        df_fs = df[(df["Short Name"] == player) & (df["Season"] == season)]
+        if df_fs.empty:
+            st.warning("Pas de données pour ce joueur / cette saison.")
+            st.stop()
 
-    with col1:
-        player = st.selectbox(
-            "Sélectionner un joueur",
-            options=sorted(df["Short Name"].dropna().unique())
+        # 3) Filtre Club si plusieurs
+        teams = df_fs["Team"].dropna().unique().tolist()
+        if len(teams) > 1:
+            team = st.selectbox("Sélectionner un club", teams, key="idx_team")
+            df_fs = df_fs[df_fs["Team"] == team]
+        else:
+            team = teams[0]
+
+        # 4) Filtre Poste si plusieurs (multi‐sélection)
+        positions = df_fs["Position Group"].dropna().unique().tolist()
+        if len(positions) > 1:
+            position = st.selectbox(
+                "Sélectionner un poste",
+                positions,
+                key="idx_position"
+            )
+        else:
+            position = positions[0]
+        df_fs = df_fs[df_fs["Position Group"] == position]
+
+        # 5) Filtre Compétition si plusieurs
+        competitions = df_fs["Competition"].dropna().unique().tolist()
+        if len(competitions) > 1:
+            competition = st.selectbox(
+                "Sélectionner une compétition",
+                competitions,
+                key="idx_comp"
+            )
+            df_fs = df_fs[df_fs["Competition"] == competition]
+        else:
+            competition = competitions[0]
+
+        # 6) On continue avec df_p
+        df_p = df_fs.copy()
+        row = df_p.iloc[0]
+        position = row["Position Group"]
+
+        # — Affichage des infos du joueur
+        info = (
+            f"<div style='text-align:center; font-size:16px; margin:10px 0;'>"
+            f"<b>{row['Short Name']}</b> – {row['Season']} – {row['Team']} "
+            f"(<i>{row['Competition']}</i>) – {int(row['Age'])} ans"
+            "</div>"
         )
+        st.markdown(info, unsafe_allow_html=True)
 
-    with col2:
-        season = st.selectbox(
-            "Sélectionner une saison",
-            options=seasons,
-            index=default_idx
-        )
-
-    df_p = df[(df["Short Name"] == player) & (df["Season"] == season)]
-    if df_p.empty:
-        st.warning("Pas de données pour ce joueur / cette saison.")
-        st.stop()
-    positions = df_p["Position Group"].dropna().unique().tolist()
-    if len(positions) > 1:
-        chosen_position = st.selectbox(
-            "Choisir le poste pour xPhysical",
-            options=positions
-        )
-        df_p = df_p[df_p["Position Group"] == chosen_position]
-    else:
-        chosen_position = positions[0]
-    row = df_p.iloc[0]
-    # On travaille ensuite sur 'position' pour tout le calcul
-    position = chosen_position
-
-    # Affichage centré des infos du joueur
-    info = (
-        f"<div style='text-align:center; font-size:16px; margin:10px 0;'>"
-        f"<b>{row['Short Name']}</b> – {row['Season']} – {row['Team']} "
-        f"(<i>{row['Competition']}</i>) – {int(row['Age'])} ans"
-        "</div>"
-    )
-    st.markdown(info, unsafe_allow_html=True)
-
-    # 2) Barème complet
-    threshold_dict = {
-    'psv99_top5': {
-        'Central Defender': [
-            {'min': 31.48, 'max': None, 'score': 12},
-            {'min': 30.84, 'max': 31.48, 'score': 9},
-            {'min': 30.28, 'max': 30.84, 'score': 6},
-            {'min': 29.64, 'max': 30.28, 'score': 3},
-            {'min': None,  'max': 29.64, 'score': 0},
-        ],
-        'Full Back': [
-            {'min': 32.0,  'max': None, 'score': 14},
-            {'min': 31.46, 'max': 32.0,  'score': 10},
-            {'min': 30.94, 'max': 31.46, 'score': 6},
-            {'min': 30.08, 'max': 30.94, 'score': 4},
-            {'min': None,  'max': 30.08, 'score': 0},
-        ],
-        'Midfield': [
-            {'min': 29.76, 'max': None, 'score': 10},
-            {'min': 29.07, 'max': 29.76, 'score': 7},
-            {'min': 28.38,  'max': 29.07, 'score': 5},
-            {'min': 27.62, 'max': 28.38,  'score': 3},
-            {'min': None,  'max': 27.62, 'score': 0},
-        ],
-        'Wide Attacker': [
-            {'min': 32.56, 'max': None, 'score': 14},
-            {'min': 31.82, 'max': 32.56, 'score': 10},
-            {'min': 31.22, 'max': 31.82, 'score': 6},
-            {'min': 30.24, 'max': 31.22, 'score': 4},
-            {'min': None,  'max': 30.24, 'score': 0},
-        ],
-        'Center Forward': [
-            {'min': 32.2,  'max': None, 'score': 14},
-            {'min': 31.28, 'max': 32.2,  'score': 10},
-            {'min': 30.7,  'max': 31.28, 'score': 6},
-            {'min': 29.96, 'max': 30.7,  'score': 4},
-            {'min': None,  'max': 29.96, 'score': 0},
-        ],
-    },
-    'hi_distance_full_all_p90': {
-        'Central Defender': [
-            {'min': 551.56, 'max': None, 'score': 4},
-            {'min': 492.06, 'max': 551.56, 'score': 3},
-            {'min': 441.2,  'max': 492.06, 'score': 2},
-            {'min': 390.76, 'max': 441.2,  'score': 1},
-            {'min': None,   'max': 390.76, 'score': 0},
-        ],
-        'Full Back': [
-            {'min': 946.93, 'max': None, 'score': 4},
-            {'min': 860.03, 'max': 946.93, 'score': 3},
-            {'min': 786.18, 'max': 860.03, 'score': 2},
-            {'min': 703.91, 'max': 786.18, 'score': 1},
-            {'min': None,   'max': 703.91, 'score': 0},
-        ],
-        'Midfield': [
-            {'min': 854.02, 'max': None, 'score': 4},
-            {'min': 746.49, 'max': 854.02, 'score': 3},
-            {'min': 665.42, 'max': 746.49, 'score': 2},
-            {'min': 560.44, 'max': 665.42, 'score': 1},
-            {'min': None,   'max': 560.44, 'score': 0},
-        ],
-        'Wide Attacker': [
-            {'min': 1035.79,'max': None, 'score': 4},
-            {'min': 940.79, 'max': 1035.79,'score': 3},
-            {'min': 863.0,  'max': 940.79, 'score': 2},
-            {'min': 777.13, 'max': 863.0,  'score': 1},
-            {'min': None,   'max': 777.13, 'score': 0},
-        ],
-        'Center Forward': [
-            {'min': 924.18, 'max': None, 'score': 4},
-            {'min': 837.87, 'max': 924.18, 'score': 3},
-            {'min': 754.05, 'max': 837.87, 'score': 2},
-            {'min': 659.55, 'max': 754.05, 'score': 1},
-            {'min': None,   'max': 659.55, 'score': 0},
-        ],
-    },
-    'total_distance_full_all_p90': {
-        'Central Defender': [
-            {'min': 9688.63, 'max': None, 'score': 7},
-            {'min': 9446.1,  'max': 9688.63, 'score': 5},
-            {'min': 9231.08, 'max': 9446.1,  'score': 3},
-            {'min': 8913.02, 'max': 9231.08, 'score': 1},
-            {'min': None,    'max': 8913.02, 'score': 0},
-        ],
-        'Full Back': [
-            {'min': 10330.71,'max': None, 'score': 7},
-            {'min': 10103.2, 'max': 10330.71,'score': 5},
-            {'min': 9802.22, 'max': 10103.2, 'score': 3},
-            {'min': 9525.6,  'max': 9802.22, 'score': 1},
-            {'min': None,    'max': 9525.6,  'score': 0},
-        ],
-        'Midfield': [
-            {'min': 11193.90,  'max': None, 'score': 10},
-            {'min': 10926.04,  'max': 11193.90,  'score': 7},
-            {'min': 10627.19,  'max': 10926.04,  'score': 5},
-            {'min': 10271.79,   'max': 10627.19,  'score': 3},
-            {'min': None,    'max': 10271.79,   'score': 0},
-        ],
-        'Wide Attacker': [
-            {'min': 10597.7,  'max': None, 'score': 7},
-            {'min': 10253.05,  'max': 10597.7, 'score': 5},
-            {'min': 9922.66,   'max': 10253.05, 'score': 3},
-            {'min': 9576.8,    'max': 9922.66,  'score': 1},
-            {'min': None,    'max': 9576.8,   'score': 0},
-        ],
-        'Center Forward': [
-            {'min': 10337.14,  'max': None, 'score': 7},
-            {'min': 9986.61,  'max': 10337.14, 'score': 5},
-            {'min': 9725.31,   'max': 9986.61, 'score': 3},
-            {'min': 9370.5,  'max': 9725.31,  'score': 1},
-            {'min': None,    'max': 9370.5, 'score': 0},
-        ],
-    },
-    'hsr_distance_full_all_p90': {
-        'Central Defender': [
-            {'min': 418.68,  'max': None,    'score': 7},
-            {'min': 386.56,  'max': 418.68,  'score': 5},
-            {'min': 359.06,  'max': 386.56,  'score': 3},
-            {'min': 319.99,  'max': 359.06,  'score': 1},
-            {'min': None,    'max': 319.99,  'score': 0},
-        ],
-        'Full Back': [
-            {'min': 683.49,  'max': None,    'score': 7},
-            {'min': 626.45,  'max': 683.49,  'score': 5},
-            {'min': 574.46,  'max': 626.45,  'score': 3},
-            {'min': 515.74,  'max': 574.46,  'score': 1},
-            {'min': None,    'max': 515.74,  'score': 0},
-        ],
-        'Midfield': [
-            {'min': 671.14,  'max': None,    'score': 7},
-            {'min': 603.56,  'max': 671.14,  'score': 5},
-            {'min': 547.54,  'max': 603.56,  'score': 3},
-            {'min': 465.70,  'max': 547.54,  'score': 1},
-            {'min': None,    'max': 465.70,  'score': 0},
-        ],
-        'Wide Attacker': [
-            {'min': 719.96,  'max': None,    'score': 7},
-            {'min': 671.78,  'max': 719.96,  'score': 5},
-            {'min': 622.00,  'max': 671.78,  'score': 3},
-            {'min': 560.85,  'max': 622.00,  'score': 1},
-            {'min': None,    'max': 560.85,  'score': 0},
-        ],
-        'Center Forward': [
-            {'min': 649.93,  'max': None,    'score': 7},
-            {'min': 595.20,  'max': 649.93,  'score': 5},
-            {'min': 551.35,  'max': 595.20,  'score': 3},
-            {'min': 484.71,  'max': 551.35,  'score': 1},
-            {'min': None,    'max': 484.71,  'score': 0},
-        ],
-    },
-    'sprint_distance_full_all_p90': {
-        'Central Defender': [
-            {'min': 139.22, 'max': None,    'score': 7},
-            {'min': 119.31, 'max': 139.22,  'score': 5},
-            {'min': 102.34,  'max': 119.31,  'score': 3},
-            {'min': 82.93,  'max': 102.34,   'score': 1},
-            {'min': None,   'max': 82.93,   'score': 0},
-        ],
-        'Full Back': [
-            {'min': 272.36, 'max': None,    'score': 7},
-            {'min': 240.01, 'max': 272.36,  'score': 5},
-            {'min': 204.02, 'max': 240.01,  'score': 3},
-            {'min': 172.29,  'max': 204.02,  'score': 1},
-            {'min': None,   'max': 172.29,   'score': 0},
-        ],
-        'Midfield': [
-            {'min': 180.98, 'max': None,    'score': 4},
-            {'min': 139.11, 'max': 180.98,  'score': 3},
-            {'min': 109.68, 'max': 139.11,  'score': 2},
-            {'min': 80.78,  'max': 109.68,  'score': 1},
-            {'min': None,   'max': 80.78,   'score': 0},
-        ],
-        'Wide Attacker': [
-            {'min': 305.22, 'max': None,    'score': 7},
-            {'min': 258.86, 'max': 305.22,  'score': 5},
-            {'min': 224.24, 'max': 258.86,  'score': 3},
-            {'min': 179.44, 'max': 224.24,  'score': 1},
-            {'min': None,   'max': 179.44,  'score': 0},
-        ],
-        'Center Forward': [
-            {'min': 253.71, 'max': None,    'score': 7},
-            {'min': 219.69, 'max': 253.71,  'score': 5},
-            {'min': 180.40, 'max': 219.69,  'score': 3},
-            {'min': 136.27, 'max': 180.40,  'score': 1},
-            {'min': None,   'max': 136.27,  'score': 0},
-        ],
-    },
-    'sprint_count_full_all_p90': {
-        'Central Defender': [
-            {'min': 7.79, 'max': None,   'score': 7},
-            {'min': 6.74,  'max': 7.79,  'score': 5},
-            {'min': 5.87,  'max': 6.74,   'score': 3},
-            {'min': 4.9,  'max': 5.87,   'score': 1},
-            {'min': None,  'max': 4.9,   'score': 0},
-        ],
-        'Full Back': [
-            {'min': 14.47, 'max': None,   'score': 7},
-            {'min': 12.89, 'max': 14.47,  'score': 5},
-            {'min': 11.44, 'max': 12.89,  'score': 3},
-            {'min': 9.69,  'max': 11.44,  'score': 1},
-            {'min': None,  'max': 9.69,   'score': 0},
-        ],
-        'Midfield': [
-            {'min': 10.10, 'max': None,   'score': 4},
-            {'min': 7.85,  'max': 10.10,  'score': 3},
-            {'min': 6.26,  'max': 7.85,   'score': 2},
-            {'min': 4.83,  'max': 6.26,   'score': 1},
-            {'min': None,  'max': 4.83,   'score': 0},
-        ],
-        'Wide Attacker': [
-            {'min': 16.27, 'max': None,   'score': 7},
-            {'min': 14.26, 'max': 16.27,  'score': 5},
-            {'min': 12.32, 'max': 14.26,  'score': 3},
-            {'min': 10.2,  'max': 12.32,  'score': 1},
-            {'min': None,  'max': 10.2,   'score': 0},
-        ],
-        'Center Forward': [
-            {'min': 14.28, 'max': None,   'score': 7},
-            {'min': 12.44, 'max': 14.28,  'score': 5},
-            {'min': 10.54,  'max': 12.44,  'score': 3},
-            {'min': 7.99,  'max': 10.54,   'score': 1},
-            {'min': None,  'max': 7.99,   'score': 0},
-        ],
-    },
-    'highaccel_count_full_all_p90': {
-        'Central Defender': [
-            {'min': 5.84, 'max': None, 'score': 7},
-            {'min': 5.14, 'max': 5.84, 'score': 5},
-            {'min': 4.62, 'max': 5.14, 'score': 3},
-            {'min': 4.09, 'max': 4.62, 'score': 1},
-            {'min': None,'max': 4.09,  'score': 0},
-        ],
-        'Full Back': [
-            {'min': 8.93, 'max': None, 'score': 7},
-            {'min': 8.07, 'max': 8.93, 'score': 5},
-            {'min': 7.22, 'max': 8.07, 'score': 3},
-            {'min': 6.24, 'max': 7.22, 'score': 1},
-            {'min': None,'max': 6.24,  'score': 0},
-        ],
-        'Midfield': [
-            {'min': 5.18,'max': None,'score': 7},
-            {'min': 4.37,'max': 5.18,'score': 5},
-            {'min': 3.77,'max': 4.37,'score': 3},
-            {'min': 3.15,'max': 3.77,'score': 1},
-            {'min': None,'max': 3.15,'score': 0},
-        ],
-        'Wide Attacker': [
-            {'min': 9.96,'max': None,'score': 10},
-            {'min': 8.88,'max': 9.96,'score': 7},
-            {'min': 7.63,'max': 8.88,'score': 5},
-            {'min': 6.30,'max': 7.63,'score': 3},
-            {'min': None,'max': 6.30,'score': 0},
-        ],
-        'Center Forward': [
-            {'min': 9.52,'max': None,'score': 4},
-            {'min': 8.35,'max': 9.52,'score': 3},
-            {'min': 7.12,'max': 8.35,'score': 2},
-            {'min': 6.20,'max': 7.12,'score': 1},
-            {'min': None,'max': 6.20,'score': 0},
+        # 2) Barème complet
+        threshold_dict = {
+        'psv99_top5': {
+            'Central Defender': [
+                {'min': 31.48, 'max': None, 'score': 12},
+                {'min': 30.84, 'max': 31.48, 'score': 9},
+                {'min': 30.28, 'max': 30.84, 'score': 6},
+                {'min': 29.64, 'max': 30.28, 'score': 3},
+                {'min': None,  'max': 29.64, 'score': 0},
+            ],
+            'Full Back': [
+                {'min': 32.0,  'max': None, 'score': 14},
+                {'min': 31.46, 'max': 32.0,  'score': 10},
+                {'min': 30.94, 'max': 31.46, 'score': 6},
+                {'min': 30.08, 'max': 30.94, 'score': 4},
+                {'min': None,  'max': 30.08, 'score': 0},
+            ],
+            'Midfield': [
+                {'min': 29.76, 'max': None, 'score': 10},
+                {'min': 29.07, 'max': 29.76, 'score': 7},
+                {'min': 28.38,  'max': 29.07, 'score': 5},
+                {'min': 27.62, 'max': 28.38,  'score': 3},
+                {'min': None,  'max': 27.62, 'score': 0},
+            ],
+            'Wide Attacker': [
+                {'min': 32.56, 'max': None, 'score': 14},
+                {'min': 31.82, 'max': 32.56, 'score': 10},
+                {'min': 31.22, 'max': 31.82, 'score': 6},
+                {'min': 30.24, 'max': 31.22, 'score': 4},
+                {'min': None,  'max': 30.24, 'score': 0},
+            ],
+            'Center Forward': [
+                {'min': 32.2,  'max': None, 'score': 14},
+                {'min': 31.28, 'max': 32.2,  'score': 10},
+                {'min': 30.7,  'max': 31.28, 'score': 6},
+                {'min': 29.96, 'max': 30.7,  'score': 4},
+                {'min': None,  'max': 29.96, 'score': 0},
             ],
         },
-    }
+        'hi_distance_full_all_p90': {
+            'Central Defender': [
+                {'min': 551.56, 'max': None, 'score': 4},
+                {'min': 492.06, 'max': 551.56, 'score': 3},
+                {'min': 441.2,  'max': 492.06, 'score': 2},
+                {'min': 390.76, 'max': 441.2,  'score': 1},
+                {'min': None,   'max': 390.76, 'score': 0},
+            ],
+            'Full Back': [
+                {'min': 946.93, 'max': None, 'score': 4},
+                {'min': 860.03, 'max': 946.93, 'score': 3},
+                {'min': 786.18, 'max': 860.03, 'score': 2},
+                {'min': 703.91, 'max': 786.18, 'score': 1},
+                {'min': None,   'max': 703.91, 'score': 0},
+            ],
+            'Midfield': [
+                {'min': 854.02, 'max': None, 'score': 4},
+                {'min': 746.49, 'max': 854.02, 'score': 3},
+                {'min': 665.42, 'max': 746.49, 'score': 2},
+                {'min': 560.44, 'max': 665.42, 'score': 1},
+                {'min': None,   'max': 560.44, 'score': 0},
+            ],
+            'Wide Attacker': [
+                {'min': 1035.79,'max': None, 'score': 4},
+                {'min': 940.79, 'max': 1035.79,'score': 3},
+                {'min': 863.0,  'max': 940.79, 'score': 2},
+                {'min': 777.13, 'max': 863.0,  'score': 1},
+                {'min': None,   'max': 777.13, 'score': 0},
+            ],
+            'Center Forward': [
+                {'min': 924.18, 'max': None, 'score': 4},
+                {'min': 837.87, 'max': 924.18, 'score': 3},
+                {'min': 754.05, 'max': 837.87, 'score': 2},
+                {'min': 659.55, 'max': 754.05, 'score': 1},
+                {'min': None,   'max': 659.55, 'score': 0},
+            ],
+        },
+        'total_distance_full_all_p90': {
+            'Central Defender': [
+                {'min': 9688.63, 'max': None, 'score': 7},
+                {'min': 9446.1,  'max': 9688.63, 'score': 5},
+                {'min': 9231.08, 'max': 9446.1,  'score': 3},
+                {'min': 8913.02, 'max': 9231.08, 'score': 1},
+                {'min': None,    'max': 8913.02, 'score': 0},
+            ],
+            'Full Back': [
+                {'min': 10330.71,'max': None, 'score': 7},
+                {'min': 10103.2, 'max': 10330.71,'score': 5},
+                {'min': 9802.22, 'max': 10103.2, 'score': 3},
+                {'min': 9525.6,  'max': 9802.22, 'score': 1},
+                {'min': None,    'max': 9525.6,  'score': 0},
+            ],
+            'Midfield': [
+                {'min': 11193.90,  'max': None, 'score': 10},
+                {'min': 10926.04,  'max': 11193.90,  'score': 7},
+                {'min': 10627.19,  'max': 10926.04,  'score': 5},
+                {'min': 10271.79,   'max': 10627.19,  'score': 3},
+                {'min': None,    'max': 10271.79,   'score': 0},
+            ],
+            'Wide Attacker': [
+                {'min': 10597.7,  'max': None, 'score': 7},
+                {'min': 10253.05,  'max': 10597.7, 'score': 5},
+                {'min': 9922.66,   'max': 10253.05, 'score': 3},
+                {'min': 9576.8,    'max': 9922.66,  'score': 1},
+                {'min': None,    'max': 9576.8,   'score': 0},
+            ],
+            'Center Forward': [
+                {'min': 10337.14,  'max': None, 'score': 7},
+                {'min': 9986.61,  'max': 10337.14, 'score': 5},
+                {'min': 9725.31,   'max': 9986.61, 'score': 3},
+                {'min': 9370.5,  'max': 9725.31,  'score': 1},
+                {'min': None,    'max': 9370.5, 'score': 0},
+            ],
+        },
+        'hsr_distance_full_all_p90': {
+            'Central Defender': [
+                {'min': 418.68,  'max': None,    'score': 7},
+                {'min': 386.56,  'max': 418.68,  'score': 5},
+                {'min': 359.06,  'max': 386.56,  'score': 3},
+                {'min': 319.99,  'max': 359.06,  'score': 1},
+                {'min': None,    'max': 319.99,  'score': 0},
+            ],
+            'Full Back': [
+                {'min': 683.49,  'max': None,    'score': 7},
+                {'min': 626.45,  'max': 683.49,  'score': 5},
+                {'min': 574.46,  'max': 626.45,  'score': 3},
+                {'min': 515.74,  'max': 574.46,  'score': 1},
+                {'min': None,    'max': 515.74,  'score': 0},
+            ],
+            'Midfield': [
+                {'min': 671.14,  'max': None,    'score': 7},
+                {'min': 603.56,  'max': 671.14,  'score': 5},
+                {'min': 547.54,  'max': 603.56,  'score': 3},
+                {'min': 465.70,  'max': 547.54,  'score': 1},
+                {'min': None,    'max': 465.70,  'score': 0},
+            ],
+            'Wide Attacker': [
+                {'min': 719.96,  'max': None,    'score': 7},
+                {'min': 671.78,  'max': 719.96,  'score': 5},
+                {'min': 622.00,  'max': 671.78,  'score': 3},
+                {'min': 560.85,  'max': 622.00,  'score': 1},
+                {'min': None,    'max': 560.85,  'score': 0},
+            ],
+            'Center Forward': [
+                {'min': 649.93,  'max': None,    'score': 7},
+                {'min': 595.20,  'max': 649.93,  'score': 5},
+                {'min': 551.35,  'max': 595.20,  'score': 3},
+                {'min': 484.71,  'max': 551.35,  'score': 1},
+                {'min': None,    'max': 484.71,  'score': 0},
+            ],
+        },
+        'sprint_distance_full_all_p90': {
+            'Central Defender': [
+                {'min': 139.22, 'max': None,    'score': 7},
+                {'min': 119.31, 'max': 139.22,  'score': 5},
+                {'min': 102.34,  'max': 119.31,  'score': 3},
+                {'min': 82.93,  'max': 102.34,   'score': 1},
+                {'min': None,   'max': 82.93,   'score': 0},
+            ],
+            'Full Back': [
+                {'min': 272.36, 'max': None,    'score': 7},
+                {'min': 240.01, 'max': 272.36,  'score': 5},
+                {'min': 204.02, 'max': 240.01,  'score': 3},
+                {'min': 172.29,  'max': 204.02,  'score': 1},
+                {'min': None,   'max': 172.29,   'score': 0},
+            ],
+            'Midfield': [
+                {'min': 180.98, 'max': None,    'score': 4},
+                {'min': 139.11, 'max': 180.98,  'score': 3},
+                {'min': 109.68, 'max': 139.11,  'score': 2},
+                {'min': 80.78,  'max': 109.68,  'score': 1},
+                {'min': None,   'max': 80.78,   'score': 0},
+            ],
+            'Wide Attacker': [
+                {'min': 305.22, 'max': None,    'score': 7},
+                {'min': 258.86, 'max': 305.22,  'score': 5},
+                {'min': 224.24, 'max': 258.86,  'score': 3},
+                {'min': 179.44, 'max': 224.24,  'score': 1},
+                {'min': None,   'max': 179.44,  'score': 0},
+            ],
+            'Center Forward': [
+                {'min': 253.71, 'max': None,    'score': 7},
+                {'min': 219.69, 'max': 253.71,  'score': 5},
+                {'min': 180.40, 'max': 219.69,  'score': 3},
+                {'min': 136.27, 'max': 180.40,  'score': 1},
+                {'min': None,   'max': 136.27,  'score': 0},
+            ],
+        },
+        'sprint_count_full_all_p90': {
+            'Central Defender': [
+                {'min': 7.79, 'max': None,   'score': 7},
+                {'min': 6.74,  'max': 7.79,  'score': 5},
+                {'min': 5.87,  'max': 6.74,   'score': 3},
+                {'min': 4.9,  'max': 5.87,   'score': 1},
+                {'min': None,  'max': 4.9,   'score': 0},
+            ],
+            'Full Back': [
+                {'min': 14.47, 'max': None,   'score': 7},
+                {'min': 12.89, 'max': 14.47,  'score': 5},
+                {'min': 11.44, 'max': 12.89,  'score': 3},
+                {'min': 9.69,  'max': 11.44,  'score': 1},
+                {'min': None,  'max': 9.69,   'score': 0},
+            ],
+            'Midfield': [
+                {'min': 10.10, 'max': None,   'score': 4},
+                {'min': 7.85,  'max': 10.10,  'score': 3},
+                {'min': 6.26,  'max': 7.85,   'score': 2},
+                {'min': 4.83,  'max': 6.26,   'score': 1},
+                {'min': None,  'max': 4.83,   'score': 0},
+            ],
+            'Wide Attacker': [
+                {'min': 16.27, 'max': None,   'score': 7},
+                {'min': 14.26, 'max': 16.27,  'score': 5},
+                {'min': 12.32, 'max': 14.26,  'score': 3},
+                {'min': 10.2,  'max': 12.32,  'score': 1},
+                {'min': None,  'max': 10.2,   'score': 0},
+            ],
+            'Center Forward': [
+                {'min': 14.28, 'max': None,   'score': 7},
+                {'min': 12.44, 'max': 14.28,  'score': 5},
+                {'min': 10.54,  'max': 12.44,  'score': 3},
+                {'min': 7.99,  'max': 10.54,   'score': 1},
+                {'min': None,  'max': 7.99,   'score': 0},
+            ],
+        },
+        'highaccel_count_full_all_p90': {
+            'Central Defender': [
+                {'min': 5.84, 'max': None, 'score': 7},
+                {'min': 5.14, 'max': 5.84, 'score': 5},
+                {'min': 4.62, 'max': 5.14, 'score': 3},
+                {'min': 4.09, 'max': 4.62, 'score': 1},
+                {'min': None,'max': 4.09,  'score': 0},
+            ],
+            'Full Back': [
+                {'min': 8.93, 'max': None, 'score': 7},
+                {'min': 8.07, 'max': 8.93, 'score': 5},
+                {'min': 7.22, 'max': 8.07, 'score': 3},
+                {'min': 6.24, 'max': 7.22, 'score': 1},
+                {'min': None,'max': 6.24,  'score': 0},
+            ],
+            'Midfield': [
+                {'min': 5.18,'max': None,'score': 7},
+                {'min': 4.37,'max': 5.18,'score': 5},
+                {'min': 3.77,'max': 4.37,'score': 3},
+                {'min': 3.15,'max': 3.77,'score': 1},
+                {'min': None,'max': 3.15,'score': 0},
+            ],
+            'Wide Attacker': [
+                {'min': 9.96,'max': None,'score': 10},
+                {'min': 8.88,'max': 9.96,'score': 7},
+                {'min': 7.63,'max': 8.88,'score': 5},
+                {'min': 6.30,'max': 7.63,'score': 3},
+                {'min': None,'max': 6.30,'score': 0},
+            ],
+            'Center Forward': [
+                {'min': 9.52,'max': None,'score': 4},
+                {'min': 8.35,'max': 9.52,'score': 3},
+                {'min': 7.12,'max': 8.35,'score': 2},
+                {'min': 6.20,'max': 7.12,'score': 1},
+                {'min': None,'max': 6.20,'score': 0},
+                ],
+            },
+        }
 
-    position = row["Position Group"]
-    if position not in next(iter(threshold_dict.values())):
-        st.error(f"Pas de barème défini pour le poste « {position} »")
-        st.stop()
+        position = row["Position Group"]
+        if position not in next(iter(threshold_dict.values())):
+            st.error(f"Pas de barème défini pour le poste « {position} »")
+            st.stop()
 
-    # 3) Mappings colonne brute <-> metric_key, et metric_key <-> colonne points
-    metric_map = {
-        "psv99_top5":                "TOP 5 PSV-99",
-        "hi_distance_full_all_p90":  "HI Distance P90",
-        "total_distance_full_all_p90":"Total Distance P90",
-        "hsr_distance_full_all_p90": "HSR Distance P90",
-        "sprint_distance_full_all_p90":"Sprinting Distance P90",
-        "sprint_count_full_all_p90": "Sprint Count P90",
-        "highaccel_count_full_all_p90":"High Acceleration Count P90",
-    }
-    note_map = {
-        "psv99_top5":                "Note xPhy TOP 5 PSV-99",
-        "hi_distance_full_all_p90":  "Note xPhy HI Distance P90",
-        "total_distance_full_all_p90":"Note xPhy Total Distance P90",
-        "hsr_distance_full_all_p90": "Note xPhy HSR Distance P90",
-        "sprint_distance_full_all_p90":"Note xPhy Sprinting Distance P90",
-        "sprint_count_full_all_p90": "Note xPhy Sprint Count P90",
-        "highaccel_count_full_all_p90":"Note xPhy High Acceleration Count P90",
-    }
+        # 3) Mappings colonne brute <-> metric_key, et metric_key <-> colonne points
+        metric_map = {
+            "psv99_top5":                "TOP 5 PSV-99",
+            "hi_distance_full_all_p90":  "HI Distance P90",
+            "total_distance_full_all_p90":"Total Distance P90",
+            "hsr_distance_full_all_p90": "HSR Distance P90",
+            "sprint_distance_full_all_p90":"Sprinting Distance P90",
+            "sprint_count_full_all_p90": "Sprint Count P90",
+            "highaccel_count_full_all_p90":"High Acceleration Count P90",
+        }
+        note_map = {
+            "psv99_top5":                "Note xPhy TOP 5 PSV-99",
+            "hi_distance_full_all_p90":  "Note xPhy HI Distance P90",
+            "total_distance_full_all_p90":"Note xPhy Total Distance P90",
+            "hsr_distance_full_all_p90": "Note xPhy HSR Distance P90",
+            "sprint_distance_full_all_p90":"Note xPhy Sprinting Distance P90",
+            "sprint_count_full_all_p90": "Note xPhy Sprint Count P90",
+            "highaccel_count_full_all_p90":"Note xPhy High Acceleration Count P90",
+        }
 
-    # 4) Fonction pour extraire le max de points par metric pour ce poste
-    def get_max_pts(metric_key):
-        rules = threshold_dict[metric_key][position]
-        return max(r["score"] for r in rules)
+        # 4) Fonction pour extraire le max de points par metric pour ce poste
+        def get_max_pts(metric_key):
+            rules = threshold_dict[metric_key][position]
+            return max(r["score"] for r in rules)
 
-    # 5) Construction de la table de détail
-    rows = []
-    for metric_key, col_val in metric_map.items():
-        col_note = note_map[metric_key]
-        raw_val = row.get(col_val, np.nan)
-        pts     = row.get(col_note,    0)
-        max_pts = get_max_pts(metric_key)
+        # — Construction du tableau de détail
+        rows = []
+        for metric_key, col_val in metric_map.items():
+            raw_val = row.get(col_val, np.nan)
+            pts     = row.get(note_map[metric_key], 0)
+            max_pts = get_max_pts(metric_key)
 
+            rows.append({
+                "Métrique":      col_val,
+                "Valeur Joueur": f"{raw_val:.2f}" if pd.notna(raw_val) else "NA",
+                "Points":        f"{pts} / {max_pts}"
+            })
+
+        # — Total et index
+        total_pts  = row.get("Note xPhysical", 0)
+        total_max  = row.get("Note xPhy_max",  0)
+        index_xphy = row.get("xPhysical",      0)
         rows.append({
-            "Métrique":      col_val,
-            "Valeur Joueur": f"{raw_val:.2f}" if pd.notna(raw_val) else "NA",
-            "Points":        f"{pts} / {max_pts}"
+            "Métrique":      "**Total**",
+            "Valeur Joueur": "",
+            "Points":        f"**{total_pts} / {total_max}**"
+        })
+        rows.append({
+            "Métrique":      "Index xPhysical",
+            "Valeur Joueur": "",
+            "Points":        f"**{index_xphy}**"
         })
 
-    # 6) Total et index depuis le DF
-    total_pts   = row.get("Note xPhysical", 0)
-    total_max   = row.get("Note xPhy_max",  0)
-    index_xphy  = row.get("xPhysical",      0)
+        detail_df = pd.DataFrame(rows)
 
-    rows.append({
-        "Métrique":      "**Total**",
-        "Valeur Joueur": "",
-        "Points":        f"**{total_pts} / {total_max}**"
-    })
-    rows.append({
-        "Métrique":      "Index xPhysical",
-        "Valeur Joueur": "",
-        "Points":        f"**{index_xphy}**"
-    })
+        # — Jauge xPhysical
+        df_peers = df[
+            (df["Position Group"] == position) &
+            (df["Season"] == season) &
+            (df["Competition"] == row["Competition"])
+        ].sort_values("xPhysical", ascending=False)
+        mean_peer  = df_peers["xPhysical"].mean()
+        rank       = int(df_peers.reset_index().index[df_peers["Short Name"] == player][0] + 1)
+        total_peers= len(df_peers)
+        hue        = 120 * (index_xphy / 100)
+        bar_color  = f"hsl({hue:.0f}, 75%, 50%)"
+
+        fig_gauge = go.Figure(go.Indicator(
+            mode="gauge+number",
+            value=index_xphy,
+            number={'font': {'size': 48}},
+            gauge={
+                'axis':      {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
+                'bar':       {'color': bar_color, 'thickness': 0.25},
+                'bgcolor':   "rgba(255,255,255,0)",
+                'borderwidth': 0,
+                'shape':     "angular",
+                'steps':     [{'range': [0, 100], 'color': 'rgba(100,100,100,0.3)'}],
+                'threshold': {'line': {'color': "white", 'width': 4},
+                              'thickness': 0.75,
+                              'value': mean_peer}
+            },
+            domain={'x': [0,1], 'y': [0,1]},
+            title={'text': f"<b>{rank}ᵉ/{total_peers}</b>", 'font': {'size': 20}}
+        ))
+        fig_gauge.update_layout(
+            margin          = {'t':40,'b':0,'l':0,'r':0},
+            paper_bgcolor   = "rgba(0,0,0,0)",
+            height          = 300
+        )
+        st.plotly_chart(fig_gauge, use_container_width=True)
+        st.markdown(
+            f"<div style='text-align:center; font-size:14px; margin-top:-20px; color:grey'>"
+            f"Moyenne xPhysical ({position} en {row['Competition']}): {mean_peer:.1f}"
+            "</div>",
+            unsafe_allow_html=True
+        )
+        st.markdown(
+            "<div style='text-align:center; font-size:18px; margin-top:-10px'>"
+            "<b>xPhy</b></div>",
+            unsafe_allow_html=True
+        )
+
+        # — Affichage du tableau
+        st.markdown("### Détail de l’index xPhysical")
+        display_df = detail_df.set_index("Métrique")\
+                              .style.set_properties(**{"text-align":"center"})
+        st.dataframe(display_df)
+        
+        
+        
     
-    # --- 2.1) Calcul du rang du joueur dans son Position Group / Season / Competition
-    df_peers = df[
-        (df["Position Group"] == position) &
-        (df["Season"] == season) &
-        (df["Competition"] == row["Competition"])
-    ]
-    # Trier par xPhysical décroissant et ranker
-    df_peers = df_peers.sort_values("xPhysical", ascending=False)
-
-    mean_peer = df_peers["xPhysical"].mean()
-
-    # Rang (1 = meilleur)
-    rank = int(df_peers.reset_index().index[df_peers["Short Name"] == player][0] + 1)
-    total_peers = len(df_peers)
-
-    # --- 2.2) Couleur de la jauge en fonction de l’index (0=rouge,100=vert)
-    # On passe l'index sur 0–120° de hue
-    hue = 120 * (index_xphy / 100)
-    bar_color = f"hsl({hue:.0f}, 75%, 50%)"
-
-    # --- 2.3) Construction du gauge
-    fig_gauge = go.Figure(go.Indicator(
-    mode="gauge+number",
-    value=index_xphy,
-    number={'font': {'size': 48}},
-    gauge={
-        'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
-        'bar': {'color': bar_color, 'thickness': 0.25},
-        'bgcolor': "rgba(255,255,255,0)",
-        'borderwidth': 0,
-        'shape': "angular",
-        'steps': [
-            {'range': [0, 100], 'color': 'rgba(100,100,100,0.3)'}
-        ],
-        'threshold': {
-            'line': {'color': "white", 'width': 4},
-            'thickness': 0.75,
-            'value': mean_peer   # <-- ta moyenne ici
-        }
-    },
-    domain={'x': [0, 1], 'y': [0, 1]},
-    title={'text': f"<b>{rank}ᵉ/{total_peers}</b>", 'font': {'size': 20}}
-    ))
-    
-    fig_gauge.update_layout(
-        margin={'t':40,'b':0,'l':0,'r':0},
-        paper_bgcolor="rgba(0,0,0,0)",
-        height=300
-    )
-
-    # --- 2.4) Affichage
-    st.plotly_chart(fig_gauge, use_container_width=True)
-    st.markdown(f"<div style='text-align:center; font-size:14px; margin-top:-20px; color:grey'>"
-                f"Moyenne xPhysical ({position} en {row['Competition']}): {mean_peer:.1f}"
-                "</div>", unsafe_allow_html=True)
-    st.markdown("<div style='text-align:center; font-size:18px; margin-top:-10px'><b>xPhy</b></div>",
-                unsafe_allow_html=True)
-
-    detail_df = pd.DataFrame(rows)
-
-    # 7) Affichage sans colonne d’index numérique
-    st.markdown("### Détail de l’index xPhysical")
-    display_df = detail_df.set_index("Métrique").style.set_properties(**{"text-align": "center"})
-    st.dataframe(display_df)
+# ============================================= VOLET xTechnical ========================================================
+elif page == "xTechnical":
+    st.title("👷 Détail xTechnical 👷")
+    st.write("xTechnical –  IN PROGRESS")
