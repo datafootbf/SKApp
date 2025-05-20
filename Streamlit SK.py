@@ -500,7 +500,7 @@ metric_templates_tech = {
     ],
     "Striker": [
         "Passing Ratio", "Turnovers P90", "Dribbles P90", "Aerial Wins P90", "Padj Pressures P90",
-        "Counterpressures P90", "Op Xa P90", "Touches Inside Box P90", "Np Xg P90", "Goals P90",
+        "Counterpressures P90", "Op Xa P90", "Touches Inside Box P90", "Np Xg P90", "Npg P90",
         "Np Shots P90", "Np Xg Per Shot", "Shot On Target Ratio"
     ]
 }
@@ -531,7 +531,7 @@ metric_labels_tech = {
                   "PAdj Pressures", "Pressures in Opp. Half", "Shots & Key Passes", "Pressured Pass%"],
     "Midfielder (CM)": ["Passing%", "OP Passes", "Turnovers", "Deep Progressions", "Aerial Win%",
                  "PAdj Tackles And Interceptions", "PAdj Pressures", "Counterpressures in Opp. Half",
-                 "xG & xG Assisted", "Op Passes + Touches In Box", "Shots", "Scoring Contribution", "Pressured Pass%"],
+                 "xG & xG Assisted", "OP Passes + Touches In Box", "Shots", "Scoring Contribution", "Pressured Pass%"],
     "MID-DEF": ["Fouls", "Aerial Win%", "Aerial Wins", "PAdj Tackles", "PAdj Interceptions",
                 "Pressure Regains", "Pressures in Opp. Half", "Counterpressures",
                 "Counterpressures in Opp. Half", "PAdj Clearances", "Opp. Half Ball Recoveries"],
@@ -541,11 +541,11 @@ metric_labels_tech = {
     "Attacking Midfielder": ["Passing%", "OP Passes", "Turnovers", "Successful Dribbles", "Deep Progressions",
                              "PAdj Pressures", "Counterpressures in Opp. Half", "Throughballs", "OP xGAssisted",
                              "OP Passes + Touches In Box", "xG", "Scoring Contribution", "Pressured Pass%"],
-    "Winger": ["Passing%", "PAdj Pressures", "Counterpressures", "Key Passes", "Open Play xG Assisted",
+    "Winger": ["Passing%", "PAdj Pressures", "Counterpressures", "Key Passes", "OP xGAssisted",
                "Pass OBV", "Successful Dribbles", "Dribble & Carry OBV", "Fouls Won", "Shots",
                "Scoring Contribution", "OP Passes + Touches In Box", "Turnovers"],
     "Striker": ["Passing%", "Turnovers", "Successful Dribbles", "Aerial Wins", "PAdj Pressures",
-                "Counterpressures", "Open Play xG Assisted", "Touches Inside Box", "xG", "Goals",
+                "Counterpressures", "OP xGAssisted", "Touches Inside Box", "xG", "NP Goals",
                 "Shots", "xG/Shot", "Shooting%"]
 }
 
@@ -1659,24 +1659,111 @@ elif page == "xTechnical":
         display_df_tech = filtered_df_tech.drop(columns=["Unnamed: 0"], errors="ignore")
         st.dataframe(display_df_tech)
         
-        graph_columns_tech = [
-        "xTechnical Normalized (/100)", "xTech TECH Normalized (/100)", "xTech DEF Normalized (/100)",
-        "Goals P90", "Shots P90", "Shot On Target Ratio",
-        "Dribbles P90", "Npxgxa P90", "Turnovers P90",
-        "Conversion Ratio", "Aerial Wins P90", "Pressured Passing Ratio"
-        ]
-        
         st.write("---")
-        st.subheader("Paramètres du Graphe")
+        st.subheader("Paramètres du Graphe (per 90)")
+        
+        # Mapping noms internes → noms affichés
+        metric_display_map = {
+            # === Index ===
+            "xTechnical Normalized (/100)": "xTechnical Index",
+            "xTech TECH Normalized (/100)": "Sub-index TECH",
+            "xTech DEF Normalized (/100)": "Sub-index DEF",
 
+            # === Scoring ===
+            "Npg P90": "NP Goals",
+            "Op Assists P90": "OP Assists",
+            "Conversion Ratio": "Conversion %",
+            "Scoring Contribution": "Contribution G+A",
+
+            # === Shooting ===
+            "Shots P90": "Shots",
+            "Np Shots P90": "Shots",
+            "Shot On Target Ratio": "Shooting %",
+            "Np Xg P90": "NP xG",
+            "Np Xg Per Shot": "xG/Shot",
+
+            # === Passing / Creativity ===
+            "Npxgxa P90": "NPxG + xA",
+            "Op Xa P90": "OP xA",
+            "Op Key Passes P90": "OP Key Passes",
+            "Shots Key Passes P90": "Shots + Key Passes",
+            "Op Passes Into And Touches Inside Box P90": "OP Passes + Touches Into Box",
+            "Through Balls P90": "Throughballs",
+            "Crosses P90": "Crosses",
+            "Crossing Ratio": "Crossing %",
+            "Deep Progressions P90": "Deep Progressions",
+            "Deep Completions P90": "Deep Completions",
+            "Op Xgbuildup P90": "OP xG Buildup",
+            "Sp Key Passes P90": "Set Pieces Key Passes",
+            "Sp Xa P90": "Set Pieces xA",
+            
+            # === OBV ===
+            "Obv P90": "OBV", 
+            "Obv Pass P90": "OBV Pass", 
+            "Obv Shot P90": "OBV Shot", 
+            "Obv Defensive Action P90": "OBV Def. Act.", 
+            "Obv Dribble Carry P90": "OBV Dribble & Carry",
+
+            # === Possession / Ball use ===
+            "Op Passes P90": "OP Passes",
+            "Passing Ratio": "Passing %",
+            "Pressured Passing Ratio" : "Pressured Passing %",
+            "Pressured Passing Ratio": "Pressured Passing %",
+            "Long Balls P90": "Long Ball",
+            "Long Ball Ratio": "Long Ball %",
+            "Dribbles P90": "Dribbles Succ.",
+            "Dribble Ratio": "Dribble %",
+            "Carries P90": "Carries",
+            "Turnovers P90": "Turnovers",
+            "Dispossessions P90": "Dispossessions",
+
+            # === Defensive ===
+            "Padj Pressures P90": "PAdj Pressures",
+            "Counterpressures P90": "Counterpressures",
+            "Fhalf Pressures P90": "Pressures in Opp. Half",
+            "Pressure Regains P90": "Pressure Regains",
+            "Average X Pressure" : "Average Pressure Distance",
+            "Ball Recoveries P90": "Ball Recoveries",
+            "Fhalf Ball Recoveries P90": "Ball Recoveries in Opp. Half",
+            "Padj Interceptions P90": "PAdj Interceptions",
+            "Padj Tackles P90": "PAdj Tackles",
+            "Padj Tackles And Interceptions P90": "PAdj Tackles And Interceptions",
+            "Tackles And Interceptions P90": "Tackles And Interceptions",
+            "Challenge Ratio": "Challenge %",
+
+            # === Aerial / Blocks ===
+            "Aerial Wins P90": "Aerial Wins",
+            "Aerial Ratio": "Aerial Win %",
+            "Blocks Per Shot": "Blocks/Shot",
+            "Padj Clearances P90" : "PAdj Clearances",
+
+            # === Autres ===
+            "Errors P90": "Errors",
+            "Penalty Wins P90": "Penalty Won",
+            
+            # === GK ===
+            "Save Ratio": "Save % (GK)", 
+            "Xs Ratio": "Expected Save % (GK)", 
+            "Gsaa P90": "Goals Saved Above Average (GK)", 
+            "Clcaa": "Claims % (GK)", 
+            "Pass Into Danger Ratio": "Pass Into Danger % (GK)",
+            "Obv Gk P90": "OBV GK"
+        }
+
+        # Liste ordonnée des métriques à afficher dans les menus X/Y
+        metric_keys = list(metric_display_map.keys())
+
+        # Sélecteurs d'axes avec noms lisibles
         selected_xaxis_tech = st.selectbox(
             "Axe X",
-            options=graph_columns_tech,
+            options=metric_keys,
+            format_func=lambda x: metric_display_map.get(x, x),
             index=0
         )
         selected_yaxis_tech = st.selectbox(
             "Axe Y",
-            options=graph_columns_tech,
+            options=metric_keys,
+            format_func=lambda x: metric_display_map.get(x, x),
             index=1
         )
 
@@ -1786,6 +1873,87 @@ elif page == "xTechnical":
         )
 
         st.plotly_chart(fig, use_container_width=False)
+        
+        with st.expander("📘 Metric Definitions (xTechnical)", expanded=False):
+            st.markdown("""
+            ### 🔹 Index
+            - **xTechnical Index**: Global technical performance score (/100), normalized by Position Group.
+            - **Sub-index TECH**: Contribution to build-up, passing, creativity, and attack.
+            - **Sub-index DEF**: Contribution to defensive activity, pressure, recoveries.
+
+            ### 🎯 Scoring
+            - **NP Goals**: Goals scored (not including penalties).
+            - **OP Assists**: Number of assists from open play.
+            - **Conversion %**: Percentage of non-penalty shots a player takes that are converted into goals.
+            - **Contribution G+A**: Non-penalty goals and assists. A combined measure of the direct goal contribution of a player via goalscoring or goal assisting.
+
+            ### 🔫 Shooting
+            - **Shots**: Number of non-penalty shots a player takes.
+            - **Shooting %**: The percentage of total shots by a player that are on target (includes goals, saved, and cleared off line).
+            - **NP xG**: Cumulative expected goal value of all non-penalty shots.
+            - **xG/Shot**: Non-penalty expected goals per shot.
+
+            ### 🧠 Passing & Creativity
+            - **NPxG + xA**: Combined non-penalty xG and xA.
+            - **OP xA**: xG assisted from open play.
+            - **OP Key Passes**: Passes that create shots for teammates, just from open play.
+            - **Shots + Key Passes**: Non-penalty shots and key passes. A combined measure of a player's contribution to shots via shots themselves or the key pass prior to the shot.
+            - **OP Passes + Touches Into Box**: Successful passes into the box from outside the box (open play) + touches inside the box.
+            - **Throughballs**: A completed pass splitting the defence for a teammate to run onto.
+            - **Crosses / Crossing %**: Volume and success rate of crosses.
+            - **Deep Progressions**: Passes and dribbles/carries into the opposition final third.
+            - **Deep Completions**: Successful passes within 20 metres of the opposition goal.
+            - **OP xG Buildup**: A model that attributes the xG value of the final shot to all players involved in the entire possession. The buildup version omits xG and xG Assisted to focus on possession work prior to the end of the chain.
+            - **Set Pieces Key Passes / xA**: Key passes and xA generated from set pieces.
+
+            ### 📈 OBV Metrics
+            - **OBV**: On Ball Value Added (net) total (all event types).
+            - **OBV Pass**: On Ball Value Added (net) from Passes. 
+            - **OBV Shot**: On Ball Value Added (net) from Shots.
+            - **OBV Dribble & Carry**: On Ball Value Added (net) from Dribbles and Carries.
+            - **OBV Def. Act.**: On Ball Value Added (net) from Defensive Actions.
+
+            ### 🏃 Possession & Ball Use
+            - **OP Passes**: Number of attempted passes in open play.
+            - **Passing %**: Passing completion rate.
+            - **Pressured Passing %**: Proportion of pressured passes that were completed.
+            - **Long Balls / Long Ball %**: Long passes volume and success rate.
+            - **Dribbles Succ.**: How often a player successfully dribbles past an opponent.
+            - **Dribble %**: Percentage of dribbles that were successful.
+            - **Carries**: Number of ball carries (A player controls the ball at their feet while moving or standing still).
+            - **Turnovers / Dispossessions**: Ball losses by poor control or opponent tackle.
+
+            ### 🛡 Defensive Actions
+            - **PAdj Pressures**: Possession adjusted pressures.
+            - **Counterpressures**: Pressures exerted within 5 seconds of a turnover.
+            - **Pressures in Opp. Half**: How many pressures are exerted in the opposition (final) half of the pitch.
+            - **Pressure Regains**: Ball is regained within 5 seconds of a player pressuring an opponent.
+            - **Average Pressure Distance**: The average distance from the goal line that the player presses opponents with the ball. The scale here is the x-axis of the pitch, measured from 0-100.
+            - **Ball Recoveries / in Opp. Half**: How many ball recoveries the player made + made in the opposition (final) half of the pitch.
+            - **PAdj Interceptions**: Number of interceptions adjusted proportionally to the possession volume of a team.
+            - **PAdj Tackles**: Number of tackles adjusted proportionally to the possession volume of a team.
+            - **Tackles And Interceptions**: Combination of tackles and interceptions.
+            - **Challenge %**: Percentage of time a player makes a tackle when going into a duel vs getting dribbled past.
+
+            ### 🧱 Aerial / Blocking
+            - **Aerial Wins / Aerial Win %**: Success and volume of aerial duels.
+            - **Blocks/Shot**: Blocks per shot faced.
+            - **PAdj Clearances**: Number of clearances adjusted proportionally to the possession volume of a team.
+
+            ### ⚠️ Miscellaneous
+            - **Errors**: How many errors the player makes per 90. An error is an on the ball mistake that led to a shot.
+            - **Penalty Won**: Penalties won by the player.
+
+            ### 🧤 Goalkeeping (GK)
+            - **Save %**: Percentage of on-target shots that were saved by the goalkeeper.
+            - **Expected Save %**: Given the post-shot xG (modelled from on frame location) of shots faced by the goalkeeper what % would we expect them to save?.
+            - **Goals Saved Above Average**: How many goals did the keeper save/concede versus expectation (post-shot xG faced)? This is representative of how many goals the goalkeeper's saves prevented wthin a season.
+            - **Claims % (CLCAA)**: Claims or CCAA% (Claimable Collection Attempts over Average), is a measure of how likely the goalkeeper is to attempt to claim a "claimable" pass, versus the average goalkeeper attempted claim rate.
+            - **Pass Into Danger %**: Percentage of passes made where the recipient was deemed to be under pressure or was next engaged with a defensive action.
+            - **OBV GK**: On Ball Value Added (net) Goalkeeper.
+
+            _All values are per 90 minutes unless otherwise specified._
+            """)
         
     # === Onglet Radar ===
     with tab2:
@@ -2040,6 +2208,79 @@ elif page == "xTechnical":
         )
 
         st.plotly_chart(fig, use_container_width=True)
+        
+        # 📘 Metric Definitions: integrated into Radar tab
+        definitions_rich = {
+            "Passing%": "Passing completion rate.",
+            "OP Passes": "Number of attempted passes in open play.",
+            "Long Ball%": "Accuracy of long balls attempted.",
+            "Long Balls": "Number of completed long balls",
+            "Being Press. Change in Pass Length": "Change in average pass length when under pressure.",
+            "Claims - CCAA%": "Claims or CCAA% (Claimable Collection Attempts over Average), is a measure of how likely the goalkeeper is to attempt to claim a \"claimable\" pass, versus the average goalkeeper attempted claim rate.",
+            "GK Aggressive Distance": "Average distance from goal when goalkeeper performs defensive actions outside the box.",
+            "Goals Saved Above Average": "How many goals the keeper saved/conceded versus expectation (post-shot xG faced).",
+            "Save%": "Percentage of on-target shots saved by the goalkeeper.",
+            "On Target Shots Faced": "Number of on-target shots faced by the goalkeeper.",
+            "Pass into Danger%": "Percentage of passes made where the recipient was deemed under pressure or was next engaged with a defensive action.",
+            "Pressured Pass%": "Proportion of pressured passes that were completed.",
+            "Aerial Win%": "Percentage of aerial duels won.",
+            "Aerial Wins": "Number of aerial duels won.",
+            "PAdj Tackles And Interceptions": "Number of tackles and interceptions adjusted proportionally to the possession volume of a team.",
+            "Pressure Regains": "Ball is regained within 5 seconds of a player pressuring an opponent.",
+            "Defensive Action Regains": "Times a player’s team won the ball back within 5 seconds of the player making a defensive action against an opponent.",
+            "Pass OBV": "On Ball Value Added (net) from Passes.",
+            "Dribble & Carry OBV": "On Ball Value Added (net) from Dribbles and Carries.",
+            "Fouls": "Number of fouls committed per 90 minutes.",
+            "Opp. Half Ball Recoveries": "How many ball recoveries the player made in the opposition (final) half of the pitch.",
+            "Average Pressure Distance": "The average distance from the goal line that the player presses opponents with the ball. The scale here is the x-axis of the pitch, measured from 0-100.",
+            "Tack/Dribbled Past %": "Success rate in duels (tackles vs times dribbled past).",
+            "PAdj Pressures": "Possession adjusted pressures.",
+            "PAdj Interceptions": "Interceptions adjusted for possession volume.",
+            "PAdj Clearances": "Clearances adjusted for possession volume.",
+            "Blocks/Shot": "Blocks made per shot faced.",
+            "Errors": "On-the-ball mistakes that lead to a shot.",
+            "Dispossessed": "Times dispossessed by opponent intervention.",
+            "Turnovers": "Number of possessions lost through miscontrol or errant passing.",
+            "Shots": "Number of non-penalty shots a player takes.",
+            "Carries": "Number of ball carries (player controls the ball at feet while moving or standing still).",
+            "Deep Progressions": "Passes and dribbles/carries into the opposition final third.",
+            "Successful Crosses": "Number of crosses completed to a teammate.",
+            "Crossing %": "Success rate of crosses completed.",
+            "Counterpressures in Opp. Half": "Counterpressures applied in the opponent’s half.",
+            "Pressures in Opp. Half": "Pressures exerted in the opposition half of the pitch.",
+            "PAdj Tackles": "Tackles adjusted for possession volume.",
+            "Successful Dribbles": "Dribbles that successfully beat an opponent.",
+            "Touches In Box": "Number of touches inside the opposition box.",
+            "Passes Inside Box": "Number of passes played into the opposition box.",
+            "Shots & Key Passes": "Total of shots taken and key passes made.",
+            "xG & xG Assisted": "Combined value of xG and xA from all actions.",
+            "Counterpressures": "Immediate pressure applied after possession loss.",
+            "Throughballs": "A completed pass splitting the defence for a teammate to run onto.",
+            "xG": "Cumulative expected goal value of all shots taken.",
+            "Key Passes": "Passes that create shots for teammates.",
+            "Fouls Won": "Number of fouls drawn per 90 minutes.",
+            "xG/Shot": "Average xG per shot.",
+            "Shooting%": "The percentage of total shots that are on target.",
+            "NP Goals": "Goals scored (not including penalties).",
+            "Average Def. Action Distance": "The average distance from the goal line that the player successfully makes a defensive action. The scale is the x-axis of the pitch, measured from 0-100.",
+            "Padj Tackles And Interceptions": "Tackles + Interceptions per 90 (possession adjusted).",
+            "OP Passes + Touches In Box": "Successful passes into the box from outside the box (open play) + touches inside the box.",
+            "OP xGAssisted": "xG assisted from open play.",
+            "xGBuildup": "xG buildup value of a player’s involvement in possession sequences, excluding their own xG and xA.",
+            "Scoring Contribution": "Non-penalty goals and assists. A combined measure of the direct goal contribution of a player via goalscoring or goal assisting.",
+            "Touches Inside Box": "Number of touches inside the opposition box.",
+            "Open Play xG Assisted": "Expected assists from open play passes.",
+            "Tack/Dribbled Past%": "Percentage of time a player makes a tackle when going into a duel vs getting dribbled past."
+        }
+
+        # 📘 Dynamic display below radar
+        with st.expander("📘 Metric Definitions (shown on this radar only)", expanded=False):
+            st.markdown("Only the metrics shown on the selected radar are explained below.\n")
+            for label in metric_labels_tech[selected_template]:
+                explanation = definitions_rich.get(label, "❓ Definition not available.")
+                st.markdown(f"- **{label}**: {explanation}")
+
+
         
     # === Onglet Index ===
     with tab3:
