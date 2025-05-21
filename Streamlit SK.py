@@ -571,7 +571,7 @@ page = st.sidebar.radio(
 if page == "xPhysical":
     
     # Création des sous-onglets
-    tab1, tab2, tab3 = st.tabs(["Scatter Plot", "Radar", "Index"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Scatter Plot", "Radar", "Index", "Top 50"])
     
     # --- Onglet Scatter Plot ---
     with tab1:
@@ -1553,11 +1553,76 @@ if page == "xPhysical":
                               .style.set_properties(**{"text-align":"center"})
         st.dataframe(display_df)  
     
+    # --- Onglet Top 50 xPhysical ---
+    with tab4:
+        st.subheader("🏃‍♂️ Top 50 - xPhysical Index")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            selected_competition = st.selectbox(
+                "Compétition",
+                competition_list,
+                index=competition_list.index("ITA - Serie A") if "ITA - Serie A" in competition_list else 0,
+                key="top50_xphy_comp"
+            )
+
+        with col2:
+            available_seasons = df[df["Competition"] == selected_competition]["Season"].dropna().unique().tolist()
+            available_seasons = sorted(available_seasons)
+            default_season = "2024/2025" if "2024/2025" in available_seasons else available_seasons[-1]
+            selected_season = st.selectbox(
+                "Saison",
+                available_seasons,
+                index=available_seasons.index(default_season),
+                key="top50_xphy_season"
+            )
+
+        selected_position = st.selectbox(
+            "Poste",
+            position_list,
+            index=position_list.index("Striker") if "Striker" in position_list else 0,
+            key="top50_xphy_pos"
+        )
+
+        # Filtrage
+        filtered_top = df[
+            (df["Competition"] == selected_competition) &
+            (df["Season"] == selected_season) &
+            (df["Position Group"] == selected_position)
+        ].copy()
+
+        top_50 = filtered_top.sort_values(by="xPhysical", ascending=False).head(50).reset_index(drop=True)
+
+        # Construction manuelle des rows
+        rows = []
+        for i, row in top_50.iterrows():
+            rows.append({
+                "Rank":      i + 1,
+                "Joueur":    row["Short Name"],
+                "Équipe":    row["Team"],
+                "Âge":       int(row["Age"]),
+                "xPhysical": int(round(row["xPhysical"]))
+            })
+
+        display_df = pd.DataFrame(rows).set_index("Rank")
+
+        # Mise en forme : Rank centré (en tant qu’index), le reste aligné selon logique demandée
+        styled_df = display_df.style\
+            .set_properties(subset=["Joueur", "Équipe", "Âge", "xPhysical"], **{"text-align": "left"})\
+            .set_table_styles([
+                {"selector": "th", "props": [("text-align", "center")]},              # en-têtes colonnes
+                {"selector": ".row_heading", "props": [("text-align", "center")]},   # valeurs d'index (Rank)
+                {"selector": ".blank", "props": [("display", "none")]}               # coin vide
+            ])
+
+        st.dataframe(styled_df, use_container_width=True)
+
+    
 # ============================================= VOLET xTechnical ========================================================
 elif page == "xTechnical":
     
     # Création des sous-onglets pour xTechnical
-    tab1, tab2, tab3 = st.tabs(["Scatter Plot", "Radar", "Index"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Scatter Plot", "Radar", "Index", "Top 50"])
 
     # === Onglet Scatter Plot ===
     with tab1:
@@ -2488,3 +2553,88 @@ elif page == "xTechnical":
         detail_df = detail_df.drop_duplicates(subset=["Métrique"], keep="first")
         st.markdown("### Détail de l’index xTechnical")
         st.dataframe(detail_df.set_index("Métrique"), use_container_width=True)
+    
+    # --- Onglet Top 50 xTechnical ---
+    with tab4:
+        st.subheader("🎯 Top 50 - xTechnical Index")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            selected_comp = st.selectbox(
+                "Compétition",
+                competition_list_tech,
+                index=competition_list_tech.index("Serie A") if "Serie A" in competition_list_tech else 0,
+                key="top50_xtech_comp"
+            )
+
+        with col2:
+            available_seasons = df_tech[df_tech["Competition Name"] == selected_comp]["Season Name"].dropna().unique().tolist()
+            available_seasons = sorted(available_seasons)
+            default_season = "2024/2025" if "2024/2025" in available_seasons else available_seasons[-1]
+            selected_season = st.selectbox(
+                "Saison",
+                available_seasons,
+                index=available_seasons.index(default_season),
+                key="top50_xtech_season"
+            )
+
+        # === POSTE
+        selected_pos = st.selectbox(
+            "Poste",
+            position_list_tech,
+            index=position_list_tech.index("Striker") if "Striker" in position_list_tech else 0,
+            key="top50_xtech_pos"
+        )
+
+        # === SLIDER MINUTES
+        min_minutes = st.slider(
+            "Minutes jouées minimales",
+            0,
+            int(df_tech["Minutes"].max()),
+            600,
+            50,
+            key="top50_xtech_min"
+        )
+
+        # === INDEX A AFFICHER
+        index_options = [
+            "xTechnical Normalized (/100)",
+            "xTech TECH Normalized (/100)",
+            "xTech DEF Normalized (/100)"
+        ]
+        selected_index = st.selectbox("Index à afficher", index_options, key="top50_xtech_index")
+
+        # === FILTRAGE
+        filtered_top = df_tech[
+            (df_tech["Competition Name"] == selected_comp) &
+            (df_tech["Season Name"] == selected_season) &
+            (df_tech["Position Group"] == selected_pos) &
+            (df_tech["Minutes"] >= min_minutes)
+        ].copy()
+
+        top_50 = filtered_top.sort_values(by=selected_index, ascending=False).head(50).reset_index(drop=True)
+
+        # === CONSTRUCTION TABLEAU
+        rows = []
+        for i, row in top_50.iterrows():
+            rows.append({
+                "Rank":      i + 1,
+                "Joueur":    row["Player Name"],
+                "Équipe":    row["Team Name"],
+                "Minutes":   int(round(row["Minutes"])),
+                "Âge":       int(row["Age"]),
+                selected_index: int(round(row[selected_index]))
+            })
+
+        display_df = pd.DataFrame(rows).set_index("Rank")
+
+        styled_df = display_df.style.set_properties(**{
+            "text-align": "center"
+        }).set_table_styles([
+            {"selector": "th", "props": [("text-align", "center")]},
+            {"selector": ".row_heading", "props": [("text-align", "center")]},
+            {"selector": ".blank", "props": [("display", "none")]}
+        ])
+
+        st.dataframe(styled_df, use_container_width=True)
