@@ -12,6 +12,7 @@ import random
 import re
 import plotly.graph_objects as go
 
+st.set_page_config(layout="wide")
 # In[2]:
 
 # Helper pour raccourcir uniquement les saisons "YYYY/YYYY" -> "YY/YY"
@@ -25,8 +26,8 @@ def shorten_season(s):
     return s
 
 
-# Chargement du fichier
-file_path = "SK_All.csv"
+# Chargement du fichier xPhysical
+file_path = '/Users/favie/Statsbomb/A- Code à tourner/SK_All.csv'
 
 df = pd.read_csv(file_path, sep=",")
 
@@ -40,8 +41,7 @@ competition_list = sorted(df["Competition"].dropna().unique().tolist())
 player_list = sorted(df["Short Name"].dropna().unique().tolist())
 
 # Chargement du fichier xTechnical
-df_tech1 = "SB_Top5.csv"
-df_tech = pd.read_csv(df_tech1, sep=",")
+df_tech = pd.read_csv("/Users/favie/Statsbomb/A- Code à tourner/SB_Top5.csv", sep=",")
 df_tech.columns = df_tech.columns.str.strip()
 df_tech["season_short"] = df_tech["Season Name"].apply(shorten_season)
 # Affichage combiné : Known Name (Full Name)
@@ -53,124 +53,108 @@ df_tech["Display Name"] = df_tech.apply(
 )
 
 classic_gk_metric_map = {
-    "Save Ratio": ("xTech GK Save %", [0, 1, 3, 5, 7]),
-    "Gsaa Ratio": ("xTech GK GSAA %", [0, 3, 5, 10, 13]),
-    "Clcaa": ("xTech GK CLCAA", [0, 1, 3, 5, 7]),
-    "Op Xgbuildup Per Possession": ("xTech GK OPxGBuildup", [0, 1, 2, 3, 4]),
-    "Long Ball Ratio": ("xTech GK Long Ball %", [0, 1, 3, 5, 7]),
+    "Gsaa Ratio": ("xTech GK GSAA %", [0, 5, 7, 12, 15]),
+    "Save Ratio": ("xTech GK Save %", [0, 1, 2, 3, 4]),
+    "Da Aggressive Distance": ("xTech GK Aggressive Distance", [0, 1, 2, 3, 4]),
+    "Long Ball Ratio": ("xTech GK Long Ball %", [0, 1, 2, 3, 4]),
+    "Op Xgbuildup P90": ("xTech GK OPxGBuildup", [0, 1, 2, 3, 4]),
     "Pressured Passing Ratio": ("xTech GK Passing u. Pressure %", [0, 1, 2, 3, 4]),
+    "Passing Ratio": ("xTech GK Passing %", [0, 1, 2, 3, 4]),
     "Pass Into Danger Ratio": ("xTech GK Pass Into Danger %", [7, 5, 3, 1, 0])
 }
 
 classic_cb_metric_map = {
-    "Obv Dribble Carry P90": ("xTech CB OBV D&C", [0, 1, 2, 3, 5]),
-    "Carries P90": ("xTech CB Carries", [0, 1, 2, 3, 5]),
-    "Np Shots P90": ("xTech CB Shot", [0, 1, 2, 3, 4]),
-    "Pressure Regains P90": ("xTech CB Pressure Regains", [0, 1, 2, 3, 4]),
-    "Tackles And Interceptions P90": ("xTech CB T&I", [0, 1, 2, 3, 4]),
-    "Aerial Ratio": ("xTech CB Aerial %", [0, 3, 5, 7, 10]),
-    "Blocks Per Shot": ("xTech CB Blocks/Shot", [0, 3, 5, 7, 10]),
+    "Obv Dribble Carry P90": ("xTech CB OBV D&C", [0, 1, 2, 3, 4]),
+    "Long Ball Ratio": ("xTech CB Long Ball %", [0, 1, 2, 3, 4]),
+    "Pressured Passing Ratio": ("xTech CB Passing u. Pressure %", [0, 1, 2, 3, 5]),
+    "Obv Pass P90": ("xTech CB OBV Pass", [0, 1, 3, 5, 7]),
+    "Passing Ratio": ("xTech CB Passing %", [0, 1, 2, 3, 5]),
+    "Deep Progressions P90": ("xTech CB Deep Prog", [0, 1, 2, 3, 5]),
+    "Blocks Per Shot": ("xTech CB Blocks/Shot", [0, 1, 3, 5, 7]),
     "Challenge Ratio": ("xTech CB Challenge %", [0, 1, 3, 5, 7]),
-    "Long Ball Ratio": ("xTech CB Long Ball %", [0, 3, 5, 7, 10]),
-    "Pressured Passing Ratio": ("xTech CB Passing u. Pressure %", [0, 1, 3, 5, 7]),
-    "Obv Pass P90": ("xTech CB OBV Pass", [0, 1, 2, 3, 5]),
-    "Passing Ratio": ("xTech CB Passing %", [0, 1, 3, 5, 7])
+    "Average X Pressure": ("xTech CB Avg X Pressure", [0, 1, 2, 3, 5]),
+    "Padj Tackles P90": ("xTech CB Padj Tackles", [0, 1, 2, 3, 4]),
+    "Hops": ("xTech CB HOPS", [0, 5, 7, 10, 12]),
 }
 
 classic_fb_metric_map = {
-    "Op Xgbuildup Per Possession": ("xTech FB OPxGBuildup", [0, 1, 2, 3, 4]),
-    "Carries P90": ("xTech FB Carries", [0, 3, 5, 7, 10]),
-    "Npxgxa P90": ("xTech FB NPxG+xA", [0, 1, 3, 5, 7]),
+    "Np Shots P90": ("xTech FB Np Shots", [0, 1, 2, 3, 5]),
+    "Op Xa P90": ("xTech FB OPxA", [0, 1, 3, 5, 7]),
+    "Crossing Ratio": ("xTech FB Crossing %", [0, 1, 2, 3, 4]),
+    "Crosses P90": ("xTech FB Crosses", [0, 1, 2, 3, 5]),
+    "Op Passes Into And Touches Inside Box P90": ("xTech FB OP Box Touch", [0, 1, 3, 5, 7]),
+    "Perte Balle/Passe Ratio": ("xTech FB Ball Loss %", [0, 1, 2, 3, 4]),
     "Scoring Contribution": ("xTech FB G+A", [0, 1, 2, 3, 4]),
+    "Op Xgbuildup Per Possession": ("xTech FB OPxGBuildup", [0, 1, 2, 3, 4]),
     "Padj Pressures P90": ("xTech FB Padj Pressures", [0, 1, 3, 5, 7]),
-    "Tackles And Interceptions P90": ("xTech FB T&I", [0, 1, 2, 3, 4]),
-    "Counterpressures P90": ("xTech FB Counterpressures", [0, 1, 2, 3, 4]),
-    "Average X Defensive Action": ("xTech FB Avg XDA", [0, 1, 2, 3, 4]),
-    "Aerial Ratio": ("xTech FB Aerial %", [0, 1, 2, 3, 4]),
-    "Challenge Ratio": ("xTech FB Challenge %", [0, 1, 3, 5, 7]),
-    "Pressured Passing Ratio": ("xTech FB Passing u. Pressure %", [0, 1, 3, 5, 7]),
-    "Passing Ratio": ("xTech FB Passing %", [0, 1, 3, 5, 7]),
-    "Crosses P90": ("xTech FB Crosses", [0, 1, 2, 3, 4]),
-    "Key Passes P90": ("xTech FB Key Passes", [0, 1, 3, 5, 7])
+    "Fhalf Pressures P90": ("xTech FB FHalf Pressures", [0, 1, 2, 3, 4]),
+    "Fhalf Counterpressures P90": ("xTech FB FHalf Counterpressures", [0, 1, 2, 3, 4]),
+    "Padj Tackles And Interceptions P90": ("xTech FB Padj T&I", [0, 1, 2, 3, 5]),
+    "Challenge Ratio": ("xTech FB Challenge %", [0, 1, 2, 3, 5]),
+    "Hops": ("xTech FB HOPS", [0, 1, 2, 3, 5])
 }
 
 classic_mid_metric_map = {
-    "Op Xgbuildup Per Possession": ("xTech MID OPxGBuildup", [0, 1, 3, 5, 7]),
-    "Carries P90": ("xTech MID Carries", [0, 1, 3, 5, 7]),
-    "Npxgxa P90": ("xTech MID NPxG+xA", [0, 1, 3, 5, 7]),
-    "Scoring Contribution": ("xTech MID G+A", [0, 1, 3, 5, 7]),
-    "Deep Progressions P90": ("xTech MID Deep Progressions", [0, 1, 2, 3, 4]),
-    "Padj Pressures P90": ("xTech MID Padj Pressures", [0, 1, 3, 5, 7]),
-    "Counterpressures P90": ("xTech MID Counterpressures", [0, 1, 2, 3, 4]),
-    "Ball Recoveries P90": ("xTech MID Recoveries", [0, 1, 2, 3, 4]),
-    "Average X Pressure": ("xTech MID Avg Pressure", [0, 1, 2, 3, 4]),
-    "Fhalf Ball Recoveries P90": ("xTech MID FH Recoveries", [0, 1, 2, 3, 4]),
-    "Perte Balle/Passe Ratio": ("xTech MID Lost/Pass %", [0, 1, 2, 3, 4]),
-    "Aerial Ratio": ("xTech MID Aerial %", [0, 1, 3, 5, 7]),
-    "Challenge Ratio": ("xTech MID Challenge %", [0, 1, 2, 3, 4]),
-    "Dribbles P90": ("xTech MID Dribbles", [0, 1, 2, 3, 4]),
-    "Pressured Passing Ratio": ("xTech MID Passing u. Pressure %", [0, 1, 3, 5, 7]),
-    "Passing Ratio": ("xTech MID Passing %", [0, 1, 5, 7, 10]),
-    "Key Passes P90": ("xTech MID Key Passes", [0, 1, 2, 3, 4]),
-    "Op Passes P90": ("xTech MID Op Passes", [0, 1, 2, 3, 4])
+    "Np Shots P90": ("xTech MID Np Shots", [0, 1, 2, 3, 4]),
+    "Npxgxa P90": ("xTech MID Npxgxa", [0, 1, 2, 3, 4]),
+    "Obv Pass P90": ("xTech MID Obv Pass", [0, 1, 3, 5, 7]),
+    "Obv Dribble Carry P90": ("xTech MID Obv Carry", [0, 1, 3, 5, 7]),
+    "Op Passes Into And Touches Inside Box P90": ("xTech MID Box Pass+Touch", [0, 1, 2, 3, 5]),
+    "Perte Balle/Passe Ratio": ("xTech MID Ball Loss %", [0, 1, 2, 3, 4]),
+    "Scoring Contribution": ("xTech MID G+A", [0, 1, 2, 3, 5]),
+    "Op Xgbuildup Per Possession": ("xTech MID OPxGBuildup", [0, 1, 2, 3, 4]),
+    "Passing Ratio": ("xTech MID Passing %", [0, 1, 3, 5, 7]),
+    "Pressured Passing Ratio": ("xTech MID Pressured Passing %", [0, 1, 3, 5, 7]),
+    "Fhalf Ball Recoveries P90": ("xTech MID Opp. Ball Recov.", [0, 1, 2, 3, 5]),
+    "Pressure Regains P90": ("xTech MID Pressure Regains", [0, 1, 3, 5, 7]),
+    "Counterpressure Regains P90": ("xTech MID CPR", [0, 1, 2, 3, 5]),
+    "Padj Tackles And Interceptions P90": ("xTech MID T&I", [0, 3, 5, 7, 10]),
+    "Challenge Ratio": ("xTech MID Challenge %", [0, 1, 2, 3, 5]),
+    "Hops": ("xTech MID HOPS", [0, 1, 2, 3, 5])
 }
 
 classic_am_metric_map = {
-    "Op Xgbuildup Per Possession": ("xTech AM OPxGBuildup", [0, 1, 2, 3, 4]),
-    "Carries P90": ("xTech AM Carries", [0, 1, 3, 5, 7]),
-    "Npxgxa P90": ("xTech AM NPxG+xA", [0, 3, 5, 7, 10]),
-    "Scoring Contribution": ("xTech AM G+A", [0, 3, 5, 7, 10]),
-    "Deep Progressions P90": ("xTech AM Deep Progressions", [0, 1, 3, 5, 7]),
-    "Np Shots P90": ("xTech AM Np Shots", [0, 1, 3, 5, 7]),
-    "Dribbles P90": ("xTech AM Dribbles", [0, 1, 3, 5, 7]),
-    "Dribble Ratio": ("xTech AM Dribble Ratio", [0, 1, 2, 3, 4]),
-    "Pressured Passing Ratio": ("xTech AM Passing u. Pressure %", [0, 1, 3, 5, 7]),
-    "Op Passes Into And Touches Inside Box P90": ("xTech AM Passes Into Box", [0, 1, 3, 5, 7]),
+    "Passes Into Box P90": ("xTech AM Passes Into Box", [0, 1, 3, 4, 5]),
+    "Touches Inside Box P90": ("xTech AM Touches In Box", [0, 1, 2, 3, 4]),
+    "Dribbles P90": ("xTech AM Dribbles", [0, 1, 3, 4, 5]),
+    "Op Xa P90": ("xTech AM xA", [0, 3, 5, 7, 10]),
+    "Np Shots P90": ("xTech AM Shots", [0, 3, 5, 7, 10]),
+    "Obv Pass P90": ("xTech AM OBV Pass", [0, 3, 5, 7, 10]),
+    "Obv Dribble Carry P90": ("xTech AM OBV Carry", [0, 1, 3, 5, 7]),
+    "Perte Balle/Passe Ratio": ("xTech AM Ball Loss %", [0, 1, 2, 3, 4]),
+    "Scoring Contribution": ("xTech AM G+A", [0, 1, 3, 4, 5]),
     "Through Balls P90": ("xTech AM Through Balls", [0, 1, 2, 3, 4]),
-    "Padj Pressures P90": ("xTech AM Padj Pressures", [0, 1, 3, 5, 7]),
-    "Counterpressures P90": ("xTech AM Counterpressures", [0, 1, 2, 3, 4]),
-    "Ball Recoveries P90": ("xTech AM Recoveries", [0, 1, 2, 3, 4]),
-    "Average X Pressure": ("xTech AM Avg Pressure", [0, 1, 2, 3, 4]),
-    "Padj Interceptions P90": ("xTech AM Interceptions", [0, 1, 2, 3, 4]),
-    "Pressure Regains P90": ("xTech AM Pressure Regains", [0, 1, 3, 5, 7]),
-    "Challenge Ratio": ("xTech AM Challenge %", [0, 1, 3, 5, 7])
+    "Fhalf Pressures P90": ("xTech AM FH Pressures", [0, 3, 5, 7, 10]),
+    "Counterpressures P90": ("xTech AM Counterpressures", [0, 3, 5, 7, 10])
 }
 
 classic_wing_metric_map = {
-    "Op Xgbuildup Per Possession": ("xTech WING OPxGBuildup", [0, 1, 2, 3, 4]),
-    "Npxgxa P90": ("xTech WING NPxG+xA", [0, 1, 3, 5, 7]),
-    "Scoring Contribution": ("xTech WING G+A", [0, 3, 5, 7, 10]),
-    "Dribbles P90": ("xTech WING Dribbles", [0, 1, 2, 3, 4]),
+    "Touches Inside Box P90": ("xTech WING Touches In Box", [0, 1, 3, 4, 5]),
     "Dribble Ratio": ("xTech WING Dribble Ratio", [0, 1, 2, 3, 4]),
-    "Pressured Passing Ratio": ("xTech WING Passing u. Pressure %", [0, 1, 3, 5, 7]),
-    "Passing Ratio": ("xTech WING Passing %", [0, 1, 3, 5, 7]),
-    "Op Passes Into And Touches Inside Box P90": ("xTech WING Into Box", [0, 1, 3, 5, 7]),
-    "Crossing Ratio": ("xTech WING Crossing %", [0, 1, 2, 3, 4]),
-    "Padj Pressures P90": ("xTech WING Padj Pressures", [0, 1, 3, 5, 7]),
-    "Counterpressures P90": ("xTech WING Counterpressures", [0, 1, 2, 3, 4]),
-    "Ball Recoveries P90": ("xTech WING Recoveries", [0, 1, 2, 3, 4]),
-    "Average X Pressure": ("xTech WING Avg Pressure", [0, 1, 2, 3, 4]),
-    "Padj Interceptions P90": ("xTech WING Interceptions", [0, 1, 2, 3, 4]),
-    "Pressure Regains P90": ("xTech WING Pressure Regains", [0, 1, 3, 5, 7]),
-    "Challenge Ratio": ("xTech WING Challenge %", [0, 1, 3, 5, 7])
+    "Dribbles P90": ("xTech WING Dribbles", [0, 3, 5, 7, 10]),
+    "Op Xa P90": ("xTech WING OPxA", [0, 3, 5, 7, 10]),
+    "Np Shots P90": ("xTech WING Np Shots", [0, 3, 5, 7, 10]),
+    "Obv Dribble Carry P90": ("xTech WING OBV Carry", [0, 5, 7, 10, 12]),
+    "Scoring Contribution": ("xTech WING G+A", [0, 1, 3, 4, 5]),
+    "Crosses P90": ("xTech WING Crosses", [0, 1, 2, 3, 4]),
+    "Shot On Target Ratio": ("xTech WING SOT Ratio", [0, 1, 2, 3, 4]),
+    "Fouls Won P90": ("xTech WING Fouls Won", [0, 1, 3, 4, 5]),
+    "Fhalf Pressures P90": ("xTech WING FHalf Pressures", [0, 3, 5, 7, 10]),
+    "Counterpressures P90": ("xTech WING Counterpressures", [0, 3, 5, 7, 10])
 }
 
 classic_st_metric_map = {
-    "Npxgxa P90": ("xTech ST NPxG+xA", [0, 1, 3, 5, 7]),
-    "Conversion Ratio": ("xTech ST Conv. %", [0, 1, 3, 5, 7]),
-    "Goals P90": ("xTech ST Goals", [0, 3, 6, 9, 12]),
-    "Shot On Target Ratio": ("xTech ST SoT %", [0, 1, 3, 5, 7]),
-    "Aerial Wins P90": ("xTech ST Aerial Wins", [0, 1, 2, 3, 4]),
-    "Dribbles P90": ("xTech ST Dribbles", [0, 1, 2, 3, 4]),
-    "Pressured Passing Ratio": ("xTech ST Passing u. Pressure %", [0, 1, 3, 5, 7]),
-    "Op Passes Into And Touches Inside Box P90": ("xTech ST Into Box", [0, 1, 3, 5, 7]),
-    "Assists P90": ("xTech ST Assists", [0, 1, 2, 3, 4]),
-    "Pressures P90": ("xTech ST Pressures", [0, 1, 3, 5, 7]),
-    "Counterpressures P90": ("xTech ST Counterpressures", [0, 1, 2, 3, 4]),
-    "Ball Recoveries P90": ("xTech ST Recoveries", [0, 1, 2, 3, 4]),
-    "Average X Pressure": ("xTech ST Avg Pressure", [0, 1, 2, 3, 4]),
-    "Padj Interceptions P90": ("xTech ST Interceptions", [0, 1, 2, 3, 4]),
-    "Pressure Regains P90": ("xTech ST Pressure Regains", [0, 1, 3, 5, 7])
+    "Np Xg P90": ("xTech ST Np Xg", [0, 5, 7, 10, 12]),
+    "Np Shots P90": ("xTech ST Np Shots", [0, 1, 3, 5, 7]),
+    "Touches Inside Box P90": ("xTech ST Touches In Box", [0, 3, 5, 7, 10]),
+    "Op Xa P90": ("xTech ST Op Xa", [0, 1, 2, 3, 4]),
+    "Perte Balle/Passe Ratio": ("xTech ST Ball Loss %", [0, 1, 3, 4, 5]),
+    "Np Xg Per Shot": ("xTech ST Xg Per Shot", [0, 1, 3, 4, 5]),
+    "Scoring Contribution": ("xTech ST G+A", [0, 1, 3, 5, 7]),
+    "PSxG - xG": ("xTech ST PSxG Diff", [0, 1, 2, 3, 4]),
+    "Shot On Target Ratio": ("xTech ST SoT %", [0, 1, 2, 3, 4]),
+    "Fhalf Pressures P90": ("xTech ST Fhalf Pressures", [0, 3, 5, 7, 10]),
+    "Counterpressures P90": ("xTech ST Counterpressures", [0, 3, 5, 7, 10])
 }
 
 xtech_columns_map = {
@@ -194,6 +178,7 @@ xtech_prefix_map = {
 }
 
 xtech_tech_columns_map = {
+    'Goalkeeper': 'xTech GK Usage (/100)',
     'Central Defender': 'xTech CB TECH (/100)',
     'Full Back': 'xTech FB TECH (/100)',
     'Midfielder': 'xTech MID TECH (/100)',
@@ -203,6 +188,7 @@ xtech_tech_columns_map = {
 }
 
 xtech_def_columns_map = {
+    'Goalkeeper': 'xTech GK Save (/100)',
     'Central Defender': 'xTech CB DEF (/100)',
     'Full Back': 'xTech FB DEF (/100)',
     'Midfielder': 'xTech MID DEF (/100)',
@@ -215,97 +201,93 @@ xtech_post_config = {
     "Midfielder": {
         "metric_map": classic_mid_metric_map,
         "def": [
-            "Padj Pressures P90", "Counterpressures P90", "Ball Recoveries P90",
-            "Average X Pressure", "Fhalf Ball Recoveries P90",
-            "Aerial Ratio", "Challenge Ratio"
+            "Fhalf Ball Recoveries P90",
+            "Pressure Regains P90",
+            "Counterpressure Regains P90",
+            "Padj Tackles And Interceptions P90",
+            "Challenge Ratio",
+            "Hops"
         ],
         "tech": [
-            "Op Xgbuildup Per Possession", "Carries P90", "Npxgxa P90", "Scoring Contribution",
-            "Deep Progressions P90", "Dribbles P90", "Pressured Passing Ratio",
-            "Passing Ratio", "Perte Balle/Passe Ratio", "Key Passes P90", "Op Passes P90"
+            "Np Shots P90",
+            "Npxgxa P90",
+            "Obv Pass P90",
+            "Obv Dribble Carry P90",
+            "Op Passes Into And Touches Inside Box P90",
+            "Perte Balle/Passe Ratio",
+            "Scoring Contribution",
+            "Op Xgbuildup Per Possession",
+            "Passing Ratio",
+            "Pressured Passing Ratio"
         ],
         "labels": {
-            "Padj Pressures P90": "PAdj Pressures",
-            "Counterpressures P90": "Counterpressures",
-            "Ball Recoveries P90": "Ball Recoveries",
-            "Average X Pressure": "Avg Pressure Distance",
             "Fhalf Ball Recoveries P90": "Opp. Half Recoveries",
-            "Perte Balle/Passe Ratio": "Turnover/Passes",
-            "Aerial Ratio": "Aerial Win %",
+            "Pressure Regains P90": "Pressure Regains",
+            "Counterpressure Regains P90": "Counterpressure Regains",
+            "Padj Tackles And Interceptions P90": "PAdj Tackles & Interceptions",
+            "Counterpressures P90": "Counterpressures",
             "Challenge Ratio": "Tack./Dribbled Past %",
-            "Op Xgbuildup Per Possession": "xGBuildup",
-            "Carries P90": "Carries",
+            "Hops": "HOPS (Aerial Score)",
+            "Np Shots P90": "Shots",
             "Npxgxa P90": "NPxG + xA",
+            "Obv Pass P90": "OBV Pass",
+            "Obv Dribble Carry P90": "OBV Dribble & Carry",
+            "Op Passes Into And Touches Inside Box P90": "OP Passes + Touches Into Box",
+            "Perte Balle/Passe Ratio": "Ball Loss %",
             "Scoring Contribution": "Scoring Contribution (G+A)",
-            "Deep Progressions P90": "Deep Progressions",
-            "Dribbles P90": "Dribbles",
-            "Pressured Passing Ratio": "Passing u. Pressure %",
+            "Op Xgbuildup Per Possession": "xGBuildup (/possession)",
             "Passing Ratio": "Passing %",
-            "Key Passes P90": "Key Passes",
-            "Op Passes P90": "OP Passes"
+            "Pressured Passing Ratio": "Passing u. Pressure %"
         }
     },
 
     "Striker": {
         "metric_map": classic_st_metric_map,
         "def": [
-            "Pressures P90", "Counterpressures P90", "Ball Recoveries P90",
-            "Average X Pressure", "Padj Interceptions P90", "Pressure Regains P90"
+            "Fhalf Pressures P90", "Counterpressures P90"
         ],
         "tech": [
-            "Npxgxa P90", "Conversion Ratio", "Goals P90", "Shot On Target Ratio",
-            "Aerial Wins P90", "Dribbles P90", "Pressured Passing Ratio",
-            "Op Passes Into And Touches Inside Box P90", "Assists P90"
+            "Np Xg P90", "Np Shots P90", "Touches Inside Box P90", "Op Xa P90",
+            "Perte Balle/Passe Ratio", "Np Xg Per Shot", "Scoring Contribution",
+            "PSxG - xG", "Shot On Target Ratio"
         ],
         "labels": {
-            "Pressures P90": "Pressures",
-            "Counterpressures P90": "Counterpressures",
-            "Ball Recoveries P90": "Ball Recoveries",
-            "Average X Pressure": "Avg Pressure Distance",
-            "Padj Interceptions P90": "PAdj Interceptions",
-            "Pressure Regains P90": "Pressure Regains",
-            "Npxgxa P90": "NPxG + xA",
-            "Conversion Ratio": "Conversion %",
-            "Goals P90": "Goals",
-            "Shot On Target Ratio": "Shooting %",
-            "Aerial Wins P90": "Aerial Wins",
-            "Dribbles P90": "Dribbles",
-            "Pressured Passing Ratio": "Passing u. Pressure %",
-            "Op Passes Into And Touches Inside Box P90": "Passes + Touches Into Box",
-            "Assists P90": "Assists"
+            "Fhalf Pressures P90": "Opp. Half Pressures",
+            "Counterpressures P90": "Counterpressures",       
+            "Np Xg P90": "NPxG",
+            "Np Shots P90": "Shots",
+            "Op Xa P90": "OP xA",
+            "Perte Balle/Passe Ratio": "Ball Loss %",
+            "Np Xg Per Shot": "xG/Shot",
+            "Scoring Contribution": "Scoring Contribution (G+A)",
+            "PSxG - xG": "PSxG - xG",
+            "Shot On Target Ratio": "Shooting %"
         }
     },
 
     "Attacking Midfielder": {
         "metric_map": classic_am_metric_map,
         "def": [
-            "Padj Pressures P90", "Counterpressures P90", "Ball Recoveries P90",
-            "Average X Pressure", "Padj Interceptions P90", "Pressure Regains P90",
-            "Challenge Ratio"
+            "Fhalf Pressures P90", "Counterpressures P90"
         ],
         "tech": [
-            "Op Xgbuildup Per Possession", "Carries P90", "Npxgxa P90", "Scoring Contribution",
-            "Deep Progressions P90", "Np Shots P90", "Dribbles P90", "Dribble Ratio",
-            "Pressured Passing Ratio", "Op Passes Into And Touches Inside Box P90", "Through Balls P90"
+            "Passes Into Box P90", "Touches Inside Box P90", "Dribbles P90", "Op Xa P90",
+            "Np Shots P90", "Obv Pass P90", "Obv Dribble Carry P90", "Perte Balle/Passe Ratio",
+            "Scoring Contribution", "Through Balls P90"
         ],
         "labels": {
-            "Padj Pressures P90": "PAdj Pressures",
+            "Fhalf Pressures P90": "Opp. Half Pressures",
             "Counterpressures P90": "Counterpressures",
-            "Ball Recoveries P90": "Ball Recoveries",
-            "Average X Pressure": "Avg Pressure Distance",
-            "Padj Interceptions P90": "PAdj Interceptions",
-            "Pressure Regains P90": "Pressure Regains",
-            "Challenge Ratio": "Tack./Dribbled Past %",
-            "Op Xgbuildup Per Possession": "xGBuildup",
-            "Carries P90": "Carries",
-            "Npxgxa P90": "NPxG + xA",
+            "Passes Into Box P90": "Passes Into Box",
+            "Touches Inside Box P90": "Touches Inside Box",
+            "Dribbles P90": "Succ. Dribbles",
+            "Op Xa P90": "OP xA",
+            "Np Shots P90": "Shots",
+            "Obv Pass P90": "OBV Pass",
+            "Obv Dribble Carry P90": "OBV Dribble & Carry",
+            "Perte Balle/Passe Ratio": "Ball Loss %",
             "Scoring Contribution": "Scoring Contribution (G+A)",
             "Deep Progressions P90": "Deep Progressions",
-            "Np Shots P90": "Shots",
-            "Dribbles P90": "Dribbles",
-            "Dribble Ratio": "Dribble Success %",
-            "Pressured Passing Ratio": "Passing u. Pressure %",
-            "Op Passes Into And Touches Inside Box P90": "Passes + Touches Into Box",
             "Through Balls P90": "Throughballs"
         }
     },
@@ -313,103 +295,114 @@ xtech_post_config = {
     "Winger": {
         "metric_map": classic_wing_metric_map,
         "def": [
-            "Padj Pressures P90", "Counterpressures P90", "Ball Recoveries P90",
-            "Average X Pressure", "Padj Interceptions P90", "Pressure Regains P90",
-            "Challenge Ratio"
+            "Fhalf Pressures P90", "Counterpressures P90"
         ],
         "tech": [
-            "Op Xgbuildup Per Possession", "Npxgxa P90", "Scoring Contribution",
-            "Dribbles P90", "Dribble Ratio", "Pressured Passing Ratio",
-            "Passing Ratio", "Op Passes Into And Touches Inside Box P90", "Crossing Ratio"
+            "Touches Inside Box P90", "Dribble Ratio", "Dribbles P90", "Op Xa P90", "Np Shots P90",
+            "Obv Dribble Carry P90", "Scoring Contribution", "Crosses P90", "Shot On Target Ratio", "Fouls Won P90"
         ],
         "labels": {
-            "Padj Pressures P90": "PAdj Pressures",
+            "Fhalf Pressures P90": "Opp. Half Pressures",
             "Counterpressures P90": "Counterpressures",
-            "Ball Recoveries P90": "Ball Recoveries",
-            "Average X Pressure": "Avg Pressure Distance",
-            "Padj Interceptions P90": "PAdj Interceptions",
-            "Pressure Regains P90": "Pressure Regains",
-            "Challenge Ratio": "Tack./Dribbled Past %",
-            "Op Xgbuildup Per Possession": "xGBuildup",
-            "Npxgxa P90": "NPxG + xA",
-            "Scoring Contribution": "Scoring Contribution (G+A)",
-            "Dribbles P90": "Dribbles",
+            "Touches Inside Box P90": "Touches Inside Box",
             "Dribble Ratio": "Dribble Success %",
-            "Pressured Passing Ratio": "Passing u. Pressure %",
-            "Passing Ratio": "Passing %",
-            "Op Passes Into And Touches Inside Box P90": "Passes + Touches Into Box",
-            "Crossing Ratio": "Crossing %"
+            "Dribbles P90": "Succ. Dribbles",
+            "Op Xa P90": "OP xA",
+            "Np Shots P90": "Shots",
+            "Obv Dribble Carry P90": "OBV Dribble & Carry",
+            "Scoring Contribution": "Scoring Contribution (G+A)",
+            "Crosses P90": "Succ. Crosses",
+            "Shot On Target Ratio": "Shooting %",
+            "Fouls Won P90": "Fouls Won"
         }
     },
 
     "Full Back": {
         "metric_map": classic_fb_metric_map,
         "def": [
-            "Padj Pressures P90", "Tackles And Interceptions P90", "Counterpressures P90",
-            "Average X Defensive Action", "Aerial Ratio", "Challenge Ratio"
+            "Padj Pressures P90",
+            "Fhalf Pressures P90",
+            "Fhalf Counterpressures P90",
+            "Padj Tackles And Interceptions P90",
+            "Challenge Ratio",
+            "Hops"
         ],
         "tech": [
-            "Op Xgbuildup Per Possession", "Carries P90", "Npxgxa P90", "Scoring Contribution",
-            "Pressured Passing Ratio", "Passing Ratio", "Crosses P90", "Key Passes P90"
+            "Np Shots P90",
+            "Op Xa P90",
+            "Crossing Ratio",
+            "Crosses P90",
+            "Op Passes Into And Touches Inside Box P90",
+            "Perte Balle/Passe Ratio",
+            "Scoring Contribution",
+            "Op Xgbuildup Per Possession"
         ],
         "labels": {
             "Padj Pressures P90": "PAdj Pressures",
-            "Tackles And Interceptions P90": "Tackles + Interceptions",
-            "Counterpressures P90": "Counterpressures",
-            "Average X Defensive Action": "Avg Defensive Action Distance",
-            "Aerial Ratio": "Aerial Win %",
+            "Fhalf Pressures P90": "Opp. Half Pressures",
+            "Fhalf Counterpressures P90": "Opp. Half Counterpressures",
+            "Padj Tackles And Interceptions P90": "PAdj Tackles & Interceptions",
             "Challenge Ratio": "Tack./Dribbled Past %",
-            "Op Xgbuildup Per Possession": "xGBuildup",
-            "Carries P90": "Carries",
-            "Npxgxa P90": "NPxG + xA",
-            "Scoring Contribution": "Scoring Contribution (G+A)",
-            "Pressured Passing Ratio": "Passing u. Pressure %",
-            "Passing Ratio": "Passing %",
+            "Hops": "HOPS",   
+            "Np Shots P90": "Shots",
+            "Op Xa P90": "OP xA",
+            "Crossing Ratio": "Crossing %",
             "Crosses P90": "Crosses",
-            "Key Passes P90": "Key Passes"
+            "Op Passes Into And Touches Inside Box P90": "OP Passes + Touches Into Box",
+            "Perte Balle/Passe Ratio": "Ball Loss %",
+            "Scoring Contribution": "Scoring Contribution (G+A)",
+            "Op Xgbuildup Per Possession": "xGBuildup (/possession)"
         }
     },
 
     "Central Defender": {
         "metric_map": classic_cb_metric_map,
         "def": [
-            "Pressure Regains P90", "Tackles And Interceptions P90", "Aerial Ratio",
-            "Blocks Per Shot", "Challenge Ratio"
+            "Blocks Per Shot", "Challenge Ratio", "Average X Pressure",
+            "Padj Tackles P90", "Hops"
         ],
         "tech": [
-            "Obv Dribble Carry P90", "Carries P90", "Np Shots P90", "Long Ball Ratio",
-            "Pressured Passing Ratio", "Obv Pass P90", "Passing Ratio"
+            "Obv Dribble Carry P90", "Long Ball Ratio", "Pressured Passing Ratio", "Obv Pass P90",
+            "Passing Ratio", "Deep Progressions P90"
         ],
         "labels": {
-            "Pressure Regains P90": "Pressure Regains",
-            "Tackles And Interceptions P90": "Tackles + Interceptions",
-            "Aerial Ratio": "Aerial Win %",
             "Blocks Per Shot": "Blocks/Shot",
             "Challenge Ratio": "Tack./Dribbled Past %",
+            "Average X Pressure": "Av. Pressure Dist.",
+            "Padj Tackles P90": "PAdj Tackles",
+            "Hops": "HOPS",           
             "Obv Dribble Carry P90": "OBV Dribble & Carry",
-            "Carries P90": "Carries",
-            "Np Shots P90": "Shots",
             "Long Ball Ratio": "Long Ball %",
             "Pressured Passing Ratio": "Passing u. Pressure %",
             "Obv Pass P90": "OBV Pass",
-            "Passing Ratio": "Passing %"
+            "Passing Ratio": "Passing %",
+            "Deep Progressions P90": "Deep Progressions"
         }
     },
 
     "Goalkeeper": {
         "metric_map": classic_gk_metric_map,
-        "metrics": [
-            "Save Ratio", "Gsaa Ratio", "Clcaa", "Op Xgbuildup Per Possession",
-            "Long Ball Ratio", "Pressured Passing Ratio", "Pass Into Danger Ratio"
+        "save": [
+            "Gsaa Ratio",
+            "Save Ratio",
+            "Da Aggressive Distance"
+        ],
+        "usage": [
+            "Long Ball Ratio",
+            "Op Xgbuildup P90",
+            "Pressured Passing Ratio",
+            "Passing Ratio",
+            "Pass Into Danger Ratio"
         ],
         "labels": {
-            "Save Ratio": "Save %",
             "Gsaa Ratio": "GSAA %",
-            "Clcaa": "Claim % (CLCAA)",
-            "Op Xgbuildup Per Possession": "xGBuildup",
+            "Save Ratio": "Save %",
+            "Da Aggressive Distance": "GK Aggressive Dist.",
             "Long Ball Ratio": "Long Ball %",
+            "Op Xgbuildup P90": "OP xGBuildup",           
             "Pressured Passing Ratio": "Passing u. Pressure %",
-            "Pass Into Danger Ratio": "Pass into Danger %"
+            "Passing Ratio": "Passing %",
+            "Pass Into Danger Ratio": "Pass into Danger %",
         }
     }
 }
@@ -551,7 +544,6 @@ metric_labels_tech = {
 
 # In[8]:
 
-
 # On définit les colonnes pour le graphe
 graph_columns = [
     "PSV-99", "TOP 5 PSV-99", "Total Distance P90", "M/min P90", "Running Distance P90",
@@ -565,7 +557,7 @@ graph_columns = [
 # === Sélecteur de page dans la sidebar ===
 page = st.sidebar.radio(
     "Choisir le volet",
-    ["xPhysical", "xTechnical"]
+    ["xPhysical", "xTech/xDef"]
 )
 
 if page == "xPhysical":
@@ -1619,7 +1611,7 @@ if page == "xPhysical":
 
     
 # ============================================= VOLET xTechnical ========================================================
-elif page == "xTechnical":
+elif page == "xTech/xDef":
     
     # Création des sous-onglets pour xTechnical
     tab1, tab2, tab3, tab4 = st.tabs(["Scatter Plot", "Radar", "Index", "Top 50"])
@@ -1730,10 +1722,9 @@ elif page == "xTechnical":
         # Mapping noms internes → noms affichés
         metric_display_map = {
             # === Index ===
-            "xTechnical Normalized (/100)": "xTechnical Index",
-            "xTech TECH Normalized (/100)": "Sub-index TECH",
-            "xTech DEF Normalized (/100)": "Sub-index DEF",
-
+            "xTECH": "xTECH",
+            "xDEF": "xDEF",
+            
             # === Scoring ===
             "Npg P90": "NP Goals",
             "Op Assists P90": "OP Assists",
@@ -1794,9 +1785,10 @@ elif page == "xTechnical":
             "Padj Tackles P90": "PAdj Tackles",
             "Padj Tackles And Interceptions P90": "PAdj Tackles And Interceptions",
             "Tackles And Interceptions P90": "Tackles And Interceptions",
-            "Challenge Ratio": "Challenge %",
+            "Challenge Ratio": "Tack./Dribbled Past %",
 
             # === Aerial / Blocks ===
+            "Hops": "HOPS",
             "Aerial Wins P90": "Aerial Wins",
             "Aerial Ratio": "Aerial Win %",
             "Blocks Per Shot": "Blocks/Shot",
@@ -1807,6 +1799,8 @@ elif page == "xTechnical":
             "Penalty Wins P90": "Penalty Won",
             
             # === GK ===
+            "xTech GK Save (/100)": "xSave GK", 
+            "xTech GK Usage (/100)": "xUsage GK",
             "Save Ratio": "Save % (GK)", 
             "Xs Ratio": "Expected Save % (GK)", 
             "Gsaa P90": "Goals Saved Above Average (GK)", 
@@ -1942,9 +1936,8 @@ elif page == "xTechnical":
         with st.expander("📘 Metric Definitions (xTechnical)", expanded=False):
             st.markdown("""
             ### 🔹 Index
-            - **xTechnical Index**: Global technical performance score (/100), normalized by Position Group.
-            - **Sub-index TECH**: Contribution to build-up, passing, creativity, and attack.
-            - **Sub-index DEF**: Contribution to defensive activity, pressure, recoveries.
+            - **xTECH**: Contribution to build-up, passing, creativity, and attack.
+            - **xDEF**: Contribution to defensive activity, pressure, recoveries.
 
             ### 🎯 Scoring
             - **NP Goals**: Goals scored (not including penalties).
@@ -1998,9 +1991,10 @@ elif page == "xTechnical":
             - **PAdj Interceptions**: Number of interceptions adjusted proportionally to the possession volume of a team.
             - **PAdj Tackles**: Number of tackles adjusted proportionally to the possession volume of a team.
             - **Tackles And Interceptions**: Combination of tackles and interceptions.
-            - **Challenge %**: Percentage of time a player makes a tackle when going into a duel vs getting dribbled past.
+            - **Tack./Dribbled Past %**: Percentage of time a player makes a tackle when going into a duel vs getting dribbled past.
 
             ### 🧱 Aerial / Blocking
+            - **HOPS**: HOPS is a model that measures a player's ability to win aerial duels. HOPS take into account the aerial ability of the opposing duellist in order to credit the winner of the duel appropriately.
             - **Aerial Wins / Aerial Win %**: Success and volume of aerial duels.
             - **Blocks/Shot**: Blocks per shot faced.
             - **PAdj Clearances**: Number of clearances adjusted proportionally to the possession volume of a team.
@@ -2381,10 +2375,46 @@ elif page == "xTechnical":
         comp = row["Competition Name"]
         age = int(row["Age"])
         minutes = int(row["Minutes"])
-        idx_col = "xTechnical Normalized (/100)"
-        row[idx_col] = round(float(row[idx_col]), 1)
-        score = row[idx_col]
 
+        # Mapping colonnes selon poste
+        if pos == "Goalkeeper":
+            tech_col = "xTech GK Usage (/100)"
+            def_col = "xTech GK Save (/100)"
+            tech_label = "Usage"
+            def_label = "Save"
+        else:
+            tech_col = "xTECH"
+            def_col = "xDEF"
+            tech_label = "xTECH"
+            def_label = "xDEF"
+
+        tech_score = row.get(tech_col, np.nan)
+        def_score = row.get(def_col, np.nan)
+
+        # Filtrage pairs pour chaque jauge
+        peers = df_tech[
+            (df_tech["Position Group"] == pos) &
+            (df_tech["Season Name"] == s1) &
+            (df_tech["Competition Name"] == comp) &
+            (df_tech["Minutes"] >= 600)
+        ]
+        mean_tech = peers[tech_col].mean()
+        mean_def = peers[def_col].mean()
+        
+        sorted_peers_tech = peers.sort_values(tech_col, ascending=False).reset_index(drop=True)
+        if row["Player Name"] in sorted_peers_tech["Player Name"].values:
+            rank_tech = sorted_peers_tech[sorted_peers_tech["Player Name"] == row["Player Name"]].index[0] + 1
+        else:
+            rank_tech = "—"
+            
+        sorted_peers_def = peers.sort_values(def_col, ascending=False).reset_index(drop=True)
+        if row["Player Name"] in sorted_peers_def["Player Name"].values:
+            rank_def = sorted_peers_def[sorted_peers_def["Player Name"] == row["Player Name"]].index[0] + 1
+        else:
+            rank_def = "—"
+        
+        total_peers = len(sorted_peers_tech)  # ou sorted_peers_def, c’est la même longueur
+            
         # Affichage infos joueur
         info = (
             f"<div style='text-align:center; font-size:16px; margin:10px 0;'>"
@@ -2394,101 +2424,73 @@ elif page == "xTechnical":
         )
         st.markdown(info, unsafe_allow_html=True)
 
-        # Rang et moyenne
-        # Filtrage des pairs pour le classement (seulement +600 minutes)
-        peers = df_tech[
-            (df_tech["Position Group"] == pos) &
-            (df_tech["Season Name"] == s1) &
-            (df_tech["Competition Name"] == comp) &
-            (df_tech["Minutes"] >= 600)
-        ]
+        # --- Deux colonnes côte à côte
+        col1, col2 = st.columns(2)
+        hue_def  = 120 * (def_score / 100)
+        bar_color_def  = f"hsl({hue_def:.0f}, 75%, 50%)"
+        with col1:
+            fig_def = go.Figure(go.Indicator(
+                mode="gauge+number",
+                value=round(def_score),
+                number={'font': {'size': 40}},
+                gauge={
+                    'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
+                    'bar': {'color': bar_color_def, 'thickness': 0.25},
+                    'bgcolor': "rgba(255,255,255,0)",
+                    'borderwidth': 0,
+                    'steps': [{'range': [0, 100], 'color': 'rgba(100,100,100,0.2)'}],
+                    'threshold': {'line': {'color': "white", 'width': 4},
+                                  'thickness': 0.75,
+                                  'value': mean_def}
+                },
+                domain={'x': [0, 1], 'y': [0, 1]},
+                title={'text': f"<b>{rank_def}ᵉ / {total_peers}</b>", 'font': {'size': 18}}
+            ))
+            fig_def.update_layout(margin={'t': 40, 'b': 0, 'l': 0, 'r': 0}, paper_bgcolor="rgba(0,0,0,0)", height=250)
+            st.plotly_chart(fig_def, use_container_width=True)
 
-        # Moyenne xTech de ces pairs
-        mean_peer = peers[idx_col].mean()
+            st.markdown(
+                f"<div style='text-align:center; font-size:18px; margin-top:-22px; margin-bottom:2px;'><b>{def_label}</b></div>",
+                unsafe_allow_html=True
+            )
 
-        # Tri des pairs pour classement
-        sorted_peers = peers.sort_values(idx_col, ascending=False).reset_index(drop=True)
+            # Moyenne, placée juste sous le label
+            mean_def = df_tech[
+                (df_tech["Position Group"] == pos) &
+                (df_tech["Competition Name"] == comp) &
+                (df_tech["Minutes"] >= 500)
+            ][def_col].mean()
 
-        # Classement du joueur (s'il est éligible au filtre)
-        player_row = sorted_peers[sorted_peers["Player Name"] == row["Player Name"]]
+            st.markdown(
+                f"<div style='text-align:center; color:grey; margin-top:-8px; margin-bottom:12px;'>"
+                f"Moyenne {def_label} ({pos} en {comp}) : {round(mean_def)}</div>",
+                unsafe_allow_html=True
+            )
 
-        if not player_row.empty:
-            rank = player_row.index[0] + 1
-        else:
-            rank = "–"  # joueur hors classement (>600 min non atteint)
+            st.markdown("##### Détail du score xDEF")
+            # Tableau DEF
+            if pos == "Goalkeeper":
+                metrics = [
+                    ("xTech GK GSAA %", "GSAA %"),
+                    ("xTech GK Save %", "Save %"),
+                    ("xTech GK Aggressive Distance", "Aggressive Distance"),
+                    ("xTech GK Long Ball %", "Long Ball %"),
+                    ("xTech GK OPxGBuildup", "OPxGBuildup"),
+                ]
+            else:
+                # === Tableau xDEF ===
+                config = xtech_post_config.get(pos)
+                if not config:
+                    st.error(f"Aucun mapping défini pour le poste : {pos}")
+                    st.stop()
+                prefix = config.get("prefix", pos.split()[0].upper())
+                metric_map = config["metric_map"]
+                labels = config["labels"]
 
-        total_peers = len(sorted_peers)
+                metric_rows = []
 
-        hue = 120 * (score / 100)
-        bar_color = f"hsl({hue:.0f}, 75%, 50%)"
-
-        # Jauge
-        fig_gauge = go.Figure(go.Indicator(
-            mode="gauge+number",
-            value=round(score, 1),
-            number={'font': {'size': 48}, 'valueformat': '.0f'},
-            gauge={
-                'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
-                'bar': {'color': bar_color, 'thickness': 0.25},
-                'bgcolor': "rgba(255,255,255,0)",
-                'borderwidth': 0,
-                'shape': "angular",
-                'steps': [{'range': [0, 100], 'color': 'rgba(100,100,100,0.3)'}],
-                'threshold': {'line': {'color': "white", 'width': 4},
-                              'thickness': 0.75,
-                              'value': round(mean_peer, 1)}
-            },
-            domain={'x': [0, 1], 'y': [0, 1]},
-            title={'text': f"<b>{rank}ᵉ / {total_peers}</b>", 'font': {'size': 20}}
-        ))
-        fig_gauge.update_layout(
-            margin={'t': 40, 'b': 0, 'l': 0, 'r': 0},
-            paper_bgcolor="rgba(0,0,0,0)",
-            height=300
-        )
-        st.plotly_chart(fig_gauge, use_container_width=True)
-
-        st.markdown(
-            f"<div style='text-align:center; font-size:14px; margin-top:-20px; color:grey'>"
-            f"Moyenne xTechnical ({pos} en {comp}) : {mean_peer:.0f}"
-            "</div>",
-            unsafe_allow_html=True
-        )
-        st.markdown(
-            "<div style='text-align:center; font-size:18px; margin-top:-10px'>"
-            "<b>xTech</b></div>",
-            unsafe_allow_html=True
-        )
-
-        # === Affichage tableau xTechnical ===
-        config = xtech_post_config.get(pos)
-        if not config:
-            st.error(f"Aucun mapping défini pour le poste : {pos}")
-            st.stop()
-        prefix = config.get("prefix", pos.split()[0].upper())
-
-        metric_map = config["metric_map"]
-        labels = config["labels"]
-
-        metric_rows = []
-
-        if pos == "Goalkeeper":
-            for raw_col in config["metrics"]:
-                note_col, scores = metric_map.get(raw_col, (None, None))
-                if not note_col or note_col not in df1.columns:
-                    continue
-                raw_val = row.get(raw_col, None)
-                note_val = row.get(note_col, None)
-                max_pts = max(scores)
-                label = labels.get(raw_col, raw_col)
-                metric_rows.append({
-                    "Métrique": label,
-                    "Valeur Joueur": f"{raw_val:.2f}" if pd.notna(raw_val) else "NA",
-                    "Points": f"{note_val} / {max_pts}" if pd.notna(note_val) else "NA"
-                })
-        else:
-            for group_label, group_keys in [("TECH", config["tech"]), ("DEF", config["def"])]:
-                for raw_col in group_keys:
+                # --- Métriques DEF uniquement ---
+                for raw_col in config["def"]:
                     note_col, scores = metric_map.get(raw_col, (None, None))
                     if not note_col or note_col not in df1.columns:
                         continue
@@ -2499,67 +2501,156 @@ elif page == "xTechnical":
                     metric_rows.append({
                         "Métrique": label,
                         "Valeur Joueur": f"{raw_val:.2f}" if pd.notna(raw_val) else "NA",
-                        "Points": f"{note_val} / {max_pts}" if pd.notna(note_val) else "NA"
+                        "Points": f"{note_val} / {max_pts}" if pd.notna(note_val) else f"0 / {max_pts}"
                     })
 
-                # 🔁 Sous-index affiché juste après son groupe
-                sub_col = f"xTech {group_label} Normalized (/100)"
-                sub_val = row.get(sub_col, None)
+                # --- Total DEF ---
+                total_points = 0
+                total_max = 0
+                for row_ in metric_rows:
+                    label = row_["Métrique"]
+                    if row_["Points"] and "/" in row_["Points"] and not any(x in label for x in ["Sous-index", "Total", "Index"]):
+                        try:
+                            pts, max_pts = row_["Points"].split("/")
+                            total_points += int(pts.strip(" *"))
+                            total_max += int(max_pts.strip(" *"))
+                        except:
+                            continue
+
+                metric_rows.append({
+                    "Métrique": "**Total**",
+                    "Valeur Joueur": "",
+                    "Points": f"**{total_points} / {total_max}**"
+                })
+                
+                # --- Sous-index DEF ---
+                sub_val = row.get("xDEF", None)
                 if pd.notna(sub_val):
                     metric_rows.append({
-                        "Métrique": f"**Sous-index {group_label}**",
+                        "Métrique": "**Index xDEF**",
                         "Valeur Joueur": "",
                         "Points": f"**{sub_val:.0f} / 100**"
                     })
 
-                # Ajouter le sous-index
-                sub_col = f"xTech {prefix} {group_label} (/100)"
-                sub_val = row.get(sub_col, None)
-                if pd.notna(sub_val):
-                    metric_rows.append({
-                        "Métrique": f"**Sous-index {group_label}**",
-                        "Valeur Joueur": "",
-                        "Points": f"**{sub_val:.0f} / 100**"
-                    })
-                    
-        # ✅ Ligne Total (somme des points sur toutes les métriques notées)
-        total_points = 0
-        total_max = 0
-        for row_ in metric_rows:
-            label = row_["Métrique"]
-            if row_["Points"] and "/" in row_["Points"] and not any(x in label for x in ["Sous-index", "Total", "Index"]):
-                try:
-                    pts, max_pts = row_["Points"].split("/")
-                    total_points += int(pts.strip(" *"))
-                    total_max += int(max_pts.strip(" *"))
-                except:
-                    continue
-
-        metric_rows.append({
-            "Métrique": "**Total**",
-            "Valeur Joueur": "",
-            "Points": f"**{total_points} / {total_max}**"
-        })    
+                # === Affichage final du tableau (propre, sans index auto)
+                detail_df = pd.DataFrame(metric_rows)
+                detail_df = detail_df.drop_duplicates(subset=["Métrique"], keep="first")
+                st.dataframe(detail_df.set_index("Métrique"), use_container_width=True)
         
-        # ✅ Ajouter l’index final
-        metric_rows.append({
-            "Métrique": "Index xTechnical",
-            "Valeur Joueur": "",
-            "Points": f"**{score:.0f} / 100**"
-        })
+                hue_tech = 120 * (tech_score / 100)
+                bar_color_tech = f"hsl({hue_tech:.0f}, 75%, 50%)"
+        with col2:
+            fig_tech = go.Figure(go.Indicator(
+                mode="gauge+number",
+                value=round(tech_score),
+                number={'font': {'size': 40}},
+                gauge={
+                    'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
+                    'bar': {'color': bar_color_tech, 'thickness': 0.25},
+                    'bgcolor': "rgba(255,255,255,0)",
+                    'borderwidth': 0,
+                    'steps': [{'range': [0, 100], 'color': 'rgba(100,100,100,0.2)'}],
+                    'threshold': {'line': {'color': "white", 'width': 4},
+                                  'thickness': 0.75,
+                                  'value': mean_tech}
+                },
+                domain={'x': [0, 1], 'y': [0, 1]},
+                title={'text': f"<b>{rank_tech}ᵉ / {total_peers}</b>", 'font': {'size': 18}}
+            ))
+            fig_tech.update_layout(margin={'t': 40, 'b': 0, 'l': 0, 'r': 0}, paper_bgcolor="rgba(0,0,0,0)", height=250)
+            st.plotly_chart(fig_tech, use_container_width=True)
+            # Ajoute le label juste sous la jauge, avant la moyenne
+            st.markdown(
+                f"<div style='text-align:center; font-size:18px; margin-top:-22px; margin-bottom:2px;'><b>{tech_label}</b></div>",
+                unsafe_allow_html=True
+            )
+            mean_tech = df_tech[
+                (df_tech["Position Group"] == pos) &
+                (df_tech["Competition Name"] == comp) &
+                (df_tech["Minutes"] >= 500)
+            ][tech_col].mean()
 
-        # === Affichage final du tableau (propre, sans index auto)
-        detail_df = pd.DataFrame(metric_rows)
-        detail_df = detail_df.drop_duplicates(subset=["Métrique"], keep="first")
-        st.markdown("### Détail de l’index xTechnical")
-        st.dataframe(detail_df.set_index("Métrique"), use_container_width=True)
+            st.markdown(
+                f"<div style='text-align:center; color:grey; margin-top:-8px; margin-bottom:12px;'>"
+                f"Moyenne {tech_label} ({pos} en {comp}) : {round(mean_tech)}</div>",
+                unsafe_allow_html=True
+            )
+            st.markdown("##### Détail du score xTECH")
+            # Tableau TECH
+            if pos == "Goalkeeper":
+                metrics = [
+                    ("xTech GK Passing %", "Passing %"),
+                    ("xTech GK Passing u. Pressure %", "Passing under Pressure %"),
+                    ("xTech GK Pass Into Danger %", "Pass into Danger %"),
+                    ("xTech GK Long Ball %", "Long Ball %"),
+                    ("xTech GK OPxGBuildup", "OPxGBuildup"),
+                ]
+            else:
+                # === Tableau xTECH ===
+                config = xtech_post_config.get(pos)
+                if not config:
+                    st.error(f"Aucun mapping défini pour le poste : {pos}")
+                    st.stop()
+                prefix = config.get("prefix", pos.split()[0].upper())
+                metric_map = config["metric_map"]
+                labels = config["labels"]
+
+                metric_rows = []
+
+                # --- Métriques TECH uniquement ---
+                for raw_col in config["tech"]:
+                    note_col, scores = metric_map.get(raw_col, (None, None))
+                    if not note_col or note_col not in df1.columns:
+                        continue
+                    raw_val = row.get(raw_col, None)
+                    note_val = row.get(note_col, None)
+                    max_pts = max(scores)
+                    label = labels.get(raw_col, raw_col)
+                    metric_rows.append({
+                        "Métrique": label,
+                        "Valeur Joueur": f"{raw_val:.2f}" if pd.notna(raw_val) else "NA",
+                        "Points": f"{note_val} / {max_pts}" if pd.notna(note_val) else f"0 / {max_pts}"
+                    })
+
+                # --- Total TECH (ligne avant-dernière) ---
+                total_points = 0
+                total_max = 0
+                for row_ in metric_rows:
+                    label = row_["Métrique"]
+                    if row_["Points"] and "/" in row_["Points"] and not any(x in label for x in ["Sous-index", "Total", "Index"]):
+                        try:
+                            pts, max_pts = row_["Points"].split("/")
+                            total_points += int(pts.strip(" *"))
+                            total_max += int(max_pts.strip(" *"))
+                        except:
+                            continue
+
+                metric_rows.append({
+                    "Métrique": "**Total**",
+                    "Valeur Joueur": "",
+                    "Points": f"**{total_points} / {total_max}**"
+                })
+
+                # --- Sous-index TECH (à la toute fin) ---
+                sub_val = row.get("xTECH", None)
+                if pd.notna(sub_val):
+                    metric_rows.append({
+                        "Métrique": "**Index xTECH**",
+                        "Valeur Joueur": "",
+                        "Points": f"**{sub_val:.0f} / 100**"
+                    })
+                
+                # === Affichage final du tableau (propre, sans index auto)
+                detail_df = pd.DataFrame(metric_rows)
+                detail_df = detail_df.drop_duplicates(subset=["Métrique"], keep="first")
+                st.dataframe(detail_df.set_index("Métrique"), use_container_width=True)
     
-    # --- Onglet Top 50 xTechnical ---
+################### --- Onglet Top 50 xTechnical --- ###################
     with tab4:
         st.subheader("🎯 Top 50 - xTechnical Index")
 
+        # 1. Sélection Compétition et Saison
         col1, col2 = st.columns(2)
-
         with col1:
             selected_comp = st.selectbox(
                 "Compétition",
@@ -2567,7 +2658,6 @@ elif page == "xTechnical":
                 index=competition_list_tech.index("Serie A") if "Serie A" in competition_list_tech else 0,
                 key="top50_xtech_comp"
             )
-
         with col2:
             available_seasons = df_tech[df_tech["Competition Name"] == selected_comp]["Season Name"].dropna().unique().tolist()
             available_seasons = sorted(available_seasons)
@@ -2579,15 +2669,19 @@ elif page == "xTechnical":
                 key="top50_xtech_season"
             )
 
-        # === POSTE
+        # 2. Sélection POSTE avec ordre imposé
+        ordered_positions = [
+            "Goalkeeper", "Central Defender", "Full Back", "Midfielder", "Attacking Midfielder", "Winger", "Striker"
+        ]
+        positions_available = [p for p in ordered_positions if p in df_tech["Position Group"].unique()]
         selected_pos = st.selectbox(
             "Poste",
-            position_list_tech,
-            index=position_list_tech.index("Striker") if "Striker" in position_list_tech else 0,
+            positions_available,
+            index=positions_available.index("Striker") if "Striker" in positions_available else 0,
             key="top50_xtech_pos"
         )
 
-        # === SLIDER MINUTES
+        # 3. Slider Minutes
         min_minutes = st.slider(
             "Minutes jouées minimales",
             0,
@@ -2597,15 +2691,23 @@ elif page == "xTechnical":
             key="top50_xtech_min"
         )
 
-        # === INDEX A AFFICHER
-        index_options = [
-            "xTechnical Normalized (/100)",
-            "xTech TECH Normalized (/100)",
-            "xTech DEF Normalized (/100)"
-        ]
-        selected_index = st.selectbox("Index à afficher", index_options, key="top50_xtech_index")
+        # 4. INDEX A AFFICHER (adapté GK/autres)
+        if selected_pos == "Goalkeeper":
+            index_options = {
+                "xSave": "xTech GK Save (/100)",
+                "xUsage": "xTech GK Usage (/100)"
+            }
+            default_index = "xSave"
+        else:
+            index_options = {
+                "xDEF": "xDEF",
+                "xTECH": "xTECH"
+            }
+            default_index = "xTECH"
+        selected_index_label = st.selectbox("Index à afficher", list(index_options.keys()), key="top50_xtech_index")
+        selected_index = index_options[selected_index_label]
 
-        # === FILTRAGE
+        # 5. FILTRAGE
         filtered_top = df_tech[
             (df_tech["Competition Name"] == selected_comp) &
             (df_tech["Season Name"] == selected_season) &
@@ -2613,22 +2715,23 @@ elif page == "xTechnical":
             (df_tech["Minutes"] >= min_minutes)
         ].copy()
 
+        filtered_top = filtered_top[filtered_top[selected_index].notna()]
         top_50 = filtered_top.sort_values(by=selected_index, ascending=False).head(50).reset_index(drop=True)
 
-        # === CONSTRUCTION TABLEAU
+        # 6. CONSTRUCTION TABLEAU
         rows = []
         for i, row in top_50.iterrows():
+            index_value = row[selected_index]
             rows.append({
                 "Rank":      i + 1,
                 "Joueur":    row["Player Name"],
                 "Équipe":    row["Team Name"],
                 "Minutes":   int(round(row["Minutes"])),
                 "Âge":       int(row["Age"]),
-                selected_index: int(round(row[selected_index]))
+                selected_index_label: int(round(index_value)) if pd.notna(index_value) else "—"
             })
 
         display_df = pd.DataFrame(rows).set_index("Rank")
-
         styled_df = display_df.style.set_properties(**{
             "text-align": "center"
         }).set_table_styles([
