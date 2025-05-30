@@ -27,7 +27,7 @@ def shorten_season(s):
 
 
 # Chargement du fichier xPhysical
-file_path = '/Users/favie/Statsbomb/A- Code à tourner/SK_All.csv'
+file_path = 'SK_All.csv'
 
 df = pd.read_csv(file_path, sep=",")
 
@@ -41,7 +41,7 @@ competition_list = sorted(df["Competition"].dropna().unique().tolist())
 player_list = sorted(df["Short Name"].dropna().unique().tolist())
 
 # Chargement du fichier xTechnical
-df_tech = pd.read_csv("/Users/favie/Statsbomb/A- Code à tourner/SB_Top5.csv", sep=",")
+df_tech = pd.read_csv("SB_Top5.csv", sep=",")
 df_tech.columns = df_tech.columns.str.strip()
 df_tech["season_short"] = df_tech["Season Name"].apply(shorten_season)
 # Affichage combiné : Known Name (Full Name)
