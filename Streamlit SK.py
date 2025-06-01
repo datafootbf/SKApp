@@ -2040,20 +2040,26 @@ elif page == "xTech/xDef":
             s1 = st.selectbox("Saison 1", seasons1, key="tech_radar_s1")
 
         df1 = df_tech[(df_tech["Player Name"] == p1) & (df_tech["Season Name"] == s1)]
-        
-
         if df1.empty:
             st.warning("Aucune donnée trouvée pour ce joueur et cette saison.")
             st.stop()
-
-        # Sélection du club
+        
+        # === AJOUT : Sélection compétition si plusieurs ===
+        competitions1 = df1["Competition Name"].dropna().unique().tolist()
+        if len(competitions1) > 1:
+            comp1 = st.selectbox("Compétition 1", sorted(competitions1), key="tech_radar_comp1")
+            df1 = df1[df1["Competition Name"] == comp1]
+        else:
+            comp1 = competitions1[0]
+        
+        # Ensuite seulement : sélection club si plusieurs
         teams1 = df1["Team Name"].dropna().unique().tolist()
         if len(teams1) > 1:
             team1 = st.selectbox("Club 1", teams1, key="tech_radar_team1")
             df1 = df1[df1["Team Name"] == team1]
         else:
             team1 = teams1[0]
-
+        
         # Extraction du poste
         if "Position Group" in df1.columns and df1["Position Group"].notna().any():
             pos1 = df1["Position Group"].dropna().unique()[0]
@@ -2361,15 +2367,23 @@ elif page == "xTech/xDef":
         if df1.empty:
             st.warning("Aucune donnée trouvée.")
             st.stop()
-
-        # Filtre Club
+        
+        # === AJOUT : Sélection compétition si plusieurs ===
+        competitions = df1["Competition Name"].dropna().unique().tolist()
+        if len(competitions) > 1:
+            comp = st.selectbox("Compétition", sorted(competitions), key="tech_index_comp")
+            df1 = df1[df1["Competition Name"] == comp]
+        else:
+            comp = competitions[0]
+        
+        # Ensuite seulement : sélection club si plusieurs
         teams = df1["Team Name"].dropna().unique().tolist()
         if len(teams) > 1:
             team1 = st.selectbox("Club", teams, key="tech_index_team1")
             df1 = df1[df1["Team Name"] == team1]
         else:
             team1 = teams[0]
-
+        
         row = df1.iloc[0]
         pos = row["Position Group"]
         comp = row["Competition Name"]
