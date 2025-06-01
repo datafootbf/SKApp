@@ -41,8 +41,8 @@ competition_list = sorted(df["Competition"].dropna().unique().tolist())
 player_list = sorted(df["Short Name"].dropna().unique().tolist())
 
 # Chargement du fichier xTechnical
-df1 = pd.read_csv("SB_Top5_part1.csv")
-df2 = pd.read_csv("SB_Top5_part2.csv")
+df1 = pd.read_csv("SB_All_part1.csv.csv")
+df2 = pd.read_csv("SB_All_part2.csv.csv")
 df_tech = pd.concat([df1, df2], ignore_index=True)
 df_tech.columns = df_tech.columns.str.strip()
 df_tech["season_short"] = df_tech["Season Name"].apply(shorten_season)
