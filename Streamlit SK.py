@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[1]:
-
-
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -13,44 +7,41 @@ import re
 import plotly.graph_objects as go
 
 st.set_page_config(layout="wide")
-# In[2]:
 
-# Helper pour raccourcir uniquement les saisons "YYYY/YYYY" -> "YY/YY"
 def shorten_season(s):
     s = str(s)
-    # ne traite que le format 4 chiffres / 4 chiffres
     if re.match(r'^\d{4}/\d{4}$', s):
         y1, y2 = s.split('/')
         return f"{y1[-2:]}/{y2[-2:]}"
-    # tout autre format reste identique
     return s
 
+@st.cache_data
+def load_xphysical():
+    df = pd.read_csv('SK_All.csv', sep=",")
+    df.columns = df.columns.str.strip()
+    return df
 
-# Chargement du fichier xPhysical
-file_path = 'SK_All.csv'
+@st.cache_data
+def load_xtechnical():
+    df_tech = pd.read_csv('SB_All.csv', sep=",")
+    df_tech.columns = df_tech.columns.str.strip()
+    df_tech["season_short"] = df_tech["Season Name"].apply(shorten_season)
+    df_tech["Display Name"] = df_tech.apply(
+        lambda row: f"{row['Player Known Name']} ({row['Player Name']})"
+        if pd.notna(row.get("Player Known Name")) and row["Player Known Name"] != row["Player Name"]
+        else row["Player Name"],
+        axis=1
+    )
+    return df_tech
 
-df = pd.read_csv(file_path, sep=",")
+df = load_xphysical()
+df_tech = load_xtechnical()
 
-# Nettoyage colonnes xPhysical
-df.columns = df.columns.str.strip()
-
-# Listes pour les filtres xPhysical
+# Ensuite seulement, tes listes et tes widgets/filtres
 season_list = sorted(df["Season"].dropna().unique().tolist())
 position_list = sorted(df["Position Group"].dropna().unique().tolist())
 competition_list = sorted(df["Competition"].dropna().unique().tolist())
 player_list = sorted(df["Short Name"].dropna().unique().tolist())
-
-# Chargement du fichier xTechnical
-df_tech = pd.read_csv('SB_All.csv', sep=",")
-df_tech.columns = df_tech.columns.str.strip()
-df_tech["season_short"] = df_tech["Season Name"].apply(shorten_season)
-# Affichage combiné : Known Name (Full Name)
-df_tech["Display Name"] = df_tech.apply(
-    lambda row: f"{row['Player Known Name']} ({row['Player Name']})"
-    if pd.notna(row.get("Player Known Name")) and row["Player Known Name"] != row["Player Name"]
-    else row["Player Name"],
-    axis=1
-)
 
 classic_gk_metric_map = {
     "Gsaa Ratio": ("xTech GK GSAA %", [0, 5, 7, 12, 15]),
