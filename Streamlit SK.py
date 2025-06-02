@@ -2368,10 +2368,16 @@ elif page == "xTech/xDef":
             st.warning("Aucune donnée trouvée.")
             st.stop()
         
-        # === AJOUT : Sélection compétition si plusieurs ===
+        # Sélection compétition principale (où le joueur a le plus joué)
+        df_allplayer = df_tech[(df_tech["Player Name"] == p1) & (df_tech["Season Name"] == s1)]
+        comp_minutes = df_allplayer.groupby("Competition Name")["Minutes"].sum().sort_values(ascending=False)
+        main_competition = comp_minutes.index[0] if not comp_minutes.empty else None
+        
         competitions = df1["Competition Name"].dropna().unique().tolist()
         if len(competitions) > 1:
-            comp = st.selectbox("Compétition", sorted(competitions), key="tech_index_comp")
+            # Préselection sur la compétition principale
+            index_main = competitions.index(main_competition) if main_competition in competitions else 0
+            comp = st.selectbox("Compétition", sorted(competitions), key="tech_index_comp", index=index_main)
             df1 = df1[df1["Competition Name"] == comp]
         else:
             comp = competitions[0]
@@ -2432,7 +2438,7 @@ elif page == "xTech/xDef":
         # Affichage infos joueur
         info = (
             f"<div style='text-align:center; font-size:16px; margin:10px 0;'>"
-            f"<b>{p1}</b> – {s1} – {team1} "
+            f"<b>{p1} ({pos})</b> – {s1} – {team1} "
             f"(<i>{comp}</i>) – {age} ans – {minutes} min"
             "</div>"
         )
