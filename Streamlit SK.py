@@ -2254,12 +2254,12 @@ elif page == "xTech/xDef":
         # Titre dynamique
         team1 = row1["Team Name"] if "Team Name" in row1 else ""
         minutes1 = int(row1["Minutes"]) if "Minutes" in row1 else "NA"
-        title_text = f"xTechnical Radar – {p1} ({pos1}) – {s1} – {team1} ({minutes1} min)"
+        title_text = f"{p1} ({pos1}) – {s1} – {team1} - {minutes1} min"
         if compare:
             team2 = row2["Team Name"] if "Team Name" in row2 else ""
             minutes2 = int(row2["Minutes"]) if "Minutes" in row2 else "NA"
             pos2 = row2["Position Group"] if "Position Group" in row2 else ""
-            title_text += f" vs {p2} ({pos2}) – {s2} – {team2} ({minutes2} min)"
+            title_text += f" vs {p2} ({pos2}) – {s2} – {team2} - {minutes2} min"
 
         # 9) Mise en forme finale
         fig.update_layout(
