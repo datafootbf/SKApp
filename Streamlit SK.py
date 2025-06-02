@@ -2496,9 +2496,8 @@ elif page == "xTech/xDef":
                     })
                 detail_df = pd.DataFrame(metric_rows)
                 detail_df = detail_df.drop_duplicates(subset=["Métrique"], keep="first")
-                st.dataframe(detail_df.set_index("Métrique"), use_container_width=True)
-        
-                # Affichage jauge Save
+            
+                # Affichage jauge Save (en premier)
                 hue_save = 120 * (save_score / 100) if pd.notna(save_score) else 0
                 bar_color_save = f"hsl({hue_save:.0f}, 75%, 50%)"
                 fig_save = go.Figure(go.Indicator(
@@ -2520,12 +2519,13 @@ elif page == "xTech/xDef":
                 ))
                 fig_save.update_layout(margin={'t': 40, 'b': 0, 'l': 0, 'r': 0}, paper_bgcolor="rgba(0,0,0,0)", height=250)
                 st.plotly_chart(fig_save, use_container_width=True)
-        
+            
+                # Label sous la jauge
                 st.markdown(
                     f"<div style='text-align:center; font-size:18px; margin-top:-22px; margin-bottom:2px;'><b>Save</b></div>",
                     unsafe_allow_html=True
                 )
-        
+            
                 # Moyenne Save index
                 df_filtre = df_tech[
                     (df_tech["Position Group"] == "Goalkeeper") &
@@ -2546,6 +2546,12 @@ elif page == "xTech/xDef":
                         "The 500min threshold is not reached in the competition, no average can be calculated.</div>",
                         unsafe_allow_html=True
                     )
+            
+                # Titre avant le tableau
+                st.markdown("##### Détail du score Save")
+                # Tableau à la fin
+                st.dataframe(detail_df.set_index("Métrique"), use_container_width=True)
+
             else:
                 fig_def = go.Figure(go.Indicator(
                     mode="gauge+number",
