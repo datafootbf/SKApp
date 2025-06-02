@@ -1519,17 +1519,17 @@ if page == "xPhysical":
         )
         st.plotly_chart(fig_gauge, use_container_width=True)
         
+        # Label xPhy juste sous le score
+        st.markdown(
+            "<div style='text-align:center; font-size:18px; margin-top:-22px; margin-bottom:2px;'><b>xPhy</b></div>",
+            unsafe_allow_html=True
+        )
+    
         # Phrase moyenne (si tu veux la garder)
         st.markdown(
             f"<div style='text-align:center; font-size:14px; margin-top:-20px; color:grey'>"
             f"Moyenne xPhysical ({position} en {row['Competition']}): {mean_peer:.1f}"
             "</div>",
-            unsafe_allow_html=True
-        )
-        
-        # Label xPhy juste sous le score
-        st.markdown(
-            "<div style='text-align:center; font-size:18px; margin-top:-22px; margin-bottom:2px;'><b>xPhy</b></div>",
             unsafe_allow_html=True
         )
 
