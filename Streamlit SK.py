@@ -1497,14 +1497,14 @@ if page == "xPhysical":
         fig_gauge = go.Figure(go.Indicator(
             mode="gauge+number",
             value=index_xphy,
-            number={'font': {'size': 48}},  # Pas de suffix ici
+            number={'font': {'size': 48}},  # score en grand
             gauge={
-                'axis':      {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
-                'bar':       {'color': bar_color, 'thickness': 0.25},
-                'bgcolor':   "rgba(255,255,255,0)",
+                'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
+                'bar': {'color': bar_color, 'thickness': 0.25},
+                'bgcolor': "rgba(255,255,255,0)",
                 'borderwidth': 0,
-                'shape':     "angular",
-                'steps':     [{'range': [0, 100], 'color': 'rgba(100,100,100,0.3)'}],
+                'shape': "angular",
+                'steps': [{'range': [0, 100], 'color': 'rgba(100,100,100,0.3)'}],
                 'threshold': {'line': {'color': "white", 'width': 4},
                               'thickness': 0.75,
                               'value': mean_peer}
@@ -1512,28 +1512,24 @@ if page == "xPhysical":
             domain={'x': [0,1], 'y': [0,1]},
             title={'text': f"<b>{rank}ᵉ/{total_peers}</b>", 'font': {'size': 20}}
         ))
-        
-        # Ajout de l’annotation "xPhy" juste en dessous du score
-        fig_gauge.add_annotation(
-            x=0.5, y=0.37,  # x=0.5 (centre horizontal), y plus bas que le chiffre
-            text="<span style='font-size:22px; color:grey;'>xPhy</span>",
-            showarrow=False,
-            font=dict(size=22, color='grey'),
-            xref="paper", yref="paper",
-            align="center"
-        )
-        
         fig_gauge.update_layout(
-            margin={'t':40, 'b':0, 'l':0, 'r':0},
+            margin={'t':40,'b':0,'l':0,'r':0},
             paper_bgcolor="rgba(0,0,0,0)",
             height=300
         )
-
         st.plotly_chart(fig_gauge, use_container_width=True)
+        
+        # Phrase moyenne (si tu veux la garder)
         st.markdown(
             f"<div style='text-align:center; font-size:14px; margin-top:-20px; color:grey'>"
             f"Moyenne xPhysical ({position} en {row['Competition']}): {mean_peer:.1f}"
             "</div>",
+            unsafe_allow_html=True
+        )
+        
+        # Label xPhy juste sous le score
+        st.markdown(
+            "<div style='text-align:center; font-size:18px; margin-top:-22px; margin-bottom:2px;'><b>xPhy</b></div>",
             unsafe_allow_html=True
         )
 
