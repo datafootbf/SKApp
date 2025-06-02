@@ -1093,20 +1093,18 @@ if page == "xPhysical":
             player = st.selectbox(
                 "Sélectionner un joueur",
                 sorted(df["Short Name"].dropna().unique()),
-                key="radar_p1"  # même clé que Radar
+                key="idx_p1"
             )
         with col2:
             seasons = sorted(
                 df[df["Short Name"] == player]["Season"]
                   .dropna().unique()
             )
-            # Attention : index par défaut
-            default_idx = seasons.index(st.session_state["radar_s1"]) if "radar_s1" in st.session_state and st.session_state["radar_s1"] in seasons else len(seasons)-1
             season = st.selectbox(
                 "Sélectionner une saison",
                 seasons,
-                index=default_idx,
-                key="radar_s1"  # même clé que Radar
+                index=len(seasons) - 1,
+                key="idx_s1"
             )
 
         # 2) Filtrer par Joueur + Saison
