@@ -2547,56 +2547,56 @@ elif page == "xTech/xDef":
                         unsafe_allow_html=True
                     )
             else:
-            fig_def = go.Figure(go.Indicator(
-                mode="gauge+number",
-                value=round(def_score),
-                number={'font': {'size': 40}},
-                gauge={
-                    'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
-                    'bar': {'color': bar_color_def, 'thickness': 0.25},
-                    'bgcolor': "rgba(255,255,255,0)",
-                    'borderwidth': 0,
-                    'steps': [{'range': [0, 100], 'color': 'rgba(100,100,100,0.2)'}],
-                    'threshold': {'line': {'color': "white", 'width': 4},
-                                  'thickness': 0.75,
-                                  'value': mean_def}
-                },
-                domain={'x': [0, 1], 'y': [0, 1]},
-                title={'text': f"<b>{rank_def}ᵉ / {total_peers}</b>", 'font': {'size': 18}}
-            ))
-            fig_def.update_layout(margin={'t': 40, 'b': 0, 'l': 0, 'r': 0}, paper_bgcolor="rgba(0,0,0,0)", height=250)
-            st.plotly_chart(fig_def, use_container_width=True)
-
-            st.markdown(
-                f"<div style='text-align:center; font-size:18px; margin-top:-22px; margin-bottom:2px;'><b>{def_label}</b></div>",
-                unsafe_allow_html=True
-            )
-
-            # Moyenne, placée juste sous le label
-            # Filtrage des joueurs pour la moyenne
-            df_filtre = df_tech[
-                (df_tech["Position Group"] == pos) &
-                (df_tech["Competition Name"] == comp) &
-                (df_tech["Minutes"] >= 500)
-            ]
-            
-            if not df_filtre.empty:
-                mean_def = df_filtre[def_col].mean()
-                if pd.notnull(mean_def):
-                    mean_def_affiche = round(mean_def)
-                    st.markdown(
-                        f"<div style='text-align:center; color:grey; margin-top:-8px; margin-bottom:12px;'>"
-                        f"Moyenne {def_label} ({pos} en {comp}) : {mean_def_affiche}</div>",
-                        unsafe_allow_html=True
-                    )
-            else:
+                fig_def = go.Figure(go.Indicator(
+                    mode="gauge+number",
+                    value=round(def_score),
+                    number={'font': {'size': 40}},
+                    gauge={
+                        'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
+                        'bar': {'color': bar_color_def, 'thickness': 0.25},
+                        'bgcolor': "rgba(255,255,255,0)",
+                        'borderwidth': 0,
+                        'steps': [{'range': [0, 100], 'color': 'rgba(100,100,100,0.2)'}],
+                        'threshold': {'line': {'color': "white", 'width': 4},
+                                      'thickness': 0.75,
+                                      'value': mean_def}
+                    },
+                    domain={'x': [0, 1], 'y': [0, 1]},
+                    title={'text': f"<b>{rank_def}ᵉ / {total_peers}</b>", 'font': {'size': 18}}
+                ))
+                fig_def.update_layout(margin={'t': 40, 'b': 0, 'l': 0, 'r': 0}, paper_bgcolor="rgba(0,0,0,0)", height=250)
+                st.plotly_chart(fig_def, use_container_width=True)
+    
                 st.markdown(
-                    "<div style='text-align:center; color:#b0b0b0; font-size:13px; margin-top:-8px; margin-bottom:12px;'>"
-                    "The 500min threshold is not reached in the competition, no average can be calculated.</div>",
+                    f"<div style='text-align:center; font-size:18px; margin-top:-22px; margin-bottom:2px;'><b>{def_label}</b></div>",
                     unsafe_allow_html=True
                 )
-            
-            st.markdown("##### Détail du score xDEF")
+    
+                # Moyenne, placée juste sous le label
+                # Filtrage des joueurs pour la moyenne
+                df_filtre = df_tech[
+                    (df_tech["Position Group"] == pos) &
+                    (df_tech["Competition Name"] == comp) &
+                    (df_tech["Minutes"] >= 500)
+                ]
+                
+                if not df_filtre.empty:
+                    mean_def = df_filtre[def_col].mean()
+                    if pd.notnull(mean_def):
+                        mean_def_affiche = round(mean_def)
+                        st.markdown(
+                            f"<div style='text-align:center; color:grey; margin-top:-8px; margin-bottom:12px;'>"
+                            f"Moyenne {def_label} ({pos} en {comp}) : {mean_def_affiche}</div>",
+                            unsafe_allow_html=True
+                        )
+                else:
+                    st.markdown(
+                        "<div style='text-align:center; color:#b0b0b0; font-size:13px; margin-top:-8px; margin-bottom:12px;'>"
+                        "The 500min threshold is not reached in the competition, no average can be calculated.</div>",
+                        unsafe_allow_html=True
+                    )
+                
+                st.markdown("##### Détail du score xDEF")
 
             # Tableau DEF
             if pos == "Goalkeeper":
@@ -2748,54 +2748,54 @@ elif page == "xTech/xDef":
                         unsafe_allow_html=True
                     )
             else:
-            fig_tech = go.Figure(go.Indicator(
-                mode="gauge+number",
-                value=round(tech_score),
-                number={'font': {'size': 40}},
-                gauge={
-                    'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
-                    'bar': {'color': bar_color_tech, 'thickness': 0.25},
-                    'bgcolor': "rgba(255,255,255,0)",
-                    'borderwidth': 0,
-                    'steps': [{'range': [0, 100], 'color': 'rgba(100,100,100,0.2)'}],
-                    'threshold': {'line': {'color': "white", 'width': 4},
-                                  'thickness': 0.75,
-                                  'value': mean_tech}
-                },
-                domain={'x': [0, 1], 'y': [0, 1]},
-                title={'text': f"<b>{rank_tech}ᵉ / {total_peers}</b>", 'font': {'size': 18}}
-            ))
-            fig_tech.update_layout(margin={'t': 40, 'b': 0, 'l': 0, 'r': 0}, paper_bgcolor="rgba(0,0,0,0)", height=250)
-            st.plotly_chart(fig_tech, use_container_width=True)
-            # Ajoute le label juste sous la jauge, avant la moyenne
-            st.markdown(
-                f"<div style='text-align:center; font-size:18px; margin-top:-22px; margin-bottom:2px;'><b>{tech_label}</b></div>",
-                unsafe_allow_html=True
-            )
-            # Filtrage des joueurs pour la moyenne TECH
-            df_filtre_tech = df_tech[
-                (df_tech["Position Group"] == pos) &
-                (df_tech["Competition Name"] == comp) &
-                (df_tech["Minutes"] >= 500)
-            ]
-            
-            if not df_filtre_tech.empty:
-                mean_tech = df_filtre_tech[tech_col].mean()
-                if pd.notnull(mean_tech):
-                    mean_tech_affiche = round(mean_tech)
-                    st.markdown(
-                        f"<div style='text-align:center; color:grey; margin-top:-8px; margin-bottom:12px;'>"
-                        f"Moyenne {tech_label} ({pos} en {comp}) : {mean_tech_affiche}</div>",
-                        unsafe_allow_html=True
-                    )
-            else:
+                fig_tech = go.Figure(go.Indicator(
+                    mode="gauge+number",
+                    value=round(tech_score),
+                    number={'font': {'size': 40}},
+                    gauge={
+                        'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
+                        'bar': {'color': bar_color_tech, 'thickness': 0.25},
+                        'bgcolor': "rgba(255,255,255,0)",
+                        'borderwidth': 0,
+                        'steps': [{'range': [0, 100], 'color': 'rgba(100,100,100,0.2)'}],
+                        'threshold': {'line': {'color': "white", 'width': 4},
+                                      'thickness': 0.75,
+                                      'value': mean_tech}
+                    },
+                    domain={'x': [0, 1], 'y': [0, 1]},
+                    title={'text': f"<b>{rank_tech}ᵉ / {total_peers}</b>", 'font': {'size': 18}}
+                ))
+                fig_tech.update_layout(margin={'t': 40, 'b': 0, 'l': 0, 'r': 0}, paper_bgcolor="rgba(0,0,0,0)", height=250)
+                st.plotly_chart(fig_tech, use_container_width=True)
+                # Ajoute le label juste sous la jauge, avant la moyenne
                 st.markdown(
-                    "<div style='text-align:center; color:#b0b0b0; font-size:13px; margin-top:-8px; margin-bottom:12px;'>"
-                    "The 500min threshold is not reached in the competition, no average can be calculated.</div>",
+                    f"<div style='text-align:center; font-size:18px; margin-top:-22px; margin-bottom:2px;'><b>{tech_label}</b></div>",
                     unsafe_allow_html=True
                 )
-            
-            st.markdown("##### Détail du score xTECH")
+                # Filtrage des joueurs pour la moyenne TECH
+                df_filtre_tech = df_tech[
+                    (df_tech["Position Group"] == pos) &
+                    (df_tech["Competition Name"] == comp) &
+                    (df_tech["Minutes"] >= 500)
+                ]
+                
+                if not df_filtre_tech.empty:
+                    mean_tech = df_filtre_tech[tech_col].mean()
+                    if pd.notnull(mean_tech):
+                        mean_tech_affiche = round(mean_tech)
+                        st.markdown(
+                            f"<div style='text-align:center; color:grey; margin-top:-8px; margin-bottom:12px;'>"
+                            f"Moyenne {tech_label} ({pos} en {comp}) : {mean_tech_affiche}</div>",
+                            unsafe_allow_html=True
+                        )
+                else:
+                    st.markdown(
+                        "<div style='text-align:center; color:#b0b0b0; font-size:13px; margin-top:-8px; margin-bottom:12px;'>"
+                        "The 500min threshold is not reached in the competition, no average can be calculated.</div>",
+                        unsafe_allow_html=True
+                    )
+                
+                st.markdown("##### Détail du score xTECH")
 
             # Tableau TECH
             if pos == "Goalkeeper":
