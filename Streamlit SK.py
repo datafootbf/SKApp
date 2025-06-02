@@ -2115,21 +2115,33 @@ elif page == "xTech/xDef":
             with col4:
                 seasons2 = sorted(df_tech[df_tech["Player Name"] == p2]["Season Name"].dropna().unique().tolist())
                 s2 = st.selectbox("Saison 2", seasons2, key="tech_radar_s2")
-
             df2 = df_tech[(df_tech["Player Name"] == p2) & (df_tech["Season Name"] == s2)]
-
             if df2.empty:
                 st.warning("Aucune donnée trouvée pour le joueur 2.")
                 st.stop()
-
+        
+            # === Sélection compétition pour Joueur 2 ===
+            df_allplayer2 = df_tech[(df_tech["Player Name"] == p2) & (df_tech["Season Name"] == s2)]
+            comp_minutes2 = df_allplayer2.groupby("Competition Name")["Minutes"].sum().sort_values(ascending=False)
+            main_competition2 = comp_minutes2.index[0] if not comp_minutes2.empty else None
+        
+            competitions2 = df2["Competition Name"].dropna().unique().tolist()
+            if len(competitions2) > 1:
+                index_main2 = competitions2.index(main_competition2) if main_competition2 in competitions2 else 0
+                comp2 = st.selectbox("Compétition 2", sorted(competitions2), key="tech_radar_comp2", index=index_main2)
+                df2 = df2[df2["Competition Name"] == comp2]
+            else:
+                comp2 = competitions2[0]
+        
             teams2 = df2["Team Name"].dropna().unique().tolist()
             if len(teams2) > 1:
                 team2 = st.selectbox("Club 2", teams2, key="tech_radar_team2")
                 df2 = df2[df2["Team Name"] == team2]
             else:
                 team2 = teams2[0]
-
+        
             row2 = df2.iloc[0]
+            pos2 = row2["Position Group"] if "Position Group" in row2 else ""
 
         # Peers
         top5_leagues = ["Premier League", "Ligue 1", "La Liga", "Serie A", "1. Bundesliga"]
