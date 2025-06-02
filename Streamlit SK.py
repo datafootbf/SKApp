@@ -2590,18 +2590,31 @@ elif page == "xTech/xDef":
                 f"<div style='text-align:center; font-size:18px; margin-top:-22px; margin-bottom:2px;'><b>{tech_label}</b></div>",
                 unsafe_allow_html=True
             )
-            mean_tech = df_tech[
+            # Filtrage des joueurs pour la moyenne TECH
+            df_filtre_tech = df_tech[
                 (df_tech["Position Group"] == pos) &
                 (df_tech["Competition Name"] == comp) &
                 (df_tech["Minutes"] >= 500)
-            ][tech_col].mean()
-
-            st.markdown(
-                f"<div style='text-align:center; color:grey; margin-top:-8px; margin-bottom:12px;'>"
-                f"Moyenne {tech_label} ({pos} en {comp}) : {round(mean_tech)}</div>",
-                unsafe_allow_html=True
-            )
+            ]
+            
+            if not df_filtre_tech.empty:
+                mean_tech = df_filtre_tech[tech_col].mean()
+                if pd.notnull(mean_tech):
+                    mean_tech_affiche = round(mean_tech)
+                    st.markdown(
+                        f"<div style='text-align:center; color:grey; margin-top:-8px; margin-bottom:12px;'>"
+                        f"Moyenne {tech_label} ({pos} en {comp}) : {mean_tech_affiche}</div>",
+                        unsafe_allow_html=True
+                    )
+            else:
+                st.markdown(
+                    "<div style='text-align:center; color:#b0b0b0; font-size:13px; margin-top:-8px; margin-bottom:12px;'>"
+                    "The 500min threshold is not reached in the competition, no average can be calculated.</div>",
+                    unsafe_allow_html=True
+                )
+            
             st.markdown("##### Détail du score xTECH")
+
             # Tableau TECH
             if pos == "Goalkeeper":
                 metrics = [
