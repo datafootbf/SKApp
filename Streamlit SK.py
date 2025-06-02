@@ -2044,10 +2044,16 @@ elif page == "xTech/xDef":
             st.warning("Aucune donnée trouvée pour ce joueur et cette saison.")
             st.stop()
         
-        # === AJOUT : Sélection compétition si plusieurs ===
+        # Calcul de la compétition principale (où le joueur a le plus joué sur cette saison)
+        df_allplayer1 = df_tech[(df_tech["Player Name"] == p1) & (df_tech["Season Name"] == s1)]
+        comp_minutes1 = df_allplayer1.groupby("Competition Name")["Minutes"].sum().sort_values(ascending=False)
+        main_competition1 = comp_minutes1.index[0] if not comp_minutes1.empty else None
+        
         competitions1 = df1["Competition Name"].dropna().unique().tolist()
         if len(competitions1) > 1:
-            comp1 = st.selectbox("Compétition 1", sorted(competitions1), key="tech_radar_comp1")
+            # Préselection sur la compétition principale
+            index_main1 = competitions1.index(main_competition1) if main_competition1 in competitions1 else 0
+            comp1 = st.selectbox("Compétition 1", sorted(competitions1), key="tech_radar_comp1", index=index_main1)
             df1 = df1[df1["Competition Name"] == comp1]
         else:
             comp1 = competitions1[0]
@@ -2236,11 +2242,12 @@ elif page == "xTech/xDef":
         # Titre dynamique
         team1 = row1["Team Name"] if "Team Name" in row1 else ""
         minutes1 = int(row1["Minutes"]) if "Minutes" in row1 else "NA"
-        title_text = f"xTechnical Radar – {p1} {s1} {team1} ({pos1} – {minutes1} min)"
+        title_text = f"xTechnical Radar – {p1} ({pos1}) – {s1} – {team1} ({minutes1} min)"
         if compare:
             team2 = row2["Team Name"] if "Team Name" in row2 else ""
             minutes2 = int(row2["Minutes"]) if "Minutes" in row2 else "NA"
-            title_text += f" vs {p2} {s2} {team2} ({minutes2} min)"
+            pos2 = row2["Position Group"] if "Position Group" in row2 else ""
+            title_text += f" vs {p2} ({pos2}) – {s2} – {team2} ({minutes2} min)"
 
         # 9) Mise en forme finale
         fig.update_layout(
