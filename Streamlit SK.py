@@ -2548,7 +2548,7 @@ elif page == "xTech/xDef":
                     )
             
                 # Titre avant le tableau
-                st.markdown("##### Détail du score Save")
+                st.markdown("##### Détail du score xSave")
                 # Tableau à la fin
                 st.dataframe(detail_df.set_index("Métrique"), use_container_width=True)
 
@@ -2755,7 +2755,7 @@ elif page == "xTech/xDef":
                     )
             
                 # Titre avant le tableau
-                st.markdown("##### Détail du score Usage")
+                st.markdown("##### Détail du score xUsage")
                 # Tableau à la fin
                 st.dataframe(detail_df.set_index("Métrique"), use_container_width=True)
             else:
