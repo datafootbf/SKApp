@@ -2410,6 +2410,7 @@ elif page == "xTech/xDef":
             team1 = teams[0]
         
         row = df1.iloc[0]
+        is_gk = row["Position Group"] == "Goalkeeper"
         pos = row["Position Group"]
         comp = row["Competition Name"]
         age = int(row["Age"])
@@ -2468,6 +2469,84 @@ elif page == "xTech/xDef":
         hue_def  = 120 * (def_score / 100)
         bar_color_def  = f"hsl({hue_def:.0f}, 75%, 50%)"
         with col1:
+            if is_gk:
+                # ========== DEF GK ========== 
+                gk_def_metrics = [
+                    ("xTech GK GSAA %", "GSAA %"),
+                    ("xTech GK Save %", "Save %"),
+                    ("xTech GK Aggressive Distance", "Aggressive Distance"),
+                    ("xTech GK Long Ball %", "Long Ball %"),
+                    ("xTech GK OPxGBuildup", "OPxGBuildup"),
+                ]
+                metric_rows = []
+                for col, label in gk_def_metrics:
+                    val = row.get(col, None)
+                    metric_rows.append({
+                        "Métrique": label,
+                        "Valeur Joueur": f"{val:.2f}" if pd.notna(val) else "NA",
+                        "Points": ""  # Pas de barème pour GK, adapter si besoin
+                    })
+                # Index Save (/100)
+                save_score = row.get("xTech GK Save (/100)", np.nan)
+                if pd.notna(save_score):
+                    metric_rows.append({
+                        "Métrique": "**GK Save Index**",
+                        "Valeur Joueur": "",
+                        "Points": f"**{save_score:.0f} / 100**"
+                    })
+                detail_df = pd.DataFrame(metric_rows)
+                detail_df = detail_df.drop_duplicates(subset=["Métrique"], keep="first")
+                st.dataframe(detail_df.set_index("Métrique"), use_container_width=True)
+        
+                # Affichage jauge Save
+                hue_save = 120 * (save_score / 100) if pd.notna(save_score) else 0
+                bar_color_save = f"hsl({hue_save:.0f}, 75%, 50%)"
+                fig_save = go.Figure(go.Indicator(
+                    mode="gauge+number",
+                    value=round(save_score) if pd.notna(save_score) else 0,
+                    number={'font': {'size': 40}},
+                    gauge={
+                        'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
+                        'bar': {'color': bar_color_save, 'thickness': 0.25},
+                        'bgcolor': "rgba(255,255,255,0)",
+                        'borderwidth': 0,
+                        'steps': [{'range': [0, 100], 'color': 'rgba(100,100,100,0.2)'}],
+                        'threshold': {'line': {'color': "white", 'width': 4},
+                                      'thickness': 0.75,
+                                      'value': mean_def}
+                    },
+                    domain={'x': [0, 1], 'y': [0, 1]},
+                    title={'text': f"<b>{rank_def}ᵉ / {total_peers}</b>", 'font': {'size': 18}}
+                ))
+                fig_save.update_layout(margin={'t': 40, 'b': 0, 'l': 0, 'r': 0}, paper_bgcolor="rgba(0,0,0,0)", height=250)
+                st.plotly_chart(fig_save, use_container_width=True)
+        
+                st.markdown(
+                    f"<div style='text-align:center; font-size:18px; margin-top:-22px; margin-bottom:2px;'><b>Save</b></div>",
+                    unsafe_allow_html=True
+                )
+        
+                # Moyenne Save index
+                df_filtre = df_tech[
+                    (df_tech["Position Group"] == "Goalkeeper") &
+                    (df_tech["Competition Name"] == comp) &
+                    (df_tech["Minutes"] >= 500)
+                ]
+                if not df_filtre.empty:
+                    mean_save = df_filtre["xTech GK Save (/100)"].mean()
+                    if pd.notnull(mean_save):
+                        st.markdown(
+                            f"<div style='text-align:center; color:grey; margin-top:-8px; margin-bottom:12px;'>"
+                            f"Moyenne Save (GK en {comp}) : {round(mean_save)}</div>",
+                            unsafe_allow_html=True
+                        )
+                else:
+                    st.markdown(
+                        "<div style='text-align:center; color:#b0b0b0; font-size:13px; margin-top:-8px; margin-bottom:12px;'>"
+                        "The 500min threshold is not reached in the competition, no average can be calculated.</div>",
+                        unsafe_allow_html=True
+                    )
+            else:
             fig_def = go.Figure(go.Indicator(
                 mode="gauge+number",
                 value=round(def_score),
@@ -2591,6 +2670,84 @@ elif page == "xTech/xDef":
                 hue_tech = 120 * (tech_score / 100)
                 bar_color_tech = f"hsl({hue_tech:.0f}, 75%, 50%)"
         with col2:
+            if is_gk:
+                # ========== TECH GK ==========
+                gk_tech_metrics = [
+                    ("xTech GK Passing %", "Passing %"),
+                    ("xTech GK Passing u. Pressure %", "Passing under Pressure %"),
+                    ("xTech GK Pass Into Danger %", "Pass into Danger %"),
+                    ("xTech GK Long Ball %", "Long Ball %"),
+                    ("xTech GK OPxGBuildup", "OPxGBuildup"),
+                ]
+                metric_rows = []
+                for col, label in gk_tech_metrics:
+                    val = row.get(col, None)
+                    metric_rows.append({
+                        "Métrique": label,
+                        "Valeur Joueur": f"{val:.2f}" if pd.notna(val) else "NA",
+                        "Points": ""  # Pas de barème pour GK, adapter si besoin
+                    })
+                # Index Usage (/100)
+                usage_score = row.get("xTech GK Usage (/100)", np.nan)
+                if pd.notna(usage_score):
+                    metric_rows.append({
+                        "Métrique": "**GK Usage Index**",
+                        "Valeur Joueur": "",
+                        "Points": f"**{usage_score:.0f} / 100**"
+                    })
+                detail_df = pd.DataFrame(metric_rows)
+                detail_df = detail_df.drop_duplicates(subset=["Métrique"], keep="first")
+                st.dataframe(detail_df.set_index("Métrique"), use_container_width=True)
+        
+                # Affichage jauge Usage
+                hue_usage = 120 * (usage_score / 100) if pd.notna(usage_score) else 0
+                bar_color_usage = f"hsl({hue_usage:.0f}, 75%, 50%)"
+                fig_usage = go.Figure(go.Indicator(
+                    mode="gauge+number",
+                    value=round(usage_score) if pd.notna(usage_score) else 0,
+                    number={'font': {'size': 40}},
+                    gauge={
+                        'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
+                        'bar': {'color': bar_color_usage, 'thickness': 0.25},
+                        'bgcolor': "rgba(255,255,255,0)",
+                        'borderwidth': 0,
+                        'steps': [{'range': [0, 100], 'color': 'rgba(100,100,100,0.2)'}],
+                        'threshold': {'line': {'color': "white", 'width': 4},
+                                      'thickness': 0.75,
+                                      'value': mean_tech}
+                    },
+                    domain={'x': [0, 1], 'y': [0, 1]},
+                    title={'text': f"<b>{rank_tech}ᵉ / {total_peers}</b>", 'font': {'size': 18}}
+                ))
+                fig_usage.update_layout(margin={'t': 40, 'b': 0, 'l': 0, 'r': 0}, paper_bgcolor="rgba(0,0,0,0)", height=250)
+                st.plotly_chart(fig_usage, use_container_width=True)
+        
+                st.markdown(
+                    f"<div style='text-align:center; font-size:18px; margin-top:-22px; margin-bottom:2px;'><b>Usage</b></div>",
+                    unsafe_allow_html=True
+                )
+        
+                # Moyenne Usage index
+                df_filtre_tech = df_tech[
+                    (df_tech["Position Group"] == "Goalkeeper") &
+                    (df_tech["Competition Name"] == comp) &
+                    (df_tech["Minutes"] >= 500)
+                ]
+                if not df_filtre_tech.empty:
+                    mean_usage = df_filtre_tech["xTech GK Usage (/100)"].mean()
+                    if pd.notnull(mean_usage):
+                        st.markdown(
+                            f"<div style='text-align:center; color:grey; margin-top:-8px; margin-bottom:12px;'>"
+                            f"Moyenne Usage (GK en {comp}) : {round(mean_usage)}</div>",
+                            unsafe_allow_html=True
+                        )
+                else:
+                    st.markdown(
+                        "<div style='text-align:center; color:#b0b0b0; font-size:13px; margin-top:-8px; margin-bottom:12px;'>"
+                        "The 500min threshold is not reached in the competition, no average can be calculated.</div>",
+                        unsafe_allow_html=True
+                    )
+            else:
             fig_tech = go.Figure(go.Indicator(
                 mode="gauge+number",
                 value=round(tech_score),
