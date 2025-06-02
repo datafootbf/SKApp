@@ -1497,7 +1497,10 @@ if page == "xPhysical":
         fig_gauge = go.Figure(go.Indicator(
             mode="gauge+number",
             value=index_xphy,
-            number={'font': {'size': 48}},
+            number={
+                'font': {'size': 48},
+                'suffix': " xPhy"  # <-- AJOUT ICI
+            },
             gauge={
                 'axis':      {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
                 'bar':       {'color': bar_color, 'thickness': 0.25},
@@ -1522,11 +1525,6 @@ if page == "xPhysical":
             f"<div style='text-align:center; font-size:14px; margin-top:-20px; color:grey'>"
             f"Moyenne xPhysical ({position} en {row['Competition']}): {mean_peer:.1f}"
             "</div>",
-            unsafe_allow_html=True
-        )
-        st.markdown(
-            "<div style='text-align:center; font-size:18px; margin-top:-10px'>"
-            "<b>xPhy</b></div>",
             unsafe_allow_html=True
         )
 
