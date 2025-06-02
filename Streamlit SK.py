@@ -2703,9 +2703,8 @@ elif page == "xTech/xDef":
                     })
                 detail_df = pd.DataFrame(metric_rows)
                 detail_df = detail_df.drop_duplicates(subset=["Métrique"], keep="first")
-                st.dataframe(detail_df.set_index("Métrique"), use_container_width=True)
-        
-                # Affichage jauge Usage
+            
+                # Affichage jauge Usage (en premier)
                 hue_usage = 120 * (usage_score / 100) if pd.notna(usage_score) else 0
                 bar_color_usage = f"hsl({hue_usage:.0f}, 75%, 50%)"
                 fig_usage = go.Figure(go.Indicator(
@@ -2727,12 +2726,13 @@ elif page == "xTech/xDef":
                 ))
                 fig_usage.update_layout(margin={'t': 40, 'b': 0, 'l': 0, 'r': 0}, paper_bgcolor="rgba(0,0,0,0)", height=250)
                 st.plotly_chart(fig_usage, use_container_width=True)
-        
+            
+                # Label sous la jauge
                 st.markdown(
                     f"<div style='text-align:center; font-size:18px; margin-top:-22px; margin-bottom:2px;'><b>Usage</b></div>",
                     unsafe_allow_html=True
                 )
-        
+            
                 # Moyenne Usage index
                 df_filtre_tech = df_tech[
                     (df_tech["Position Group"] == "Goalkeeper") &
@@ -2753,6 +2753,11 @@ elif page == "xTech/xDef":
                         "The 500min threshold is not reached in the competition, no average can be calculated.</div>",
                         unsafe_allow_html=True
                     )
+            
+                # Titre avant le tableau
+                st.markdown("##### Détail du score Usage")
+                # Tableau à la fin
+                st.dataframe(detail_df.set_index("Métrique"), use_container_width=True)
             else:
                 fig_tech = go.Figure(go.Indicator(
                     mode="gauge+number",
