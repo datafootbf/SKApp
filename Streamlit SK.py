@@ -1527,7 +1527,7 @@ if page == "xPhysical":
     
         # Phrase moyenne (si tu veux la garder)
         st.markdown(
-            f"<div style='text-align:center; font-size:14px; margin-top:-20px; color:grey'>"
+            f"<div style='text-align:center; font-size:14px; margin-top:-8px; color:grey'>"
             f"Moyenne xPhysical ({position} en {row['Competition']}): {mean_peer:.1f}"
             "</div>",
             unsafe_allow_html=True
