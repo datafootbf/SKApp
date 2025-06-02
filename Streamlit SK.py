@@ -1497,10 +1497,7 @@ if page == "xPhysical":
         fig_gauge = go.Figure(go.Indicator(
             mode="gauge+number",
             value=index_xphy,
-            number={
-                'font': {'size': 48},
-                'suffix': " xPhy"  # <-- AJOUT ICI
-            },
+            number={'font': {'size': 48}},  # Pas de suffix ici
             gauge={
                 'axis':      {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
                 'bar':       {'color': bar_color, 'thickness': 0.25},
@@ -1515,11 +1512,23 @@ if page == "xPhysical":
             domain={'x': [0,1], 'y': [0,1]},
             title={'text': f"<b>{rank}ᵉ/{total_peers}</b>", 'font': {'size': 20}}
         ))
-        fig_gauge.update_layout(
-            margin          = {'t':40,'b':0,'l':0,'r':0},
-            paper_bgcolor   = "rgba(0,0,0,0)",
-            height          = 300
+        
+        # Ajout de l’annotation "xPhy" juste en dessous du score
+        fig_gauge.add_annotation(
+            x=0.5, y=0.37,  # x=0.5 (centre horizontal), y plus bas que le chiffre
+            text="<span style='font-size:22px; color:grey;'>xPhy</span>",
+            showarrow=False,
+            font=dict(size=22, color='grey'),
+            xref="paper", yref="paper",
+            align="center"
         )
+        
+        fig_gauge.update_layout(
+            margin={'t':40, 'b':0, 'l':0, 'r':0},
+            paper_bgcolor="rgba(0,0,0,0)",
+            height=300
+        )
+
         st.plotly_chart(fig_gauge, use_container_width=True)
         st.markdown(
             f"<div style='text-align:center; font-size:14px; margin-top:-20px; color:grey'>"
