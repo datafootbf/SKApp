@@ -857,11 +857,19 @@ if page == "xPhysical":
         if not metrics:
             st.warning("Au moins une métrique est nécessaire.")
             st.stop()
+
+        # Ajout colonne Display Name
+        df["Display Name"] = df["Short Name"] + " (" + df["Player"] + ")"
+        
+        # Dictionnaire pour retrouver le Short Name
+        display_to_shortname = dict(zip(df["Display Name"], df["Short Name"]))
         
         # 2) Joueur 1 + Saison 1
         col1, col2 = st.columns(2)
         with col1:
-            p1 = st.selectbox("Joueur 1", sorted(df["Short Name"].unique()), key="radar_p1")
+            display_options = sorted(df["Display Name"].dropna().unique())
+            p1_display = st.selectbox("Joueur 1", display_options, key="radar_p1")
+            p1 = display_to_shortname[p1_display]  # récupère le Short Name
         with col2:
             seasons1 = sorted(df[df["Short Name"] == p1]["Season"].unique().tolist())
             s1 = st.selectbox("Saison 1", seasons1, key="radar_s1")
@@ -889,7 +897,8 @@ if page == "xPhysical":
         if compare:
             col3, col4 = st.columns(2)
             with col3:
-                p2 = st.selectbox("Joueur 2", sorted(df["Short Name"].unique()), key="radar_p2")
+                p2_display = st.selectbox("Joueur 2", display_options, key="radar_p2")
+                p2 = display_to_shortname[p2_display]
             with col4:
                 seasons2 = sorted(df[df["Short Name"] == p2]["Season"].unique().tolist())
                 s2 = st.selectbox("Saison 2", seasons2, key="radar_s2")
@@ -1090,23 +1099,13 @@ if page == "xPhysical":
         # 1) Sélection Joueur & Saison (uniquement les saisons dispos pour ce joueur)
         col1, col2 = st.columns(2)
         with col1:
-            player = st.selectbox(
-                "Sélectionner un joueur",
-                sorted(df["Short Name"].dropna().unique()),
-                key="idx_p1"
-            )
+            display_options = sorted(df["Display Name"].dropna().unique())
+            player_display = st.selectbox("Sélectionner un joueur", display_options, key="idx_p1")
+            player = display_to_shortname[player_display]
         with col2:
-            seasons = sorted(
-                df[df["Short Name"] == player]["Season"]
-                  .dropna().unique()
-            )
-            season = st.selectbox(
-                "Sélectionner une saison",
-                seasons,
-                index=len(seasons) - 1,
-                key="idx_s1"
-            )
-
+            seasons = sorted(df[df["Short Name"] == player]["Season"].dropna().unique())
+            season = st.selectbox("Sélectionner une saison", seasons, index=len(seasons) - 1, key="idx_s1")
+            
         # 2) Filtrer par Joueur + Saison
         df_fs = df[(df["Short Name"] == player) & (df["Season"] == season)]
         if df_fs.empty:
