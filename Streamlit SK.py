@@ -2542,7 +2542,63 @@ elif page == "xTech/xDef":
             
                 # Titre avant le tableau
                 st.markdown("##### Détail du score xSave")
-                # Tableau à la fin
+
+                # === Tableau xSave (GK) ===
+                config = xtech_post_config.get("Goalkeeper")
+                if not config:
+                    st.error("Aucun mapping défini pour le poste Goalkeeper")
+                    st.stop()
+
+                metric_map = config["metric_map"]
+                labels = config["labels"]
+                metric_rows = []
+
+                # --- Métriques SAVE uniquement ---
+                for raw_col in config["save"]:
+                    note_col, scores = metric_map.get(raw_col, (None, None))
+                    if not note_col or raw_col not in df1.columns:
+                        continue
+                    raw_val = row.get(raw_col, None)  # valeur brute
+                    note_val = row.get(note_col, None)  # valeur barémée
+                    max_pts = max(scores)
+                    label = labels.get(raw_col, raw_col)
+                    metric_rows.append({
+                        "Métrique": label,
+                        "Valeur Joueur": f"{raw_val:.2f}" if pd.notna(raw_val) else "NA",
+                        "Points": f"{note_val} / {max_pts}" if pd.notna(note_val) else f"0 / {max_pts}"
+                    })
+
+                # --- Total xSave ---
+                total_points = 0
+                total_max = 0
+                for row_ in metric_rows:
+                    label = row_["Métrique"]
+                    if row_["Points"] and "/" in row_["Points"] and not any(x in label for x in ["Sous-index", "Total", "Index"]):
+                        try:
+                            pts, max_pts = row_["Points"].split("/")
+                            total_points += int(pts.strip(" *"))
+                            total_max += int(max_pts.strip(" *"))
+                        except:
+                            continue
+
+                metric_rows.append({
+                    "Métrique": "**Total**",
+                    "Valeur Joueur": "",
+                    "Points": f"**{total_points} / {total_max}**"
+                })
+
+                # --- Sous-index Save ---
+                sub_val = row.get("xTech GK Save (/100)", None)
+                if pd.notna(sub_val):
+                    metric_rows.append({
+                        "Métrique": "**GK Save Index**",
+                        "Valeur Joueur": "",
+                        "Points": f"**{sub_val:.0f} / 100**"
+                    })
+
+                # === Affichage final du tableau
+                detail_df = pd.DataFrame(metric_rows)
+                detail_df = detail_df.drop_duplicates(subset=["Métrique"], keep="first")
                 st.dataframe(detail_df.set_index("Métrique"), use_container_width=True)
 
             else:
@@ -2748,8 +2804,58 @@ elif page == "xTech/xDef":
                     )
             
                 # Titre avant le tableau
+                # Titre avant le tableau
                 st.markdown("##### Détail du score xUsage")
-                # Tableau à la fin
+
+                # === Tableau xUsage (GK) avec barèmes ===
+                metric_rows = []
+
+                # --- Métriques USAGE uniquement ---
+                for raw_col in config["usage"]:
+                    note_col, scores = metric_map.get(raw_col, (None, None))
+                    if not note_col or raw_col not in df1.columns:
+                        continue
+                    raw_val = row.get(raw_col, None)  # valeur brute
+                    note_val = row.get(note_col, None)  # valeur barémée
+                    max_pts = max(scores)
+                    label = labels.get(raw_col, raw_col)
+                    metric_rows.append({
+                        "Métrique": label,
+                        "Valeur Joueur": f"{raw_val:.2f}" if pd.notna(raw_val) else "NA",
+                        "Points": f"{note_val} / {max_pts}" if pd.notna(note_val) else f"0 / {max_pts}"
+                    })
+
+                # --- Total xUsage ---
+                total_points = 0
+                total_max = 0
+                for row_ in metric_rows:
+                    label = row_["Métrique"]
+                    if row_["Points"] and "/" in row_["Points"] and not any(x in label for x in ["Sous-index", "Total", "Index"]):
+                        try:
+                            pts, max_pts = row_["Points"].split("/")
+                            total_points += int(pts.strip(" *"))
+                            total_max += int(max_pts.strip(" *"))
+                        except:
+                            continue
+
+                metric_rows.append({
+                    "Métrique": "**Total**",
+                    "Valeur Joueur": "",
+                    "Points": f"**{total_points} / {total_max}**"
+                })
+
+                # --- Sous-index Usage ---
+                sub_val = row.get("xTech GK Usage (/100)", None)
+                if pd.notna(sub_val):
+                    metric_rows.append({
+                        "Métrique": "**GK Usage Index**",
+                        "Valeur Joueur": "",
+                        "Points": f"**{sub_val:.0f} / 100**"
+                    })
+
+                # === Affichage final du tableau
+                detail_df = pd.DataFrame(metric_rows)
+                detail_df = detail_df.drop_duplicates(subset=["Métrique"], keep="first")
                 st.dataframe(detail_df.set_index("Métrique"), use_container_width=True)
             else:
                 fig_tech = go.Figure(go.Indicator(
