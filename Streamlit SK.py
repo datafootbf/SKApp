@@ -864,59 +864,83 @@ if page == "xPhysical":
         # Dictionnaire pour retrouver le Short Name
         display_to_shortname = dict(zip(df["Display Name"], df["Short Name"]))
         
-        # 2) Joueur 1 + Saison 1
+        # === MAPPINGS JOUEURS POUR AFFICHAGE ===
+        # Optimisation : mapping unique Player -> Display Name
+        df_display = df[["Player", "Display Name"]].dropna().drop_duplicates()
+        player_to_display = dict(zip(df_display["Player"], df_display["Display Name"]))
+        display_to_player = {v: k for k, v in player_to_display.items()}
+        display_options = sorted(player_to_display.values())
+
+        # === JOUEUR 1 ===
         col1, col2 = st.columns(2)
+
         with col1:
-            display_options = sorted(df["Display Name"].dropna().unique())
-            p1_display = st.selectbox("Joueur 1", display_options, key="radar_p1")
-            p1 = display_to_shortname[p1_display]  # récupère le Short Name
+            # Affichage joueur (Display Name), clé réelle = Player
+            default_display = next((name for name in display_options if "Artem Dovbyk" in name), display_options[0])
+            p1_display = st.selectbox("Joueur 1", display_options, index=display_options.index(default_display), key="radar_p1")
+            p1 = display_to_player[p1_display]
+
         with col2:
-            seasons1 = sorted(df[df["Short Name"] == p1]["Season"].unique().tolist())
-            s1 = st.selectbox("Saison 1", seasons1, key="radar_s1")
-        
-        df1 = df[(df["Short Name"] == p1) & (df["Season"] == s1)]
-        #  — Si plusieurs clubs, on filtre d’abord sur l’équipe
+            # Liste des saisons disponibles
+            seasons1 = sorted(df[df["Player"] == p1]["Season"].dropna().unique().tolist())
+            default_season = "2024/2025" if "2024/2025" in seasons1 else seasons1[-1]
+            s1 = st.selectbox("Saison 1", seasons1, index=seasons1.index(default_season), key="radar_s1")
+
+        df1 = df[(df["Player"] == p1) & (df["Season"] == s1)]
+
+        # Club
         teams1 = df1["Team"].dropna().unique().tolist()
         if len(teams1) > 1:
             team1 = st.selectbox("Sélectionner un club", teams1, key="radar_team1")
             df1 = df1[df1["Team"] == team1]
         else:
             team1 = teams1[0]
-        # Poste 1 (conditionnel)
+
+        # Poste
         poss1 = df1["Position Group"].dropna().unique().tolist()
         pos1 = st.selectbox("Poste 1", poss1, key="radar_pos1") if len(poss1) > 1 else poss1[0]
         df1 = df1[df1["Position Group"] == pos1]
-        # Compétition 1 (conditionnel)
+
+        # Compétition
         comps1 = df1["Competition"].dropna().unique().tolist()
         comp1 = st.selectbox("Compétition 1", comps1, key="radar_c1") if len(comps1) > 1 else comps1[0]
         df1 = df1[df1["Competition"] == comp1]
+
+        # Ligne finale joueur 1
         row1 = df1.iloc[0]
-        
-        # 3) Comparaison Joueur 2 (optionnelle)
+
+        # === COMPARAISON JOUEUR 2 ===
         compare = st.checkbox("Comparer à un 2ᵉ joueur")
         if compare:
             col3, col4 = st.columns(2)
             with col3:
                 p2_display = st.selectbox("Joueur 2", display_options, key="radar_p2")
-                p2 = display_to_shortname[p2_display]
+                p2 = display_to_player[p2_display]
             with col4:
-                seasons2 = sorted(df[df["Short Name"] == p2]["Season"].unique().tolist())
+                seasons2 = sorted(df[df["Player"] == p2]["Season"].unique().tolist())
                 s2 = st.selectbox("Saison 2", seasons2, key="radar_s2")
-        
-            df2 = df[(df["Short Name"] == p2) & (df["Season"] == s2)]
-            # Filtre Club 2 si plusieurs équipes
+
+            df2 = df[(df["Player"] == p2) & (df["Season"] == s2)]
+
+            # Club
             teams2 = df2["Team"].dropna().unique().tolist()
             if len(teams2) > 1:
                 team2 = st.selectbox("Sélectionner un club (Joueur 2)", teams2, key="radar_team2")
                 df2 = df2[df2["Team"] == team2]
             else:
                 team2 = teams2[0]
+
+            # Poste
             poss2 = df2["Position Group"].dropna().unique().tolist()
             pos2 = st.selectbox("Poste 2", poss2, key="radar_pos2") if len(poss2) > 1 else poss2[0]
             df2 = df2[df2["Position Group"] == pos2]
+
+            # Compétition
             comps2 = df2["Competition"].dropna().unique().tolist()
             comp2 = st.selectbox("Compétition 2", comps2, key="radar_c2") if len(comps2) > 1 else comps2[0]
             df2 = df2[df2["Competition"] == comp2]
+
+            # Ligne finale joueur 2
             row2 = df2.iloc[0]
         
         # 4) Préparer les peers (cinq ligues), avec fallback pour libellés “AAAA/AAAA”
@@ -1059,11 +1083,11 @@ if page == "xPhysical":
         # On récupère aussi les noms d’équipes
         team1 = row1["Team"]
         # Titre de base pour joueur 1
-        title_text = f"Physical Comparison - {p1} {s1} {team1} ({pos1})"
+        title_text = f"{p1} ({pos1}) – {s1} – {team1} ({row1['Competition']}) – {int(row1['Age'])} ans"
+
+        # Si comparaison activée, on ajoute joueur 2
         if compare:
-            team2 = row2["Team"]
-            # On ajoute joueur 2 au titre
-            title_text += f" vs {p2} {s2} {team2} ({pos2})"
+            title_text += f" vs {p2} ({pos2}) – {s2} – {row2['Team']} ({row2['Competition']}) – {int(row2['Age'])} ans"
         
         fig.update_layout(
             hovermode='closest',
@@ -1096,18 +1120,26 @@ if page == "xPhysical":
     with tab3:
         st.subheader("xPhysical Player Index")
 
-        # 1) Sélection Joueur & Saison (uniquement les saisons dispos pour ce joueur)
+        # === MAPPINGS JOUEURS (optimisé une seule fois plus haut)
+        # player_to_display = dict(zip(df["Player"], df["Display Name"]))
+        # display_to_player = {v: k for k, v in player_to_display.items()}
+        # display_options = sorted(player_to_display.values())
+
+        # 1) Sélection Joueur & Saison
         col1, col2 = st.columns(2)
+
         with col1:
-            display_options = sorted(df["Display Name"].dropna().unique())
-            player_display = st.selectbox("Sélectionner un joueur", display_options, key="idx_p1")
-            player = display_to_shortname[player_display]
+            default_display = next((name for name in display_options if "Artem Dovbyk" in name), display_options[0])
+            player_display = st.selectbox("Sélectionner un joueur", display_options, index=display_options.index(default_display), key="idx_p1")
+            player = display_to_player[player_display]
+
         with col2:
-            seasons = sorted(df[df["Short Name"] == player]["Season"].dropna().unique())
-            season = st.selectbox("Sélectionner une saison", seasons, index=len(seasons) - 1, key="idx_s1")
-            
+            seasons = sorted(df[df["Player"] == player]["Season"].dropna().unique())
+            default_season = "2024/2025" if "2024/2025" in seasons else seasons[-1]
+            season = st.selectbox("Sélectionner une saison", seasons, index=seasons.index(default_season), key="idx_s1")
+
         # 2) Filtrer par Joueur + Saison
-        df_fs = df[(df["Short Name"] == player) & (df["Season"] == season)]
+        df_fs = df[(df["Player"] == player) & (df["Season"] == season)]
         if df_fs.empty:
             st.warning("Pas de données pour ce joueur / cette saison.")
             st.stop()
@@ -1120,14 +1152,10 @@ if page == "xPhysical":
         else:
             team = teams[0]
 
-        # 4) Filtre Poste si plusieurs (multi‐sélection)
+        # 4) Filtre Poste si plusieurs
         positions = df_fs["Position Group"].dropna().unique().tolist()
         if len(positions) > 1:
-            position = st.selectbox(
-                "Sélectionner un poste",
-                positions,
-                key="idx_position"
-            )
+            position = st.selectbox("Sélectionner un poste", positions, key="idx_position")
         else:
             position = positions[0]
         df_fs = df_fs[df_fs["Position Group"] == position]
@@ -1135,11 +1163,7 @@ if page == "xPhysical":
         # 5) Filtre Compétition si plusieurs
         competitions = df_fs["Competition"].dropna().unique().tolist()
         if len(competitions) > 1:
-            competition = st.selectbox(
-                "Sélectionner une compétition",
-                competitions,
-                key="idx_comp"
-            )
+            competition = st.selectbox("Sélectionner une compétition", competitions, key="idx_comp")
             df_fs = df_fs[df_fs["Competition"] == competition]
         else:
             competition = competitions[0]
@@ -1488,7 +1512,7 @@ if page == "xPhysical":
             (df["Competition"] == row["Competition"])
         ].sort_values("xPhysical", ascending=False)
         mean_peer  = df_peers["xPhysical"].mean()
-        rank       = int(df_peers.reset_index().index[df_peers["Short Name"] == player][0] + 1)
+        rank       = int(df_peers.reset_index().index[df_peers["Player"] == player][0] + 1)
         total_peers= len(df_peers)
         hue        = 120 * (index_xphy / 100)
         bar_color  = f"hsl({hue:.0f}, 75%, 50%)"
