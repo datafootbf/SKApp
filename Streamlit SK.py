@@ -546,7 +546,7 @@ graph_columns = [
 ]
 
 # Charge le logo (met le chemin exact si besoin)
-logo_path = "/Users/favie/Statsbomb/TEST/AS Roma.png"
+logo_path = "AS Roma.png"
 logo = Image.open(logo_path)
 st.sidebar.image(logo, use_container_width=True)
 
