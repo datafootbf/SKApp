@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[1]:
-
-
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -13,44 +7,41 @@ import re
 import plotly.graph_objects as go
 
 st.set_page_config(layout="wide")
-# In[2]:
 
-# Helper pour raccourcir uniquement les saisons "YYYY/YYYY" -> "YY/YY"
 def shorten_season(s):
     s = str(s)
-    # ne traite que le format 4 chiffres / 4 chiffres
     if re.match(r'^\d{4}/\d{4}$', s):
         y1, y2 = s.split('/')
         return f"{y1[-2:]}/{y2[-2:]}"
-    # tout autre format reste identique
     return s
 
+@st.cache_data
+def load_xphysical():
+    df = pd.read_csv('SK_All.csv', sep=",")
+    df.columns = df.columns.str.strip()
+    return df
 
-# Chargement du fichier xPhysical
-file_path = 'SK_All.csv'
+@st.cache_data
+def load_xtechnical():
+    df_tech = pd.read_csv('SB_All.csv', sep=",")
+    df_tech.columns = df_tech.columns.str.strip()
+    df_tech["season_short"] = df_tech["Season Name"].apply(shorten_season)
+    df_tech["Display Name"] = df_tech.apply(
+        lambda row: f"{row['Player Known Name']} ({row['Player Name']})"
+        if pd.notna(row.get("Player Known Name")) and row["Player Known Name"] != row["Player Name"]
+        else row["Player Name"],
+        axis=1
+    )
+    return df_tech
 
-df = pd.read_csv(file_path, sep=",")
+df = load_xphysical()
+df_tech = load_xtechnical()
 
-# Nettoyage colonnes xPhysical
-df.columns = df.columns.str.strip()
-
-# Listes pour les filtres xPhysical
+# Ensuite seulement, tes listes et tes widgets/filtres
 season_list = sorted(df["Season"].dropna().unique().tolist())
 position_list = sorted(df["Position Group"].dropna().unique().tolist())
 competition_list = sorted(df["Competition"].dropna().unique().tolist())
 player_list = sorted(df["Short Name"].dropna().unique().tolist())
-
-# Chargement du fichier xTechnical
-df_tech = pd.read_csv('SB_All.csv', sep=",")
-df_tech.columns = df_tech.columns.str.strip()
-df_tech["season_short"] = df_tech["Season Name"].apply(shorten_season)
-# Affichage combiné : Known Name (Full Name)
-df_tech["Display Name"] = df_tech.apply(
-    lambda row: f"{row['Player Known Name']} ({row['Player Name']})"
-    if pd.notna(row.get("Player Known Name")) and row["Player Known Name"] != row["Player Name"]
-    else row["Player Name"],
-    axis=1
-)
 
 classic_gk_metric_map = {
     "Gsaa Ratio": ("xTech GK GSAA %", [0, 5, 7, 12, 15]),
@@ -866,57 +857,90 @@ if page == "xPhysical":
         if not metrics:
             st.warning("Au moins une métrique est nécessaire.")
             st.stop()
+
+        # Ajout colonne Display Name
+        df["Display Name"] = df["Short Name"] + " (" + df["Player"] + ")"
         
-        # 2) Joueur 1 + Saison 1
+        # Dictionnaire pour retrouver le Short Name
+        display_to_shortname = dict(zip(df["Display Name"], df["Short Name"]))
+        
+        # === MAPPINGS JOUEURS POUR AFFICHAGE ===
+        # Optimisation : mapping unique Player -> Display Name
+        df_display = df[["Player", "Display Name"]].dropna().drop_duplicates()
+        player_to_display = dict(zip(df_display["Player"], df_display["Display Name"]))
+        display_to_player = {v: k for k, v in player_to_display.items()}
+        display_options = sorted(player_to_display.values())
+
+        # === JOUEUR 1 ===
         col1, col2 = st.columns(2)
+
         with col1:
-            p1 = st.selectbox("Joueur 1", sorted(df["Short Name"].unique()), key="radar_p1")
+            # Affichage joueur (Display Name), clé réelle = Player
+            default_display = next((name for name in display_options if "Artem Dovbyk" in name), display_options[0])
+            p1_display = st.selectbox("Joueur 1", display_options, index=display_options.index(default_display), key="radar_p1")
+            p1 = display_to_player[p1_display]
+
         with col2:
-            seasons1 = sorted(df[df["Short Name"] == p1]["Season"].unique().tolist())
-            s1 = st.selectbox("Saison 1", seasons1, key="radar_s1")
-        
-        df1 = df[(df["Short Name"] == p1) & (df["Season"] == s1)]
-        #  — Si plusieurs clubs, on filtre d’abord sur l’équipe
+            # Liste des saisons disponibles
+            seasons1 = sorted(df[df["Player"] == p1]["Season"].dropna().unique().tolist())
+            default_season = "2024/2025" if "2024/2025" in seasons1 else seasons1[-1]
+            s1 = st.selectbox("Saison 1", seasons1, index=seasons1.index(default_season), key="radar_s1")
+
+        df1 = df[(df["Player"] == p1) & (df["Season"] == s1)]
+
+        # Club
         teams1 = df1["Team"].dropna().unique().tolist()
         if len(teams1) > 1:
             team1 = st.selectbox("Sélectionner un club", teams1, key="radar_team1")
             df1 = df1[df1["Team"] == team1]
         else:
             team1 = teams1[0]
-        # Poste 1 (conditionnel)
+
+        # Poste
         poss1 = df1["Position Group"].dropna().unique().tolist()
         pos1 = st.selectbox("Poste 1", poss1, key="radar_pos1") if len(poss1) > 1 else poss1[0]
         df1 = df1[df1["Position Group"] == pos1]
-        # Compétition 1 (conditionnel)
+
+        # Compétition
         comps1 = df1["Competition"].dropna().unique().tolist()
         comp1 = st.selectbox("Compétition 1", comps1, key="radar_c1") if len(comps1) > 1 else comps1[0]
         df1 = df1[df1["Competition"] == comp1]
+
+        # Ligne finale joueur 1
         row1 = df1.iloc[0]
-        
-        # 3) Comparaison Joueur 2 (optionnelle)
+
+        # === COMPARAISON JOUEUR 2 ===
         compare = st.checkbox("Comparer à un 2ᵉ joueur")
         if compare:
             col3, col4 = st.columns(2)
             with col3:
-                p2 = st.selectbox("Joueur 2", sorted(df["Short Name"].unique()), key="radar_p2")
+                p2_display = st.selectbox("Joueur 2", display_options, key="radar_p2")
+                p2 = display_to_player[p2_display]
             with col4:
-                seasons2 = sorted(df[df["Short Name"] == p2]["Season"].unique().tolist())
+                seasons2 = sorted(df[df["Player"] == p2]["Season"].unique().tolist())
                 s2 = st.selectbox("Saison 2", seasons2, key="radar_s2")
-        
-            df2 = df[(df["Short Name"] == p2) & (df["Season"] == s2)]
-            # Filtre Club 2 si plusieurs équipes
+
+            df2 = df[(df["Player"] == p2) & (df["Season"] == s2)]
+
+            # Club
             teams2 = df2["Team"].dropna().unique().tolist()
             if len(teams2) > 1:
                 team2 = st.selectbox("Sélectionner un club (Joueur 2)", teams2, key="radar_team2")
                 df2 = df2[df2["Team"] == team2]
             else:
                 team2 = teams2[0]
+
+            # Poste
             poss2 = df2["Position Group"].dropna().unique().tolist()
             pos2 = st.selectbox("Poste 2", poss2, key="radar_pos2") if len(poss2) > 1 else poss2[0]
             df2 = df2[df2["Position Group"] == pos2]
+
+            # Compétition
             comps2 = df2["Competition"].dropna().unique().tolist()
             comp2 = st.selectbox("Compétition 2", comps2, key="radar_c2") if len(comps2) > 1 else comps2[0]
             df2 = df2[df2["Competition"] == comp2]
+
+            # Ligne finale joueur 2
             row2 = df2.iloc[0]
         
         # 4) Préparer les peers (cinq ligues), avec fallback pour libellés “AAAA/AAAA”
@@ -1059,11 +1083,11 @@ if page == "xPhysical":
         # On récupère aussi les noms d’équipes
         team1 = row1["Team"]
         # Titre de base pour joueur 1
-        title_text = f"Physical Comparison - {p1} {s1} {team1} ({pos1})"
+        title_text = f"{p1} ({pos1}) – {s1} – {team1} ({row1['Competition']}) – {int(row1['Age'])} ans"
+
+        # Si comparaison activée, on ajoute joueur 2
         if compare:
-            team2 = row2["Team"]
-            # On ajoute joueur 2 au titre
-            title_text += f" vs {p2} {s2} {team2} ({pos2})"
+            title_text += f" vs {p2} ({pos2}) – {s2} – {row2['Team']} ({row2['Competition']}) – {int(row2['Age'])} ans"
         
         fig.update_layout(
             hovermode='closest',
@@ -1096,28 +1120,26 @@ if page == "xPhysical":
     with tab3:
         st.subheader("xPhysical Player Index")
 
-        # 1) Sélection Joueur & Saison (uniquement les saisons dispos pour ce joueur)
+        # === MAPPINGS JOUEURS (optimisé une seule fois plus haut)
+        # player_to_display = dict(zip(df["Player"], df["Display Name"]))
+        # display_to_player = {v: k for k, v in player_to_display.items()}
+        # display_options = sorted(player_to_display.values())
+
+        # 1) Sélection Joueur & Saison
         col1, col2 = st.columns(2)
+
         with col1:
-            player = st.selectbox(
-                "Sélectionner un joueur",
-                sorted(df["Short Name"].dropna().unique()),
-                key="idx_p1"
-            )
+            default_display = next((name for name in display_options if "Artem Dovbyk" in name), display_options[0])
+            player_display = st.selectbox("Sélectionner un joueur", display_options, index=display_options.index(default_display), key="idx_p1")
+            player = display_to_player[player_display]
+
         with col2:
-            seasons = sorted(
-                df[df["Short Name"] == player]["Season"]
-                  .dropna().unique()
-            )
-            season = st.selectbox(
-                "Sélectionner une saison",
-                seasons,
-                index=len(seasons) - 1,
-                key="idx_s1"
-            )
+            seasons = sorted(df[df["Player"] == player]["Season"].dropna().unique())
+            default_season = "2024/2025" if "2024/2025" in seasons else seasons[-1]
+            season = st.selectbox("Sélectionner une saison", seasons, index=seasons.index(default_season), key="idx_s1")
 
         # 2) Filtrer par Joueur + Saison
-        df_fs = df[(df["Short Name"] == player) & (df["Season"] == season)]
+        df_fs = df[(df["Player"] == player) & (df["Season"] == season)]
         if df_fs.empty:
             st.warning("Pas de données pour ce joueur / cette saison.")
             st.stop()
@@ -1130,14 +1152,10 @@ if page == "xPhysical":
         else:
             team = teams[0]
 
-        # 4) Filtre Poste si plusieurs (multi‐sélection)
+        # 4) Filtre Poste si plusieurs
         positions = df_fs["Position Group"].dropna().unique().tolist()
         if len(positions) > 1:
-            position = st.selectbox(
-                "Sélectionner un poste",
-                positions,
-                key="idx_position"
-            )
+            position = st.selectbox("Sélectionner un poste", positions, key="idx_position")
         else:
             position = positions[0]
         df_fs = df_fs[df_fs["Position Group"] == position]
@@ -1145,11 +1163,7 @@ if page == "xPhysical":
         # 5) Filtre Compétition si plusieurs
         competitions = df_fs["Competition"].dropna().unique().tolist()
         if len(competitions) > 1:
-            competition = st.selectbox(
-                "Sélectionner une compétition",
-                competitions,
-                key="idx_comp"
-            )
+            competition = st.selectbox("Sélectionner une compétition", competitions, key="idx_comp")
             df_fs = df_fs[df_fs["Competition"] == competition]
         else:
             competition = competitions[0]
@@ -1498,7 +1512,7 @@ if page == "xPhysical":
             (df["Competition"] == row["Competition"])
         ].sort_values("xPhysical", ascending=False)
         mean_peer  = df_peers["xPhysical"].mean()
-        rank       = int(df_peers.reset_index().index[df_peers["Short Name"] == player][0] + 1)
+        rank       = int(df_peers.reset_index().index[df_peers["Player"] == player][0] + 1)
         total_peers= len(df_peers)
         hue        = 120 * (index_xphy / 100)
         bar_color  = f"hsl({hue:.0f}, 75%, 50%)"
@@ -1506,14 +1520,14 @@ if page == "xPhysical":
         fig_gauge = go.Figure(go.Indicator(
             mode="gauge+number",
             value=index_xphy,
-            number={'font': {'size': 48}},
+            number={'font': {'size': 48}},  # score en grand
             gauge={
-                'axis':      {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
-                'bar':       {'color': bar_color, 'thickness': 0.25},
-                'bgcolor':   "rgba(255,255,255,0)",
+                'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
+                'bar': {'color': bar_color, 'thickness': 0.25},
+                'bgcolor': "rgba(255,255,255,0)",
                 'borderwidth': 0,
-                'shape':     "angular",
-                'steps':     [{'range': [0, 100], 'color': 'rgba(100,100,100,0.3)'}],
+                'shape': "angular",
+                'steps': [{'range': [0, 100], 'color': 'rgba(100,100,100,0.3)'}],
                 'threshold': {'line': {'color': "white", 'width': 4},
                               'thickness': 0.75,
                               'value': mean_peer}
@@ -1522,20 +1536,23 @@ if page == "xPhysical":
             title={'text': f"<b>{rank}ᵉ/{total_peers}</b>", 'font': {'size': 20}}
         ))
         fig_gauge.update_layout(
-            margin          = {'t':40,'b':0,'l':0,'r':0},
-            paper_bgcolor   = "rgba(0,0,0,0)",
-            height          = 300
+            margin={'t':40,'b':0,'l':0,'r':0},
+            paper_bgcolor="rgba(0,0,0,0)",
+            height=300
         )
         st.plotly_chart(fig_gauge, use_container_width=True)
+        
+        # Label xPhy juste sous le score
         st.markdown(
-            f"<div style='text-align:center; font-size:14px; margin-top:-20px; color:grey'>"
-            f"Moyenne xPhysical ({position} en {row['Competition']}): {mean_peer:.1f}"
-            "</div>",
+            "<div style='text-align:center; font-size:18px; margin-top:-22px; margin-bottom:2px;'><b>xPhy</b></div>",
             unsafe_allow_html=True
         )
+    
+        # Phrase moyenne (si tu veux la garder)
         st.markdown(
-            "<div style='text-align:center; font-size:18px; margin-top:-10px'>"
-            "<b>xPhy</b></div>",
+            f"<div style='text-align:center; font-size:14px; margin-top:-8px; color:grey'>"
+            f"Moyenne xPhysical ({position} en {row['Competition']}): {mean_peer:.1f}"
+            "</div>",
             unsafe_allow_html=True
         )
 
@@ -2044,10 +2061,16 @@ elif page == "xTech/xDef":
             st.warning("Aucune donnée trouvée pour ce joueur et cette saison.")
             st.stop()
         
-        # === AJOUT : Sélection compétition si plusieurs ===
+        # Calcul de la compétition principale (où le joueur a le plus joué sur cette saison)
+        df_allplayer1 = df_tech[(df_tech["Player Name"] == p1) & (df_tech["Season Name"] == s1)]
+        comp_minutes1 = df_allplayer1.groupby("Competition Name")["Minutes"].sum().sort_values(ascending=False)
+        main_competition1 = comp_minutes1.index[0] if not comp_minutes1.empty else None
+        
         competitions1 = df1["Competition Name"].dropna().unique().tolist()
         if len(competitions1) > 1:
-            comp1 = st.selectbox("Compétition 1", sorted(competitions1), key="tech_radar_comp1")
+            # Préselection sur la compétition principale
+            index_main1 = competitions1.index(main_competition1) if main_competition1 in competitions1 else 0
+            comp1 = st.selectbox("Compétition 1", sorted(competitions1), key="tech_radar_comp1", index=index_main1)
             df1 = df1[df1["Competition Name"] == comp1]
         else:
             comp1 = competitions1[0]
@@ -2109,21 +2132,33 @@ elif page == "xTech/xDef":
             with col4:
                 seasons2 = sorted(df_tech[df_tech["Player Name"] == p2]["Season Name"].dropna().unique().tolist())
                 s2 = st.selectbox("Saison 2", seasons2, key="tech_radar_s2")
-
             df2 = df_tech[(df_tech["Player Name"] == p2) & (df_tech["Season Name"] == s2)]
-
             if df2.empty:
                 st.warning("Aucune donnée trouvée pour le joueur 2.")
                 st.stop()
-
+        
+            # === Sélection compétition pour Joueur 2 ===
+            df_allplayer2 = df_tech[(df_tech["Player Name"] == p2) & (df_tech["Season Name"] == s2)]
+            comp_minutes2 = df_allplayer2.groupby("Competition Name")["Minutes"].sum().sort_values(ascending=False)
+            main_competition2 = comp_minutes2.index[0] if not comp_minutes2.empty else None
+        
+            competitions2 = df2["Competition Name"].dropna().unique().tolist()
+            if len(competitions2) > 1:
+                index_main2 = competitions2.index(main_competition2) if main_competition2 in competitions2 else 0
+                comp2 = st.selectbox("Compétition 2", sorted(competitions2), key="tech_radar_comp2", index=index_main2)
+                df2 = df2[df2["Competition Name"] == comp2]
+            else:
+                comp2 = competitions2[0]
+        
             teams2 = df2["Team Name"].dropna().unique().tolist()
             if len(teams2) > 1:
                 team2 = st.selectbox("Club 2", teams2, key="tech_radar_team2")
                 df2 = df2[df2["Team Name"] == team2]
             else:
                 team2 = teams2[0]
-
+        
             row2 = df2.iloc[0]
+            pos2 = row2["Position Group"] if "Position Group" in row2 else ""
 
         # Peers
         top5_leagues = ["Premier League", "Ligue 1", "La Liga", "Serie A", "1. Bundesliga"]
@@ -2236,11 +2271,12 @@ elif page == "xTech/xDef":
         # Titre dynamique
         team1 = row1["Team Name"] if "Team Name" in row1 else ""
         minutes1 = int(row1["Minutes"]) if "Minutes" in row1 else "NA"
-        title_text = f"xTechnical Radar – {p1} {s1} {team1} ({pos1} – {minutes1} min)"
+        title_text = f"{p1} ({pos1}) – {s1} – {team1} - {minutes1} min"
         if compare:
             team2 = row2["Team Name"] if "Team Name" in row2 else ""
             minutes2 = int(row2["Minutes"]) if "Minutes" in row2 else "NA"
-            title_text += f" vs {p2} {s2} {team2} ({minutes2} min)"
+            pos2 = row2["Position Group"] if "Position Group" in row2 else ""
+            title_text += f" vs {p2} ({pos2}) – {s2} – {team2} - {minutes2} min"
 
         # 9) Mise en forme finale
         fig.update_layout(
@@ -2368,10 +2404,16 @@ elif page == "xTech/xDef":
             st.warning("Aucune donnée trouvée.")
             st.stop()
         
-        # === AJOUT : Sélection compétition si plusieurs ===
+        # Sélection compétition principale (où le joueur a le plus joué)
+        df_allplayer = df_tech[(df_tech["Player Name"] == p1) & (df_tech["Season Name"] == s1)]
+        comp_minutes = df_allplayer.groupby("Competition Name")["Minutes"].sum().sort_values(ascending=False)
+        main_competition = comp_minutes.index[0] if not comp_minutes.empty else None
+        
         competitions = df1["Competition Name"].dropna().unique().tolist()
         if len(competitions) > 1:
-            comp = st.selectbox("Compétition", sorted(competitions), key="tech_index_comp")
+            # Préselection sur la compétition principale
+            index_main = competitions.index(main_competition) if main_competition in competitions else 0
+            comp = st.selectbox("Compétition", sorted(competitions), key="tech_index_comp", index=index_main)
             df1 = df1[df1["Competition Name"] == comp]
         else:
             comp = competitions[0]
@@ -2385,6 +2427,7 @@ elif page == "xTech/xDef":
             team1 = teams[0]
         
         row = df1.iloc[0]
+        is_gk = row["Position Group"] == "Goalkeeper"
         pos = row["Position Group"]
         comp = row["Competition Name"]
         age = int(row["Age"])
@@ -2432,7 +2475,7 @@ elif page == "xTech/xDef":
         # Affichage infos joueur
         info = (
             f"<div style='text-align:center; font-size:16px; margin:10px 0;'>"
-            f"<b>{p1}</b> – {s1} – {team1} "
+            f"<b>{p1} ({pos})</b> – {s1} – {team1} "
             f"(<i>{comp}</i>) – {age} ans – {minutes} min"
             "</div>"
         )
@@ -2443,45 +2486,197 @@ elif page == "xTech/xDef":
         hue_def  = 120 * (def_score / 100)
         bar_color_def  = f"hsl({hue_def:.0f}, 75%, 50%)"
         with col1:
-            fig_def = go.Figure(go.Indicator(
-                mode="gauge+number",
-                value=round(def_score),
-                number={'font': {'size': 40}},
-                gauge={
-                    'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
-                    'bar': {'color': bar_color_def, 'thickness': 0.25},
-                    'bgcolor': "rgba(255,255,255,0)",
-                    'borderwidth': 0,
-                    'steps': [{'range': [0, 100], 'color': 'rgba(100,100,100,0.2)'}],
-                    'threshold': {'line': {'color': "white", 'width': 4},
-                                  'thickness': 0.75,
-                                  'value': mean_def}
-                },
-                domain={'x': [0, 1], 'y': [0, 1]},
-                title={'text': f"<b>{rank_def}ᵉ / {total_peers}</b>", 'font': {'size': 18}}
-            ))
-            fig_def.update_layout(margin={'t': 40, 'b': 0, 'l': 0, 'r': 0}, paper_bgcolor="rgba(0,0,0,0)", height=250)
-            st.plotly_chart(fig_def, use_container_width=True)
+            if is_gk:
+                # ========== DEF GK ========== 
+                gk_def_metrics = [
+                    ("xTech GK GSAA %", "GSAA %"),
+                    ("xTech GK Save %", "Save %"),
+                    ("xTech GK Aggressive Distance", "Aggressive Distance"),
+                    ("xTech GK Long Ball %", "Long Ball %"),
+                    ("xTech GK OPxGBuildup", "OPxGBuildup"),
+                ]
+                metric_rows = []
+                for col, label in gk_def_metrics:
+                    val = row.get(col, None)
+                    metric_rows.append({
+                        "Métrique": label,
+                        "Valeur Joueur": f"{val:.2f}" if pd.notna(val) else "NA",
+                        "Points": ""  # Pas de barème pour GK, adapter si besoin
+                    })
+                # Index Save (/100)
+                save_score = row.get("xTech GK Save (/100)", np.nan)
+                if pd.notna(save_score):
+                    metric_rows.append({
+                        "Métrique": "**GK Save Index**",
+                        "Valeur Joueur": "",
+                        "Points": f"**{save_score:.0f} / 100**"
+                    })
+                detail_df = pd.DataFrame(metric_rows)
+                detail_df = detail_df.drop_duplicates(subset=["Métrique"], keep="first")
+            
+                # Affichage jauge Save (en premier)
+                hue_save = 120 * (save_score / 100) if pd.notna(save_score) else 0
+                bar_color_save = f"hsl({hue_save:.0f}, 75%, 50%)"
+                fig_save = go.Figure(go.Indicator(
+                    mode="gauge+number",
+                    value=round(save_score) if pd.notna(save_score) else 0,
+                    number={'font': {'size': 40}},
+                    gauge={
+                        'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
+                        'bar': {'color': bar_color_save, 'thickness': 0.25},
+                        'bgcolor': "rgba(255,255,255,0)",
+                        'borderwidth': 0,
+                        'steps': [{'range': [0, 100], 'color': 'rgba(100,100,100,0.2)'}],
+                        'threshold': {'line': {'color': "white", 'width': 4},
+                                      'thickness': 0.75,
+                                      'value': mean_def}
+                    },
+                    domain={'x': [0, 1], 'y': [0, 1]},
+                    title={'text': f"<b>{rank_def}ᵉ / {total_peers}</b>", 'font': {'size': 18}}
+                ))
+                fig_save.update_layout(margin={'t': 40, 'b': 0, 'l': 0, 'r': 0}, paper_bgcolor="rgba(0,0,0,0)", height=250)
+                st.plotly_chart(fig_save, use_container_width=True)
+            
+                # Label sous la jauge
+                st.markdown(
+                    f"<div style='text-align:center; font-size:18px; margin-top:-22px; margin-bottom:2px;'><b>Save</b></div>",
+                    unsafe_allow_html=True
+                )
+            
+                # Moyenne Save index
+                df_filtre = df_tech[
+                    (df_tech["Position Group"] == "Goalkeeper") &
+                    (df_tech["Competition Name"] == comp) &
+                    (df_tech["Minutes"] >= 500)
+                ]
+                if not df_filtre.empty:
+                    mean_save = df_filtre["xTech GK Save (/100)"].mean()
+                    if pd.notnull(mean_save):
+                        st.markdown(
+                            f"<div style='text-align:center; color:grey; margin-top:-8px; margin-bottom:12px;'>"
+                            f"Moyenne Save (GK en {comp}) : {round(mean_save)}</div>",
+                            unsafe_allow_html=True
+                        )
+                else:
+                    st.markdown(
+                        "<div style='text-align:center; color:#b0b0b0; font-size:13px; margin-top:-8px; margin-bottom:12px;'>"
+                        "The 500min threshold is not reached in the competition, no average can be calculated.</div>",
+                        unsafe_allow_html=True
+                    )
+            
+                # Titre avant le tableau
+                st.markdown("##### Détail du score xSave")
 
-            st.markdown(
-                f"<div style='text-align:center; font-size:18px; margin-top:-22px; margin-bottom:2px;'><b>{def_label}</b></div>",
-                unsafe_allow_html=True
-            )
+                # === Tableau xSave (GK) ===
+                config = xtech_post_config.get("Goalkeeper")
+                if not config:
+                    st.error("Aucun mapping défini pour le poste Goalkeeper")
+                    st.stop()
 
-            # Moyenne, placée juste sous le label
-            mean_def = df_tech[
-                (df_tech["Position Group"] == pos) &
-                (df_tech["Competition Name"] == comp) &
-                (df_tech["Minutes"] >= 500)
-            ][def_col].mean()
+                metric_map = config["metric_map"]
+                labels = config["labels"]
+                metric_rows = []
 
-            st.markdown(
-                f"<div style='text-align:center; color:grey; margin-top:-8px; margin-bottom:12px;'>"
-                f"Moyenne {def_label} ({pos} en {comp}) : {round(mean_def)}</div>",
-                unsafe_allow_html=True
-            )
+                # --- Métriques SAVE uniquement ---
+                for raw_col in config["save"]:
+                    note_col, scores = metric_map.get(raw_col, (None, None))
+                    if not note_col or raw_col not in df1.columns:
+                        continue
+                    raw_val = row.get(raw_col, None)  # valeur brute
+                    note_val = row.get(note_col, None)  # valeur barémée
+                    max_pts = max(scores)
+                    label = labels.get(raw_col, raw_col)
+                    metric_rows.append({
+                        "Métrique": label,
+                        "Valeur Joueur": f"{raw_val:.2f}" if pd.notna(raw_val) else "NA",
+                        "Points": f"{note_val} / {max_pts}" if pd.notna(note_val) else f"0 / {max_pts}"
+                    })
 
-            st.markdown("##### Détail du score xDEF")
+                # --- Total xSave ---
+                total_points = 0
+                total_max = 0
+                for row_ in metric_rows:
+                    label = row_["Métrique"]
+                    if row_["Points"] and "/" in row_["Points"] and not any(x in label for x in ["Sous-index", "Total", "Index"]):
+                        try:
+                            pts, max_pts = row_["Points"].split("/")
+                            total_points += int(pts.strip(" *"))
+                            total_max += int(max_pts.strip(" *"))
+                        except:
+                            continue
+
+                metric_rows.append({
+                    "Métrique": "**Total**",
+                    "Valeur Joueur": "",
+                    "Points": f"**{total_points} / {total_max}**"
+                })
+
+                # --- Sous-index Save ---
+                sub_val = row.get("xTech GK Save (/100)", None)
+                if pd.notna(sub_val):
+                    metric_rows.append({
+                        "Métrique": "**GK Save Index**",
+                        "Valeur Joueur": "",
+                        "Points": f"**{sub_val:.0f} / 100**"
+                    })
+
+                # === Affichage final du tableau
+                detail_df = pd.DataFrame(metric_rows)
+                detail_df = detail_df.drop_duplicates(subset=["Métrique"], keep="first")
+                st.dataframe(detail_df.set_index("Métrique"), use_container_width=True)
+
+            else:
+                fig_def = go.Figure(go.Indicator(
+                    mode="gauge+number",
+                    value=round(def_score),
+                    number={'font': {'size': 40}},
+                    gauge={
+                        'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
+                        'bar': {'color': bar_color_def, 'thickness': 0.25},
+                        'bgcolor': "rgba(255,255,255,0)",
+                        'borderwidth': 0,
+                        'steps': [{'range': [0, 100], 'color': 'rgba(100,100,100,0.2)'}],
+                        'threshold': {'line': {'color': "white", 'width': 4},
+                                      'thickness': 0.75,
+                                      'value': mean_def}
+                    },
+                    domain={'x': [0, 1], 'y': [0, 1]},
+                    title={'text': f"<b>{rank_def}ᵉ / {total_peers}</b>", 'font': {'size': 18}}
+                ))
+                fig_def.update_layout(margin={'t': 40, 'b': 0, 'l': 0, 'r': 0}, paper_bgcolor="rgba(0,0,0,0)", height=250)
+                st.plotly_chart(fig_def, use_container_width=True)
+    
+                st.markdown(
+                    f"<div style='text-align:center; font-size:18px; margin-top:-22px; margin-bottom:2px;'><b>{def_label}</b></div>",
+                    unsafe_allow_html=True
+                )
+    
+                # Moyenne, placée juste sous le label
+                # Filtrage des joueurs pour la moyenne
+                df_filtre = df_tech[
+                    (df_tech["Position Group"] == pos) &
+                    (df_tech["Competition Name"] == comp) &
+                    (df_tech["Minutes"] >= 500)
+                ]
+                
+                if not df_filtre.empty:
+                    mean_def = df_filtre[def_col].mean()
+                    if pd.notnull(mean_def):
+                        mean_def_affiche = round(mean_def)
+                        st.markdown(
+                            f"<div style='text-align:center; color:grey; margin-top:-8px; margin-bottom:12px;'>"
+                            f"Moyenne {def_label} ({pos} en {comp}) : {mean_def_affiche}</div>",
+                            unsafe_allow_html=True
+                        )
+                else:
+                    st.markdown(
+                        "<div style='text-align:center; color:#b0b0b0; font-size:13px; margin-top:-8px; margin-bottom:12px;'>"
+                        "The 500min threshold is not reached in the competition, no average can be calculated.</div>",
+                        unsafe_allow_html=True
+                    )
+                
+                st.markdown("##### Détail du score xDEF")
+
             # Tableau DEF
             if pos == "Goalkeeper":
                 metrics = [
@@ -2554,42 +2749,188 @@ elif page == "xTech/xDef":
                 hue_tech = 120 * (tech_score / 100)
                 bar_color_tech = f"hsl({hue_tech:.0f}, 75%, 50%)"
         with col2:
-            fig_tech = go.Figure(go.Indicator(
-                mode="gauge+number",
-                value=round(tech_score),
-                number={'font': {'size': 40}},
-                gauge={
-                    'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
-                    'bar': {'color': bar_color_tech, 'thickness': 0.25},
-                    'bgcolor': "rgba(255,255,255,0)",
-                    'borderwidth': 0,
-                    'steps': [{'range': [0, 100], 'color': 'rgba(100,100,100,0.2)'}],
-                    'threshold': {'line': {'color': "white", 'width': 4},
-                                  'thickness': 0.75,
-                                  'value': mean_tech}
-                },
-                domain={'x': [0, 1], 'y': [0, 1]},
-                title={'text': f"<b>{rank_tech}ᵉ / {total_peers}</b>", 'font': {'size': 18}}
-            ))
-            fig_tech.update_layout(margin={'t': 40, 'b': 0, 'l': 0, 'r': 0}, paper_bgcolor="rgba(0,0,0,0)", height=250)
-            st.plotly_chart(fig_tech, use_container_width=True)
-            # Ajoute le label juste sous la jauge, avant la moyenne
-            st.markdown(
-                f"<div style='text-align:center; font-size:18px; margin-top:-22px; margin-bottom:2px;'><b>{tech_label}</b></div>",
-                unsafe_allow_html=True
-            )
-            mean_tech = df_tech[
-                (df_tech["Position Group"] == pos) &
-                (df_tech["Competition Name"] == comp) &
-                (df_tech["Minutes"] >= 500)
-            ][tech_col].mean()
+            if is_gk:
+                # ========== TECH GK ==========
+                gk_tech_metrics = [
+                    ("xTech GK Passing %", "Passing %"),
+                    ("xTech GK Passing u. Pressure %", "Passing under Pressure %"),
+                    ("xTech GK Pass Into Danger %", "Pass into Danger %"),
+                    ("xTech GK Long Ball %", "Long Ball %"),
+                    ("xTech GK OPxGBuildup", "OPxGBuildup"),
+                ]
+                metric_rows = []
+                for col, label in gk_tech_metrics:
+                    val = row.get(col, None)
+                    metric_rows.append({
+                        "Métrique": label,
+                        "Valeur Joueur": f"{val:.2f}" if pd.notna(val) else "NA",
+                        "Points": ""  # Pas de barème pour GK, adapter si besoin
+                    })
+                # Index Usage (/100)
+                usage_score = row.get("xTech GK Usage (/100)", np.nan)
+                if pd.notna(usage_score):
+                    metric_rows.append({
+                        "Métrique": "**GK Usage Index**",
+                        "Valeur Joueur": "",
+                        "Points": f"**{usage_score:.0f} / 100**"
+                    })
+                detail_df = pd.DataFrame(metric_rows)
+                detail_df = detail_df.drop_duplicates(subset=["Métrique"], keep="first")
+            
+                # Affichage jauge Usage (en premier)
+                hue_usage = 120 * (usage_score / 100) if pd.notna(usage_score) else 0
+                bar_color_usage = f"hsl({hue_usage:.0f}, 75%, 50%)"
+                fig_usage = go.Figure(go.Indicator(
+                    mode="gauge+number",
+                    value=round(usage_score) if pd.notna(usage_score) else 0,
+                    number={'font': {'size': 40}},
+                    gauge={
+                        'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
+                        'bar': {'color': bar_color_usage, 'thickness': 0.25},
+                        'bgcolor': "rgba(255,255,255,0)",
+                        'borderwidth': 0,
+                        'steps': [{'range': [0, 100], 'color': 'rgba(100,100,100,0.2)'}],
+                        'threshold': {'line': {'color': "white", 'width': 4},
+                                      'thickness': 0.75,
+                                      'value': mean_tech}
+                    },
+                    domain={'x': [0, 1], 'y': [0, 1]},
+                    title={'text': f"<b>{rank_tech}ᵉ / {total_peers}</b>", 'font': {'size': 18}}
+                ))
+                fig_usage.update_layout(margin={'t': 40, 'b': 0, 'l': 0, 'r': 0}, paper_bgcolor="rgba(0,0,0,0)", height=250)
+                st.plotly_chart(fig_usage, use_container_width=True)
+            
+                # Label sous la jauge
+                st.markdown(
+                    f"<div style='text-align:center; font-size:18px; margin-top:-22px; margin-bottom:2px;'><b>Usage</b></div>",
+                    unsafe_allow_html=True
+                )
+            
+                # Moyenne Usage index
+                df_filtre_tech = df_tech[
+                    (df_tech["Position Group"] == "Goalkeeper") &
+                    (df_tech["Competition Name"] == comp) &
+                    (df_tech["Minutes"] >= 500)
+                ]
+                if not df_filtre_tech.empty:
+                    mean_usage = df_filtre_tech["xTech GK Usage (/100)"].mean()
+                    if pd.notnull(mean_usage):
+                        st.markdown(
+                            f"<div style='text-align:center; color:grey; margin-top:-8px; margin-bottom:12px;'>"
+                            f"Moyenne Usage (GK en {comp}) : {round(mean_usage)}</div>",
+                            unsafe_allow_html=True
+                        )
+                else:
+                    st.markdown(
+                        "<div style='text-align:center; color:#b0b0b0; font-size:13px; margin-top:-8px; margin-bottom:12px;'>"
+                        "The 500min threshold is not reached in the competition, no average can be calculated.</div>",
+                        unsafe_allow_html=True
+                    )
+            
+                # Titre avant le tableau
+                # Titre avant le tableau
+                st.markdown("##### Détail du score xUsage")
 
-            st.markdown(
-                f"<div style='text-align:center; color:grey; margin-top:-8px; margin-bottom:12px;'>"
-                f"Moyenne {tech_label} ({pos} en {comp}) : {round(mean_tech)}</div>",
-                unsafe_allow_html=True
-            )
-            st.markdown("##### Détail du score xTECH")
+                # === Tableau xUsage (GK) avec barèmes ===
+                metric_rows = []
+
+                # --- Métriques USAGE uniquement ---
+                for raw_col in config["usage"]:
+                    note_col, scores = metric_map.get(raw_col, (None, None))
+                    if not note_col or raw_col not in df1.columns:
+                        continue
+                    raw_val = row.get(raw_col, None)  # valeur brute
+                    note_val = row.get(note_col, None)  # valeur barémée
+                    max_pts = max(scores)
+                    label = labels.get(raw_col, raw_col)
+                    metric_rows.append({
+                        "Métrique": label,
+                        "Valeur Joueur": f"{raw_val:.2f}" if pd.notna(raw_val) else "NA",
+                        "Points": f"{note_val} / {max_pts}" if pd.notna(note_val) else f"0 / {max_pts}"
+                    })
+
+                # --- Total xUsage ---
+                total_points = 0
+                total_max = 0
+                for row_ in metric_rows:
+                    label = row_["Métrique"]
+                    if row_["Points"] and "/" in row_["Points"] and not any(x in label for x in ["Sous-index", "Total", "Index"]):
+                        try:
+                            pts, max_pts = row_["Points"].split("/")
+                            total_points += int(pts.strip(" *"))
+                            total_max += int(max_pts.strip(" *"))
+                        except:
+                            continue
+
+                metric_rows.append({
+                    "Métrique": "**Total**",
+                    "Valeur Joueur": "",
+                    "Points": f"**{total_points} / {total_max}**"
+                })
+
+                # --- Sous-index Usage ---
+                sub_val = row.get("xTech GK Usage (/100)", None)
+                if pd.notna(sub_val):
+                    metric_rows.append({
+                        "Métrique": "**GK Usage Index**",
+                        "Valeur Joueur": "",
+                        "Points": f"**{sub_val:.0f} / 100**"
+                    })
+
+                # === Affichage final du tableau
+                detail_df = pd.DataFrame(metric_rows)
+                detail_df = detail_df.drop_duplicates(subset=["Métrique"], keep="first")
+                st.dataframe(detail_df.set_index("Métrique"), use_container_width=True)
+            else:
+                fig_tech = go.Figure(go.Indicator(
+                    mode="gauge+number",
+                    value=round(tech_score),
+                    number={'font': {'size': 40}},
+                    gauge={
+                        'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
+                        'bar': {'color': bar_color_tech, 'thickness': 0.25},
+                        'bgcolor': "rgba(255,255,255,0)",
+                        'borderwidth': 0,
+                        'steps': [{'range': [0, 100], 'color': 'rgba(100,100,100,0.2)'}],
+                        'threshold': {'line': {'color': "white", 'width': 4},
+                                      'thickness': 0.75,
+                                      'value': mean_tech}
+                    },
+                    domain={'x': [0, 1], 'y': [0, 1]},
+                    title={'text': f"<b>{rank_tech}ᵉ / {total_peers}</b>", 'font': {'size': 18}}
+                ))
+                fig_tech.update_layout(margin={'t': 40, 'b': 0, 'l': 0, 'r': 0}, paper_bgcolor="rgba(0,0,0,0)", height=250)
+                st.plotly_chart(fig_tech, use_container_width=True)
+                # Ajoute le label juste sous la jauge, avant la moyenne
+                st.markdown(
+                    f"<div style='text-align:center; font-size:18px; margin-top:-22px; margin-bottom:2px;'><b>{tech_label}</b></div>",
+                    unsafe_allow_html=True
+                )
+                # Filtrage des joueurs pour la moyenne TECH
+                df_filtre_tech = df_tech[
+                    (df_tech["Position Group"] == pos) &
+                    (df_tech["Competition Name"] == comp) &
+                    (df_tech["Minutes"] >= 500)
+                ]
+                
+                if not df_filtre_tech.empty:
+                    mean_tech = df_filtre_tech[tech_col].mean()
+                    if pd.notnull(mean_tech):
+                        mean_tech_affiche = round(mean_tech)
+                        st.markdown(
+                            f"<div style='text-align:center; color:grey; margin-top:-8px; margin-bottom:12px;'>"
+                            f"Moyenne {tech_label} ({pos} en {comp}) : {mean_tech_affiche}</div>",
+                            unsafe_allow_html=True
+                        )
+                else:
+                    st.markdown(
+                        "<div style='text-align:center; color:#b0b0b0; font-size:13px; margin-top:-8px; margin-bottom:12px;'>"
+                        "The 500min threshold is not reached in the competition, no average can be calculated.</div>",
+                        unsafe_allow_html=True
+                    )
+                
+                st.markdown("##### Détail du score xTECH")
+
             # Tableau TECH
             if pos == "Goalkeeper":
                 metrics = [
