@@ -5,6 +5,7 @@ import numpy as np
 import random
 import re
 import plotly.graph_objects as go
+from PIL import Image
 
 st.set_page_config(layout="wide")
 
@@ -544,10 +545,14 @@ graph_columns = [
     "Explosive Acceleration to HSR Count P90", "Explosive Acceleration to Sprint Count P90", "xPhysical"
 ]
 
+# Charge le logo (met le chemin exact si besoin)
+logo_path = "AS Roma.png"
+logo = Image.open(logo_path)
+st.sidebar.image(logo, use_container_width=True)
 
 # === Sélecteur de page dans la sidebar ===
 page = st.sidebar.radio(
-    "Choisir le volet",
+    "Choose tab",
     ["xPhysical", "xTech/xDef"]
 )
 
@@ -558,51 +563,74 @@ if page == "xPhysical":
     
     # --- Onglet Scatter Plot ---
     with tab1:
-        st.title("SkillCorner Viz - Streamlit")
-        with st.sidebar:
-            st.header("Filtres")
+        
+        with st.expander("📘 About the xPhysical Section", expanded=False):
+            st.markdown("""
+        This section allows you to visualize and compare players' physical performance data across multiple metrics, competitions, seasons, and positions.
+
+        #### ⚠️ Data Reliability & Scope
+        Only players who have played at least **5 matches** with a minimum of **60 minutes per match** are included in this section. This threshold ensures a higher level of reliability and consistency in the dataset.  
+        **Please note:** All metrics are provided for comparative analysis only and should not be interpreted as exact measurements.
+
+        #### 🗂️ What you can do in each tab:
+        - **Scatter Plot:**  
+          Visualize relationships between any two physical metrics for the filtered players. Highlight specific players or teams and view average reference lines.
+
+        - **Radar:**  
+          Generate percentile-based radar plots for a selected player (or compare two players) based on the main physical metrics, benchmarked against peers at the same position.
+
+        - **Index:**  
+          See a detailed breakdown of the physical score calculation for an individual player.
+
+        - **Top 50:**  
+          Display the top 50 players by xPhysical index for a selected competition, season, and position, with sorting and filtering options.
+
+        **All metrics are normalized per 90 minutes (P90), except where otherwise indicated.**
+        """)
+            
+        st.markdown("<div style='height: 2em;'></div>", unsafe_allow_html=True)
+                
+        # Ligne 1 : saisons, compétitions, postes
+        col1, col2, col3 = st.columns([1.2, 1.2, 1.2])
+        with col1:
             selected_seasons = st.multiselect(
-                "Saisons",
+                "Season(s)",
                 options=season_list,
                 default=[],
-                help="Sélectionne une ou plusieurs saisons"
             )
-            
+        with col2:
             selected_competitions = st.multiselect(
-                "Compétitions",
+                "Competition(s)",
                 options=competition_list,
                 default=[],
-                help="Sélectionne une ou plusieurs compétitions"
             )
+        with col3:
             selected_positions = st.multiselect(
-                "Postes",
+                "Position(s)",
                 options=position_list,
                 default=[],
-                help="Sélectionne un ou plusieurs postes"
             )
-            
+
+        # Ligne 2 : âge, joueurs ajoutés (plus étroites car moins d’options)
+        col4, col5 = st.columns([1, 1.2])
+        with col4:
             age_min, age_max = int(df["Age"].min()), int(df["Age"].max())
             selected_age = st.slider(
-                "Âge",
+                "Age",
                 min_value=age_min,
                 max_value=age_max,
                 value=(age_min, age_max),
                 step=1
             )
-            
-            # Joueur(s) ajouté(s)
+        with col5:
             selected_extra_players = st.multiselect(
-                "Joueur(s) ajouté(s)",
+                "Add player(s)",
                 options=player_list,
                 default=[],
-                help="Permet d'ajouter des joueurs particuliers, hors filtre"
+                help="Add players outside filters"
             )
         
-        st.write("---")
-        
-        st.subheader("Tableau filtré")
-        
-        # -- Application des filtres
+        # -- Application des filtres (inchangé)
         filtered_df = df.copy()
         if selected_seasons:
             filtered_df = filtered_df[filtered_df["Season"].isin(selected_seasons)]
@@ -610,41 +638,41 @@ if page == "xPhysical":
             filtered_df = filtered_df[filtered_df["Position Group"].isin(selected_positions)]
         if selected_competitions:
             filtered_df = filtered_df[filtered_df["Competition"].isin(selected_competitions)]
-        
-        # Filtrage sur l'âge
         filtered_df = filtered_df[
             (filtered_df["Age"] >= selected_age[0]) &
             (filtered_df["Age"] <= selected_age[1])
         ]
-        
-        # Ajout de joueurs "hors filtre"
         if selected_extra_players:
             extra_df = df[df["Short Name"].isin(selected_extra_players)]
             filtered_df = pd.concat([filtered_df, extra_df]).drop_duplicates()
-        
-        # Supprime la colonne index importée en trop, si elle existe
-        display_df = filtered_df.drop(columns=["Unnamed: 0"], errors="ignore")
-        st.dataframe(display_df)
-        
-        st.write("---")
-        
-        ############################
-        # 3. Sélection des axes + highlight
-        ############################
-        st.subheader("Paramètres du Graphe")
-        
+
+        # Bouton d'export CSV de la sélection actuelle
+        csv = filtered_df.to_csv(index=False)
+        st.download_button(
+            label="Download selection as CSV",
+            data=csv,
+            file_name="selection_physical_data.csv",
+            mime="text/csv",
+            key="download_scatter_csv"
+        )    
+            
+        st.markdown("---")
+               
         # Sélection de l'axe X, Y
-        selected_xaxis = st.selectbox(
-            "Axe X",
-            options=graph_columns,
-            index=0
-        )
-        selected_yaxis = st.selectbox(
-            "Axe Y",
-            options=graph_columns,
-            index=1
-        )
-        
+        colx, coly = st.columns(2)
+        with colx:
+            selected_xaxis = st.selectbox(
+                "X Axis",
+                options=graph_columns,
+                index=0
+            )
+        with coly:
+            selected_yaxis = st.selectbox(
+                "Y Axis",
+                options=graph_columns,
+                index=1
+            )      
+            
         # Récupérer les joueurs filtrés
         filtered_players = sorted(filtered_df["Short Name"].dropna().unique())
         team_list = sorted(filtered_df["Team"].dropna().unique())
@@ -654,24 +682,17 @@ if page == "xPhysical":
         
         with col1:
             highlight_players = st.multiselect(
-                "Surligner Joueurs",
+                "Highlight Player(s)",
                 options=filtered_players,
                 default=[]
             )
         
         with col2:
             highlight_teams = st.multiselect(
-                "Surligner Équipe",
+                "Highlight Team(s)",
                 options=team_list,
                 default=[]
-            )
-        
-        st.write("---")
-        
-        ############################
-        # 4. Création du Scatter Plot
-        ############################
-        st.subheader("Graphique XY")
+            ) 
         
         # Copy/Convert
         plot_df = filtered_df.copy()
@@ -800,33 +821,31 @@ if page == "xPhysical":
         )
         
         st.plotly_chart(fig, use_container_width=False)
-        
-        st.write("---")
-        
+                
         # Section explicative des métriques
-        st.markdown("### Explication des métriques")
-        st.markdown("""
-        **PSV-99** : Peak sprint velocity 99th percentile. Cette métrique reflète la vitesse maximale atteinte par un joueur, et sa capacité à l’atteindre plusieurs fois ou à la maintenir suffisamment longtemps.  
-        **TOP 5 PSV-99** : Moyenne des meilleures performances PSV-99 d’un joueur (les 5 meilleures).  
-        **Total Distance P90** : Distance totale parcourue, ramenée à 90 minutes.  
-        **M/min P90** : Distance totale parcourue divisée par le nombre de minutes. Pour TIP (resp. OTIP), divisé par le nombre de minutes TIP (resp. OTIP).  
-        **Running Distance P90** : Distance parcourue entre 15 et 20 km/h.  
-        **HSR Distance P90** : Distance parcourue entre 20 et 25 km/h.  
-        **HSR Count P90** : Nombre d’actions au-dessus de 20 km/h (moyenne glissante sur 1 seconde), jusqu’à 25 km/h.  
-        **Sprinting Distance P90** : Distance parcourue au-dessus de 25 km/h.  
-        **Sprint Count P90** : Nombre d’actions au-dessus de 25 km/h (moyenne glissante sur 1 seconde).  
-        **HI Distance P90** : Distance parcourue au-dessus de 20 km/h.  
-        **HI Count** : Somme de HSR Count et Sprint Count.  
-        **Medium Acceleration Count P90** : Nombre d’accélérations comprises entre 1.5 et 3 m/s², durant au moins 0.7 seconde.  
-        **High Acceleration Count P90** : Accélérations supérieures à 3 m/s², durant au moins 0.7 seconde.  
-        **Medium Deceleration Count P90** : Décélérations entre -1.5 et -3 m/s², durant au moins 0.7 seconde.  
-        **High Deceleration Count P90** : Décélérations inférieures à -3 m/s², durant au moins 0.7 seconde.  
-        **Explosive Acceleration to HSR Count P90** : Nombre d’accélérations (cf. définition ci-dessus) démarrant sous 9 km/h et atteignant au moins 20 km/h.  
-        **Explosive Acceleration to Sprint Count P90** : Nombre d’accélérations démarrant sous 9 km/h et atteignant au moins 25 km/h.
-        """)
-    with tab2:
-        st.subheader("Physical Comparison")
+        with st.expander("📘 Metrics Explanation (xPhysical)", expanded=False):
+            st.markdown("""
+- **PSV-99**: Peak sprint velocity at the 99th percentile. This metric reflects the maximum speed reached by a player, as well as their ability to reach it repeatedly or sustain it for a sufficient duration.
+- **TOP 5 PSV-99**: Average of a player’s top 5 PSV-99 performances.
+- **Total Distance P90**: Total distance covered, normalized per 90 minutes.
+- **M/min P90**: Total distance covered divided by the number of minutes played. For TIP (respectively OTIP), divided by the number of TIP (resp. OTIP) minutes.
+- **Running Distance P90**: Distance covered between 15 and 20 km/h.
+- **HSR Distance P90**: Distance covered between 20 and 25 km/h.
+- **HSR Count P90**: Number of actions above 20 km/h (1-second moving average), up to 25 km/h.
+- **Sprinting Distance P90**: Distance covered above 25 km/h.
+- **Sprint Count P90**: Number of actions above 25 km/h (1-second moving average).
+- **HI Distance P90**: Distance covered above 20 km/h.
+- **HI Count**: Sum of HSR Count and Sprint Count.
+- **Medium Acceleration Count P90**: Number of accelerations between 1.5 and 3 m/s², lasting at least 0.7 seconds.
+- **High Acceleration Count P90**: Accelerations above 3 m/s², lasting at least 0.7 seconds.
+- **Medium Deceleration Count P90**: Decelerations between -1.5 and -3 m/s², lasting at least 0.7 seconds.
+- **High Deceleration Count P90**: Decelerations below -3 m/s², lasting at least 0.7 seconds.
+- **Explosive Acceleration to HSR Count P90**: Number of accelerations (as defined above) starting below 9 km/h and reaching at least 20 km/h.
+- **Explosive Acceleration to Sprint Count P90**: Number of accelerations starting below 9 km/h and reaching at least 25 km/h.
+""")
 
+    
+    with tab2:
         # 1) Choix des métriques  
         default_metrics = [
             "TOP 5 PSV-99",
@@ -850,12 +869,12 @@ if page == "xPhysical":
             "xPhysical"
         ]
         metrics = st.multiselect(
-            "Sélectionner les métriques",
+            "Select metrics",
             options=default_metrics + extra_metrics,
             default=default_metrics
         )
         if not metrics:
-            st.warning("Au moins une métrique est nécessaire.")
+            st.warning("At least one metric is necessary.")
             st.stop()
 
         # Ajout colonne Display Name
@@ -877,28 +896,28 @@ if page == "xPhysical":
         with col1:
             # Affichage joueur (Display Name), clé réelle = Player
             default_display = next((name for name in display_options if "Artem Dovbyk" in name), display_options[0])
-            p1_display = st.selectbox("Joueur 1", display_options, index=display_options.index(default_display), key="radar_p1")
+            p1_display = st.selectbox("Player 1", display_options, index=display_options.index(default_display), key="radar_p1")
             p1 = display_to_player[p1_display]
 
         with col2:
             # Liste des saisons disponibles
             seasons1 = sorted(df[df["Player"] == p1]["Season"].dropna().unique().tolist())
             default_season = "2024/2025" if "2024/2025" in seasons1 else seasons1[-1]
-            s1 = st.selectbox("Saison 1", seasons1, index=seasons1.index(default_season), key="radar_s1")
+            s1 = st.selectbox("Season 1", seasons1, index=seasons1.index(default_season), key="radar_s1")
 
         df1 = df[(df["Player"] == p1) & (df["Season"] == s1)]
 
         # Club
         teams1 = df1["Team"].dropna().unique().tolist()
         if len(teams1) > 1:
-            team1 = st.selectbox("Sélectionner un club", teams1, key="radar_team1")
+            team1 = st.selectbox("Select a team", teams1, key="radar_team1")
             df1 = df1[df1["Team"] == team1]
         else:
             team1 = teams1[0]
 
         # Poste
         poss1 = df1["Position Group"].dropna().unique().tolist()
-        pos1 = st.selectbox("Poste 1", poss1, key="radar_pos1") if len(poss1) > 1 else poss1[0]
+        pos1 = st.selectbox("Position 1", poss1, key="radar_pos1") if len(poss1) > 1 else poss1[0]
         df1 = df1[df1["Position Group"] == pos1]
 
         # Compétition
@@ -910,34 +929,34 @@ if page == "xPhysical":
         row1 = df1.iloc[0]
 
         # === COMPARAISON JOUEUR 2 ===
-        compare = st.checkbox("Comparer à un 2ᵉ joueur")
+        compare = st.checkbox("Compare to a 2nd player")
         if compare:
             col3, col4 = st.columns(2)
             with col3:
-                p2_display = st.selectbox("Joueur 2", display_options, key="radar_p2")
+                p2_display = st.selectbox("Player 2", display_options, key="radar_p2")
                 p2 = display_to_player[p2_display]
             with col4:
                 seasons2 = sorted(df[df["Player"] == p2]["Season"].unique().tolist())
-                s2 = st.selectbox("Saison 2", seasons2, key="radar_s2")
+                s2 = st.selectbox("Season 2", seasons2, key="radar_s2")
 
             df2 = df[(df["Player"] == p2) & (df["Season"] == s2)]
 
             # Club
             teams2 = df2["Team"].dropna().unique().tolist()
             if len(teams2) > 1:
-                team2 = st.selectbox("Sélectionner un club (Joueur 2)", teams2, key="radar_team2")
+                team2 = st.selectbox("Select a team (Player 2)", teams2, key="radar_team2")
                 df2 = df2[df2["Team"] == team2]
             else:
                 team2 = teams2[0]
 
             # Poste
             poss2 = df2["Position Group"].dropna().unique().tolist()
-            pos2 = st.selectbox("Poste 2", poss2, key="radar_pos2") if len(poss2) > 1 else poss2[0]
+            pos2 = st.selectbox("Position 2", poss2, key="radar_pos2") if len(poss2) > 1 else poss2[0]
             df2 = df2[df2["Position Group"] == pos2]
 
             # Compétition
             comps2 = df2["Competition"].dropna().unique().tolist()
-            comp2 = st.selectbox("Compétition 2", comps2, key="radar_c2") if len(comps2) > 1 else comps2[0]
+            comp2 = st.selectbox("Competition 2", comps2, key="radar_c2") if len(comps2) > 1 else comps2[0]
             df2 = df2[df2["Competition"] == comp2]
 
             # Ligne finale joueur 2
@@ -1082,12 +1101,13 @@ if page == "xPhysical":
         # 9) Mise en forme finale
         # On récupère aussi les noms d’équipes
         team1 = row1["Team"]
-        # Titre de base pour joueur 1
-        title_text = f"{p1} ({pos1}) – {s1} – {team1} ({row1['Competition']}) – {int(row1['Age'])} ans"
+        #Titre de base pour joueur 1
+        age1_str = f"{int(row1['Age'])}" if pd.notna(row1['Age']) else "?"
+        title_text = f"{p1} ({pos1}) – {s1} – {team1} ({row1['Competition']}) – {age1_str} y/o"
 
-        # Si comparaison activée, on ajoute joueur 2
         if compare:
-            title_text += f" vs {p2} ({pos2}) – {s2} – {row2['Team']} ({row2['Competition']}) – {int(row2['Age'])} ans"
+            age2_str = f"{int(row2['Age'])}" if pd.notna(row2['Age']) else "?"
+            title_text += f" vs {p2} ({pos2}) – {s2} – {row2['Team']} ({row2['Competition']}) – {age2_str} y/o"
         
         fig.update_layout(
             hovermode='closest',
@@ -1115,11 +1135,32 @@ if page == "xPhysical":
         )
         
         st.plotly_chart(fig, use_container_width=True)
+        
+        # Section explicative des métriques
+        with st.expander("📘 Metrics Explanation (xPhysical)", expanded=False):
+            st.markdown("""
+- **PSV-99**: Peak sprint velocity at the 99th percentile. This metric reflects the maximum speed reached by a player, as well as their ability to reach it repeatedly or sustain it for a sufficient duration.
+- **TOP 5 PSV-99**: Average of a player’s top 5 PSV-99 performances.
+- **Total Distance P90**: Total distance covered, normalized per 90 minutes.
+- **M/min P90**: Total distance covered divided by the number of minutes played. For TIP (respectively OTIP), divided by the number of TIP (resp. OTIP) minutes.
+- **Running Distance P90**: Distance covered between 15 and 20 km/h.
+- **HSR Distance P90**: Distance covered between 20 and 25 km/h.
+- **HSR Count P90**: Number of actions above 20 km/h (1-second moving average), up to 25 km/h.
+- **Sprinting Distance P90**: Distance covered above 25 km/h.
+- **Sprint Count P90**: Number of actions above 25 km/h (1-second moving average).
+- **HI Distance P90**: Distance covered above 20 km/h.
+- **HI Count**: Sum of HSR Count and Sprint Count.
+- **Medium Acceleration Count P90**: Number of accelerations between 1.5 and 3 m/s², lasting at least 0.7 seconds.
+- **High Acceleration Count P90**: Accelerations above 3 m/s², lasting at least 0.7 seconds.
+- **Medium Deceleration Count P90**: Decelerations between -1.5 and -3 m/s², lasting at least 0.7 seconds.
+- **High Deceleration Count P90**: Decelerations below -3 m/s², lasting at least 0.7 seconds.
+- **Explosive Acceleration to HSR Count P90**: Number of accelerations (as defined above) starting below 9 km/h and reaching at least 20 km/h.
+- **Explosive Acceleration to Sprint Count P90**: Number of accelerations starting below 9 km/h and reaching at least 25 km/h.
+""")
+
     
     # --- Onglet Index ---
     with tab3:
-        st.subheader("xPhysical Player Index")
-
         # === MAPPINGS JOUEURS (optimisé une seule fois plus haut)
         # player_to_display = dict(zip(df["Player"], df["Display Name"]))
         # display_to_player = {v: k for k, v in player_to_display.items()}
@@ -1130,24 +1171,24 @@ if page == "xPhysical":
 
         with col1:
             default_display = next((name for name in display_options if "Artem Dovbyk" in name), display_options[0])
-            player_display = st.selectbox("Sélectionner un joueur", display_options, index=display_options.index(default_display), key="idx_p1")
+            player_display = st.selectbox("Select a player", display_options, index=display_options.index(default_display), key="idx_p1")
             player = display_to_player[player_display]
 
         with col2:
             seasons = sorted(df[df["Player"] == player]["Season"].dropna().unique())
             default_season = "2024/2025" if "2024/2025" in seasons else seasons[-1]
-            season = st.selectbox("Sélectionner une saison", seasons, index=seasons.index(default_season), key="idx_s1")
+            season = st.selectbox("Select a season", seasons, index=seasons.index(default_season), key="idx_s1")
 
         # 2) Filtrer par Joueur + Saison
         df_fs = df[(df["Player"] == player) & (df["Season"] == season)]
         if df_fs.empty:
-            st.warning("Pas de données pour ce joueur / cette saison.")
+            st.warning("No data for this player/season.")
             st.stop()
 
         # 3) Filtre Club si plusieurs
         teams = df_fs["Team"].dropna().unique().tolist()
         if len(teams) > 1:
-            team = st.selectbox("Sélectionner un club", teams, key="idx_team")
+            team = st.selectbox("Select a team", teams, key="idx_team")
             df_fs = df_fs[df_fs["Team"] == team]
         else:
             team = teams[0]
@@ -1155,7 +1196,7 @@ if page == "xPhysical":
         # 4) Filtre Poste si plusieurs
         positions = df_fs["Position Group"].dropna().unique().tolist()
         if len(positions) > 1:
-            position = st.selectbox("Sélectionner un poste", positions, key="idx_position")
+            position = st.selectbox("Select a position", positions, key="idx_position")
         else:
             position = positions[0]
         df_fs = df_fs[df_fs["Position Group"] == position]
@@ -1163,7 +1204,7 @@ if page == "xPhysical":
         # 5) Filtre Compétition si plusieurs
         competitions = df_fs["Competition"].dropna().unique().tolist()
         if len(competitions) > 1:
-            competition = st.selectbox("Sélectionner une compétition", competitions, key="idx_comp")
+            competition = st.selectbox("Select a competition", competitions, key="idx_comp")
             df_fs = df_fs[df_fs["Competition"] == competition]
         else:
             competition = competitions[0]
@@ -1174,10 +1215,11 @@ if page == "xPhysical":
         position = row["Position Group"]
 
         # — Affichage des infos du joueur
+        age_str = f"{int(row['Age'])}" if pd.notna(row['Age']) else "?"
         info = (
             f"<div style='text-align:center; font-size:16px; margin:10px 0;'>"
             f"<b>{row['Short Name']}</b> – {row['Season']} – {row['Team']} "
-            f"(<i>{row['Competition']}</i>) – {int(row['Age'])} ans"
+            f"(<i>{row['Competition']}</i>) – {age_str} y/o"
             "</div>"
         )
         st.markdown(info, unsafe_allow_html=True)
@@ -1447,7 +1489,7 @@ if page == "xPhysical":
 
         position = row["Position Group"]
         if position not in next(iter(threshold_dict.values())):
-            st.error(f"Pas de barème défini pour le poste « {position} »")
+            st.error(f"No defined scale for this position « {position} »")
             st.stop()
 
         # 3) Mappings colonne brute <-> metric_key, et metric_key <-> colonne points
@@ -1483,8 +1525,8 @@ if page == "xPhysical":
             max_pts = get_max_pts(metric_key)
 
             rows.append({
-                "Métrique":      col_val,
-                "Valeur Joueur": f"{raw_val:.2f}" if pd.notna(raw_val) else "NA",
+                "Metrics":      col_val,
+                "Player Value": f"{raw_val:.2f}" if pd.notna(raw_val) else "NA",
                 "Points":        f"{pts} / {max_pts}"
             })
 
@@ -1493,13 +1535,13 @@ if page == "xPhysical":
         total_max  = row.get("Note xPhy_max",  0)
         index_xphy = row.get("xPhysical",      0)
         rows.append({
-            "Métrique":      "**Total**",
-            "Valeur Joueur": "",
+            "Metrics":      "**Total**",
+            "Player Value": "",
             "Points":        f"**{total_pts} / {total_max}**"
         })
         rows.append({
-            "Métrique":      "Index xPhysical",
-            "Valeur Joueur": "",
+            "Metrics":      "Index xPhysical",
+            "Player Value": "",
             "Points":        f"**{index_xphy}**"
         })
 
@@ -1551,25 +1593,23 @@ if page == "xPhysical":
         # Phrase moyenne (si tu veux la garder)
         st.markdown(
             f"<div style='text-align:center; font-size:14px; margin-top:-8px; color:grey'>"
-            f"Moyenne xPhysical ({position} en {row['Competition']}): {mean_peer:.1f}"
+            f"xPhysical Average ({position} in {row['Competition']}): {mean_peer:.1f}"
             "</div>",
             unsafe_allow_html=True
         )
 
         # — Affichage du tableau
-        st.markdown("### Détail de l’index xPhysical")
-        display_df = detail_df.set_index("Métrique")\
+        st.markdown("### xPhysical Details")
+        display_df = detail_df.set_index("Metrics")\
                               .style.set_properties(**{"text-align":"center"})
         st.dataframe(display_df)  
     
     # --- Onglet Top 50 xPhysical ---
     with tab4:
-        st.subheader("🏃‍♂️ Top 50 - xPhysical Index")
-
         col1, col2 = st.columns(2)
         with col1:
             selected_competition = st.selectbox(
-                "Compétition",
+                "Competition",
                 competition_list,
                 index=competition_list.index("ITA - Serie A") if "ITA - Serie A" in competition_list else 0,
                 key="top50_xphy_comp"
@@ -1580,14 +1620,14 @@ if page == "xPhysical":
             available_seasons = sorted(available_seasons)
             default_season = "2024/2025" if "2024/2025" in available_seasons else available_seasons[-1]
             selected_season = st.selectbox(
-                "Saison",
+                "Season",
                 available_seasons,
                 index=available_seasons.index(default_season),
                 key="top50_xphy_season"
             )
 
         selected_position = st.selectbox(
-            "Poste",
+            "Position",
             position_list,
             index=position_list.index("Striker") if "Striker" in position_list else 0,
             key="top50_xphy_pos"
@@ -1605,11 +1645,12 @@ if page == "xPhysical":
         # Construction manuelle des rows
         rows = []
         for i, row in top_50.iterrows():
+            age = int(row["Age"]) if pd.notna(row["Age"]) else "—"
             rows.append({
                 "Rank":      i + 1,
-                "Joueur":    row["Short Name"],
-                "Équipe":    row["Team"],
-                "Âge":       int(row["Age"]),
+                "Player":    row["Short Name"],
+                "Team":    row["Team"],
+                "Age":       age,
                 "xPhysical": int(round(row["xPhysical"]))
             })
 
@@ -1617,7 +1658,7 @@ if page == "xPhysical":
 
         # Mise en forme : Rank centré (en tant qu’index), le reste aligné selon logique demandée
         styled_df = display_df.style\
-            .set_properties(subset=["Joueur", "Équipe", "Âge", "xPhysical"], **{"text-align": "left"})\
+            .set_properties(subset=["Player", "Team", "Age", "xPhysical"], **{"text-align": "left"})\
             .set_table_styles([
                 {"selector": "th", "props": [("text-align", "center")]},              # en-têtes colonnes
                 {"selector": ".row_heading", "props": [("text-align", "center")]},   # valeurs d'index (Rank)
@@ -1625,7 +1666,6 @@ if page == "xPhysical":
             ])
 
         st.dataframe(styled_df, use_container_width=True)
-
     
 # ============================================= VOLET xTechnical ========================================================
 elif page == "xTech/xDef":
@@ -1635,57 +1675,91 @@ elif page == "xTech/xDef":
 
     # === Onglet Scatter Plot ===
     with tab1:
-        st.title("xTechnical – Scatter Plot")
+       
+        with st.expander("📘 About the xTech/xDef Section", expanded=False):
+            st.markdown("""
+        This section provides access to event data, which quantifies what happens on the pitch in direct relation to individual player actions (passes, dribbles, duels, etc.).
 
-        # === SIDEBAR ===
-        with st.sidebar:
-            st.header("Filtres xTechnical")
+        #### ⚠️ Data Coverage & Reliability
+        All players who have appeared in available competitions are included, but only those with **at least 500 minutes played** provide a sufficiently robust sample for meaningful analysis.  
 
+        #### 🗂️ What you can do in each tab:
+        - **Scatter Plot:**  
+          Explore the relationships between any two technical or defensive metrics, filter by competition, season, position, foot, age, or minutes, and highlight specific players or teams.
+
+        - **Radar:**  
+          Generate percentile-based radar charts for a selected player (or compare two players), visualizing their technical and/or defensive skillset compared to their positional peers.
+
+        - **Index:**  
+          View a detailed breakdown of a player's technical and defensive indexes.
+
+        - **Top 50:**  
+          Display the top 50 players by xTECH, xDEF, or the relevant goalkeeper indexes, with full filtering by competition, season, position, and minimum minutes.
+
+        **All metrics are normalized per 90 minutes (P90), except where otherwise noted.**
+        """)
+
+        st.markdown("<div style='height: 2em;'></div>", unsafe_allow_html=True)
+
+       # Ligne 1 : Saisons, Compétitions, Postes
+        col1, col2, col3 = st.columns([1.2, 1.2, 1.2])
+        with col1:
             selected_seasons_tech = st.multiselect(
-                "Saisons",
+                "Season(s)",
                 options=season_list_tech,
                 default=[]
             )
-
+        with col2:
             selected_competitions_tech = st.multiselect(
-                "Compétitions",
+                "Competition(s)",
                 options=competition_list_tech,
                 default=[]
             )
-
+        with col3:
             selected_positions_tech = st.multiselect(
-                "Postes",
+                "Position(s)",
                 options=position_list_tech,
                 default=[]
             )
 
+        # Ligne 2 : Âge et Minutes Played côte à côte
+        col4, col5 = st.columns([1, 1.2])
+        with col4:
             age_min_tech, age_max_tech = int(df_tech["Age"].min()), int(df_tech["Age"].max())
             selected_age_tech = st.slider(
-                "Âge",
+                "Age",
                 min_value=age_min_tech,
                 max_value=age_max_tech,
                 value=(age_min_tech, age_max_tech),
                 step=1
             )
-
-            selected_foot_tech = st.multiselect(
-                "Latéralité",
-                options=foot_list_tech,
-                default=[]
-            )
-
+        with col5:
             minutes_min, minutes_max = int(df_tech["Minutes"].min()), int(df_tech["Minutes"].max())
             selected_minutes_tech = st.slider(
-                "Minutes jouées",
+                "Minutes Played",
                 min_value=minutes_min,
                 max_value=minutes_max,
                 value=(300, minutes_max),
                 step=50
             )
 
-        st.write("---")
-        st.subheader("Tableau filtré")
-
+        # Ligne 3 : Preferred Foot et Add Player(s) côte à côte
+        col6, col7 = st.columns([1, 1.5])
+        with col6:
+            selected_foot_tech = st.multiselect(
+                "Preferred Foot",
+                options=foot_list_tech,
+                default=[]
+            )
+        with col7:
+            filtered_players_tech = sorted(df_tech["Player Name"].dropna().unique())
+            selected_extra_players_tech = st.multiselect(
+                "Add Player(s)",
+                options=filtered_players_tech,
+                default=[],
+                help="Add players outside filters"
+            )
+            
         # Application des filtres
         filtered_df_tech = df_tech.copy()
 
@@ -1716,26 +1790,23 @@ elif page == "xTech/xDef":
             [p for p in player_list_tech if p not in filtered_players_tech]
         )
 
-        # Sélection des joueurs à ajouter
-        selected_extra_players_tech = st.sidebar.multiselect(
-            "Joueur(s) ajouté(s)",
-            options=available_extra_players_tech,
-            default=[],
-            help="Permet d’ajouter des joueurs hors filtre"
-        )
-
         # Ajout des joueurs hors filtre sélectionnés
         if selected_extra_players_tech:
             extra_df_tech = df_tech[df_tech["Player Name"].isin(selected_extra_players_tech)]
             filtered_df_tech = pd.concat([filtered_df_tech, extra_df_tech]).drop_duplicates()
-
-        # Affichage du tableau
-        display_df_tech = filtered_df_tech.drop(columns=["Unnamed: 0"], errors="ignore")
-        st.dataframe(display_df_tech)
         
-        st.write("---")
-        st.subheader("Paramètres du Graphe (per 90)")
+        # Bouton d'export CSV de la sélection actuelle
+        csv = filtered_df_tech.to_csv(index=False)
+        st.download_button(
+            label="Download selection as CSV",
+            data=csv,
+            file_name="selection_event_data.csv",
+            mime="text/csv",
+            key="download_scatter_csv"
+        )
         
+        st.markdown("---")        
+                
         # Mapping noms internes → noms affichés
         metric_display_map = {
             # === Index ===
@@ -1829,41 +1900,41 @@ elif page == "xTech/xDef":
         # Liste ordonnée des métriques à afficher dans les menus X/Y
         metric_keys = list(metric_display_map.keys())
 
-        # Sélecteurs d'axes avec noms lisibles
-        selected_xaxis_tech = st.selectbox(
-            "Axe X",
-            options=metric_keys,
-            format_func=lambda x: metric_display_map.get(x, x),
-            index=0
-        )
-        selected_yaxis_tech = st.selectbox(
-            "Axe Y",
-            options=metric_keys,
-            format_func=lambda x: metric_display_map.get(x, x),
-            index=1
-        )
+        # Ligne 1 : Axe X / Axe Y côte à côte
+        colx, coly = st.columns(2)
+        with colx:
+            selected_xaxis_tech = st.selectbox(
+                "X Axis",
+                options=metric_keys,
+                format_func=lambda x: metric_display_map.get(x, x),
+                index=0
+            )
+        with coly:
+            selected_yaxis_tech = st.selectbox(
+                "Y Axis",
+                options=metric_keys,
+                format_func=lambda x: metric_display_map.get(x, x),
+                index=1
+            )
 
-        # Options de surlignage
+        # Ligne 2 : surligner joueurs / équipes côte à côte
         players_filtered = sorted(filtered_df_tech["Player Last Name"].dropna().unique())
         teams_filtered = sorted(filtered_df_tech["Team Name"].dropna().unique())
 
         col1, col2 = st.columns(2)
         with col1:
             highlight_players_tech = st.multiselect(
-                "Surligner Joueurs",
+                "Highlight Player(s)",
                 options=players_filtered,
                 default=[]
             )
         with col2:
             highlight_teams_tech = st.multiselect(
-                "Surligner Équipe",
+                "Highlight Team(s)",
                 options=teams_filtered,
                 default=[]
             )
-
-        st.write("---")
-        st.subheader("Graphique XY")
-
+        
         # Ajout label + typage
         plot_df_tech = filtered_df_tech.copy()
         plot_df_tech["Player_Label"] = plot_df_tech["Player Last Name"] + " " + plot_df_tech["season_short"]
@@ -2033,20 +2104,16 @@ elif page == "xTech/xDef":
         
     # === Onglet Radar ===
     with tab2:
-        st.subheader("Radar xTechnical")
-
         # Sélection Joueur 1 + Saison
         col1, col2 = st.columns(2)
         with col1:
             display_options = sorted(df_tech["Display Name"].dropna().unique())
-
             default_display_name = next(
                 (name for name in display_options if "Artem Dovbyk" in name),
                 display_options[0]
             )
-
             p1_display = st.selectbox(
-                "Joueur 1",
+                "Player 1",
                 options=display_options,
                 index=display_options.index(default_display_name),
                 key="tech_radar_p1"
@@ -2054,44 +2121,41 @@ elif page == "xTech/xDef":
             p1 = display_to_playername[p1_display]
         with col2:
             seasons1 = sorted(df_tech[df_tech["Player Name"] == p1]["Season Name"].dropna().unique().tolist())
-            s1 = st.selectbox("Saison 1", seasons1, key="tech_radar_s1")
+            s1 = st.selectbox("Season 1", seasons1, key="tech_radar_s1")
 
         df1 = df_tech[(df_tech["Player Name"] == p1) & (df_tech["Season Name"] == s1)]
         if df1.empty:
             st.warning("Aucune donnée trouvée pour ce joueur et cette saison.")
             st.stop()
-        
+
         # Calcul de la compétition principale (où le joueur a le plus joué sur cette saison)
         df_allplayer1 = df_tech[(df_tech["Player Name"] == p1) & (df_tech["Season Name"] == s1)]
         comp_minutes1 = df_allplayer1.groupby("Competition Name")["Minutes"].sum().sort_values(ascending=False)
         main_competition1 = comp_minutes1.index[0] if not comp_minutes1.empty else None
-        
+
         competitions1 = df1["Competition Name"].dropna().unique().tolist()
-        if len(competitions1) > 1:
-            # Préselection sur la compétition principale
-            index_main1 = competitions1.index(main_competition1) if main_competition1 in competitions1 else 0
-            comp1 = st.selectbox("Compétition 1", sorted(competitions1), key="tech_radar_comp1", index=index_main1)
-            df1 = df1[df1["Competition Name"] == comp1]
-        else:
-            comp1 = competitions1[0]
-        
-        # Ensuite seulement : sélection club si plusieurs
-        teams1 = df1["Team Name"].dropna().unique().tolist()
-        if len(teams1) > 1:
-            team1 = st.selectbox("Club 1", teams1, key="tech_radar_team1")
-            df1 = df1[df1["Team Name"] == team1]
-        else:
-            team1 = teams1[0]
-        
-        # Extraction du poste
+        # --------------------------
+        # *** ZONE DES 2 FILTRES CÔTE À CÔTE ***
+        # --------------------------
+        colA, colB = st.columns(2)
+        with colA:
+            if len(competitions1) > 1:
+                index_main1 = competitions1.index(main_competition1) if main_competition1 in competitions1 else 0
+                comp1 = st.selectbox(
+                    "Competition 1",
+                    sorted(competitions1),
+                    key="tech_radar_comp1",
+                    index=index_main1
+                )
+                df1 = df1[df1["Competition Name"] == comp1]
+            else:
+                comp1 = competitions1[0]
+
+        # Extraction du poste pour choix du template
         if "Position Group" in df1.columns and df1["Position Group"].notna().any():
             pos1 = df1["Position Group"].dropna().unique()[0]
         else:
-            pos1 = "Striker"  # fallback si vide ou inexistant
-        comp1 = df1["Competition Name"].dropna().unique()[0]
-        row1 = df1.iloc[0]
-
-        # Mapping position → template
+            pos1 = "Striker"  # fallback
         position_group_to_template = {
             "Goalkeeper": "Goalkeeper",
             "Central Defender": "Central Defender",
@@ -2102,12 +2166,22 @@ elif page == "xTech/xDef":
             "Striker": "Striker"
         }
         default_template = position_group_to_template.get(pos1, "Striker")
-
-        selected_template = st.selectbox(
-            "Choisir un template",
-            options=list(metric_templates_tech.keys()),
-            index=list(metric_templates_tech.keys()).index(default_template)
-        )
+        with colB:
+            selected_template = st.selectbox(
+                "Choose a template",
+                options=list(metric_templates_tech.keys()),
+                index=list(metric_templates_tech.keys()).index(default_template)
+            )
+        # --------------------------
+        # Suite du code inchangée :
+        teams1 = df1["Team Name"].dropna().unique().tolist()
+        if len(teams1) > 1:
+            team1 = st.selectbox("Team 1", teams1, key="tech_radar_team1")
+            df1 = df1[df1["Team Name"] == team1]
+        else:
+            team1 = teams1[0]
+        comp1 = df1["Competition Name"].dropna().unique()[0]
+        row1 = df1.iloc[0]
 
         metrics = metric_templates_tech[selected_template]
         labels = metric_labels_tech[selected_template]
@@ -2123,15 +2197,15 @@ elif page == "xTech/xDef":
         # 3. Liste ordonnée pour le selectbox
         player2_options = roma_players + other_players
         
-        compare = st.checkbox("Comparer à un 2ᵉ joueur")
+        compare = st.checkbox("Compare to a 2nd player")
         if compare:
             col3, col4 = st.columns(2)
             with col3:
-                p2_display = st.selectbox("Joueur 2", display_options, key="tech_radar_p2")
+                p2_display = st.selectbox("Player 2", display_options, key="tech_radar_p2")
                 p2 = display_to_playername[p2_display]
             with col4:
                 seasons2 = sorted(df_tech[df_tech["Player Name"] == p2]["Season Name"].dropna().unique().tolist())
-                s2 = st.selectbox("Saison 2", seasons2, key="tech_radar_s2")
+                s2 = st.selectbox("Season 2", seasons2, key="tech_radar_s2")
             df2 = df_tech[(df_tech["Player Name"] == p2) & (df_tech["Season Name"] == s2)]
             if df2.empty:
                 st.warning("Aucune donnée trouvée pour le joueur 2.")
@@ -2145,14 +2219,14 @@ elif page == "xTech/xDef":
             competitions2 = df2["Competition Name"].dropna().unique().tolist()
             if len(competitions2) > 1:
                 index_main2 = competitions2.index(main_competition2) if main_competition2 in competitions2 else 0
-                comp2 = st.selectbox("Compétition 2", sorted(competitions2), key="tech_radar_comp2", index=index_main2)
+                comp2 = st.selectbox("Competition 2", sorted(competitions2), key="tech_radar_comp2", index=index_main2)
                 df2 = df2[df2["Competition Name"] == comp2]
             else:
                 comp2 = competitions2[0]
         
             teams2 = df2["Team Name"].dropna().unique().tolist()
             if len(teams2) > 1:
-                team2 = st.selectbox("Club 2", teams2, key="tech_radar_team2")
+                team2 = st.selectbox("Team 2", teams2, key="tech_radar_team2")
                 df2 = df2[df2["Team Name"] == team2]
             else:
                 team2 = teams2[0]
@@ -2364,6 +2438,7 @@ elif page == "xTech/xDef":
             "Shooting%": "The percentage of total shots that are on target.",
             "NP Goals": "Goals scored (not including penalties).",
             "Average Def. Action Distance": "The average distance from the goal line that the player successfully makes a defensive action. The scale is the x-axis of the pitch, measured from 0-100.",
+            "PAdj Tackles & Interceptions": "Tackles + Interceptions per 90 (possession adjusted).",
             "Padj Tackles And Interceptions": "Tackles + Interceptions per 90 (possession adjusted).",
             "OP Passes + Touches In Box": "Successful passes into the box from outside the box (open play) + touches inside the box.",
             "OP xGAssisted": "xG assisted from open play.",
@@ -2385,23 +2460,21 @@ elif page == "xTech/xDef":
         
     # === Onglet Index ===
     with tab3:
-        st.subheader("xTechnical Player Index")
-
         # Sélection Joueur + Saison
         col1, col2 = st.columns(2)
         with col1:
             display_options = sorted(df_tech["Display Name"].dropna().unique())
             default_display_name = next((name for name in display_options if "Artem Dovbyk" in name), display_options[0])
-            p1_display = st.selectbox("Joueur", display_options, index=display_options.index(default_display_name), key="tech_index_p1")
+            p1_display = st.selectbox("Player", display_options, index=display_options.index(default_display_name), key="tech_index_p1")
             p1 = display_to_playername[p1_display]
         with col2:
             seasons = sorted(df_tech[df_tech["Player Name"] == p1]["Season Name"].dropna().unique())
-            s1 = st.selectbox("Saison", seasons, index=len(seasons) - 1, key="tech_index_s1")
+            s1 = st.selectbox("Season", seasons, index=len(seasons) - 1, key="tech_index_s1")
 
         # Filtrage Joueur + Saison
         df1 = df_tech[(df_tech["Player Name"] == p1) & (df_tech["Season Name"] == s1)]
         if df1.empty:
-            st.warning("Aucune donnée trouvée.")
+            st.warning("No data found.")
             st.stop()
         
         # Sélection compétition principale (où le joueur a le plus joué)
@@ -2413,7 +2486,7 @@ elif page == "xTech/xDef":
         if len(competitions) > 1:
             # Préselection sur la compétition principale
             index_main = competitions.index(main_competition) if main_competition in competitions else 0
-            comp = st.selectbox("Compétition", sorted(competitions), key="tech_index_comp", index=index_main)
+            comp = st.selectbox("Competition", sorted(competitions), key="tech_index_comp", index=index_main)
             df1 = df1[df1["Competition Name"] == comp]
         else:
             comp = competitions[0]
@@ -2421,7 +2494,7 @@ elif page == "xTech/xDef":
         # Ensuite seulement : sélection club si plusieurs
         teams = df1["Team Name"].dropna().unique().tolist()
         if len(teams) > 1:
-            team1 = st.selectbox("Club", teams, key="tech_index_team1")
+            team1 = st.selectbox("Team", teams, key="tech_index_team1")
             df1 = df1[df1["Team Name"] == team1]
         else:
             team1 = teams[0]
@@ -2476,7 +2549,7 @@ elif page == "xTech/xDef":
         info = (
             f"<div style='text-align:center; font-size:16px; margin:10px 0;'>"
             f"<b>{p1} ({pos})</b> – {s1} – {team1} "
-            f"(<i>{comp}</i>) – {age} ans – {minutes} min"
+            f"(<i>{comp}</i>) – {age} y/o – {minutes} min"
             "</div>"
         )
         st.markdown(info, unsafe_allow_html=True)
@@ -2499,20 +2572,20 @@ elif page == "xTech/xDef":
                 for col, label in gk_def_metrics:
                     val = row.get(col, None)
                     metric_rows.append({
-                        "Métrique": label,
-                        "Valeur Joueur": f"{val:.2f}" if pd.notna(val) else "NA",
+                        "Mectrics": label,
+                        "Player Figures": f"{val:.2f}" if pd.notna(val) else "NA",
                         "Points": ""  # Pas de barème pour GK, adapter si besoin
                     })
                 # Index Save (/100)
                 save_score = row.get("xTech GK Save (/100)", np.nan)
                 if pd.notna(save_score):
                     metric_rows.append({
-                        "Métrique": "**GK Save Index**",
-                        "Valeur Joueur": "",
+                        "Metrics": "**GK Save Index**",
+                        "Player Figures": "",
                         "Points": f"**{save_score:.0f} / 100**"
                     })
                 detail_df = pd.DataFrame(metric_rows)
-                detail_df = detail_df.drop_duplicates(subset=["Métrique"], keep="first")
+                detail_df = detail_df.drop_duplicates(subset=["Metrics"], keep="first")
             
                 # Affichage jauge Save (en premier)
                 hue_save = 120 * (save_score / 100) if pd.notna(save_score) else 0
@@ -2554,7 +2627,7 @@ elif page == "xTech/xDef":
                     if pd.notnull(mean_save):
                         st.markdown(
                             f"<div style='text-align:center; color:grey; margin-top:-8px; margin-bottom:12px;'>"
-                            f"Moyenne Save (GK en {comp}) : {round(mean_save)}</div>",
+                            f"Average xSave (GK in {comp}) : {round(mean_save)}</div>",
                             unsafe_allow_html=True
                         )
                 else:
@@ -2565,7 +2638,7 @@ elif page == "xTech/xDef":
                     )
             
                 # Titre avant le tableau
-                st.markdown("##### Détail du score xSave")
+                st.markdown("##### xSave Details")
 
                 # === Tableau xSave (GK) ===
                 config = xtech_post_config.get("Goalkeeper")
@@ -2587,8 +2660,8 @@ elif page == "xTech/xDef":
                     max_pts = max(scores)
                     label = labels.get(raw_col, raw_col)
                     metric_rows.append({
-                        "Métrique": label,
-                        "Valeur Joueur": f"{raw_val:.2f}" if pd.notna(raw_val) else "NA",
+                        "Metrics": label,
+                        "Player Figures": f"{raw_val:.2f}" if pd.notna(raw_val) else "NA",
                         "Points": f"{note_val} / {max_pts}" if pd.notna(note_val) else f"0 / {max_pts}"
                     })
 
@@ -2596,8 +2669,8 @@ elif page == "xTech/xDef":
                 total_points = 0
                 total_max = 0
                 for row_ in metric_rows:
-                    label = row_["Métrique"]
-                    if row_["Points"] and "/" in row_["Points"] and not any(x in label for x in ["Sous-index", "Total", "Index"]):
+                    label = row_["Metrics"]
+                    if row_["Points"] and "/" in row_["Points"] and not any(x in label for x in ["Sub-index", "Total", "Index"]):
                         try:
                             pts, max_pts = row_["Points"].split("/")
                             total_points += int(pts.strip(" *"))
@@ -2606,8 +2679,8 @@ elif page == "xTech/xDef":
                             continue
 
                 metric_rows.append({
-                    "Métrique": "**Total**",
-                    "Valeur Joueur": "",
+                    "Metrics": "**Total**",
+                    "Player Figures": "",
                     "Points": f"**{total_points} / {total_max}**"
                 })
 
@@ -2615,15 +2688,15 @@ elif page == "xTech/xDef":
                 sub_val = row.get("xTech GK Save (/100)", None)
                 if pd.notna(sub_val):
                     metric_rows.append({
-                        "Métrique": "**GK Save Index**",
-                        "Valeur Joueur": "",
+                        "Metrics": "**GK Save Index**",
+                        "Player Figures": "",
                         "Points": f"**{sub_val:.0f} / 100**"
                     })
 
                 # === Affichage final du tableau
                 detail_df = pd.DataFrame(metric_rows)
-                detail_df = detail_df.drop_duplicates(subset=["Métrique"], keep="first")
-                st.dataframe(detail_df.set_index("Métrique"), use_container_width=True)
+                detail_df = detail_df.drop_duplicates(subset=["Metrics"], keep="first")
+                st.dataframe(detail_df.set_index("Metrics"), use_container_width=True)
 
             else:
                 fig_def = go.Figure(go.Indicator(
@@ -2665,7 +2738,7 @@ elif page == "xTech/xDef":
                         mean_def_affiche = round(mean_def)
                         st.markdown(
                             f"<div style='text-align:center; color:grey; margin-top:-8px; margin-bottom:12px;'>"
-                            f"Moyenne {def_label} ({pos} en {comp}) : {mean_def_affiche}</div>",
+                            f"Average {def_label} ({pos} in {comp}) : {mean_def_affiche}</div>",
                             unsafe_allow_html=True
                         )
                 else:
@@ -2675,7 +2748,7 @@ elif page == "xTech/xDef":
                         unsafe_allow_html=True
                     )
                 
-                st.markdown("##### Détail du score xDEF")
+                st.markdown("##### xDef Details")
 
             # Tableau DEF
             if pos == "Goalkeeper":
@@ -2708,8 +2781,8 @@ elif page == "xTech/xDef":
                     max_pts = max(scores)
                     label = labels.get(raw_col, raw_col)
                     metric_rows.append({
-                        "Métrique": label,
-                        "Valeur Joueur": f"{raw_val:.2f}" if pd.notna(raw_val) else "NA",
+                        "Metrics": label,
+                        "Player Figures": f"{raw_val:.2f}" if pd.notna(raw_val) else "NA",
                         "Points": f"{note_val} / {max_pts}" if pd.notna(note_val) else f"0 / {max_pts}"
                     })
 
@@ -2717,8 +2790,8 @@ elif page == "xTech/xDef":
                 total_points = 0
                 total_max = 0
                 for row_ in metric_rows:
-                    label = row_["Métrique"]
-                    if row_["Points"] and "/" in row_["Points"] and not any(x in label for x in ["Sous-index", "Total", "Index"]):
+                    label = row_["Metrics"]
+                    if row_["Points"] and "/" in row_["Points"] and not any(x in label for x in ["Sub-index", "Total", "Index"]):
                         try:
                             pts, max_pts = row_["Points"].split("/")
                             total_points += int(pts.strip(" *"))
@@ -2727,8 +2800,8 @@ elif page == "xTech/xDef":
                             continue
 
                 metric_rows.append({
-                    "Métrique": "**Total**",
-                    "Valeur Joueur": "",
+                    "Metrics": "**Total**",
+                    "Player Figures": "",
                     "Points": f"**{total_points} / {total_max}**"
                 })
                 
@@ -2736,15 +2809,15 @@ elif page == "xTech/xDef":
                 sub_val = row.get("xDEF", None)
                 if pd.notna(sub_val):
                     metric_rows.append({
-                        "Métrique": "**Index xDEF**",
-                        "Valeur Joueur": "",
+                        "Metrics": "**Index xDEF**",
+                        "Player Figures": "",
                         "Points": f"**{sub_val:.0f} / 100**"
                     })
 
                 # === Affichage final du tableau (propre, sans index auto)
                 detail_df = pd.DataFrame(metric_rows)
-                detail_df = detail_df.drop_duplicates(subset=["Métrique"], keep="first")
-                st.dataframe(detail_df.set_index("Métrique"), use_container_width=True)
+                detail_df = detail_df.drop_duplicates(subset=["Metrics"], keep="first")
+                st.dataframe(detail_df.set_index("Metrics"), use_container_width=True)
         
                 hue_tech = 120 * (tech_score / 100)
                 bar_color_tech = f"hsl({hue_tech:.0f}, 75%, 50%)"
@@ -2762,20 +2835,20 @@ elif page == "xTech/xDef":
                 for col, label in gk_tech_metrics:
                     val = row.get(col, None)
                     metric_rows.append({
-                        "Métrique": label,
-                        "Valeur Joueur": f"{val:.2f}" if pd.notna(val) else "NA",
+                        "Metrics": label,
+                        "Player Figures": f"{val:.2f}" if pd.notna(val) else "NA",
                         "Points": ""  # Pas de barème pour GK, adapter si besoin
                     })
                 # Index Usage (/100)
                 usage_score = row.get("xTech GK Usage (/100)", np.nan)
                 if pd.notna(usage_score):
                     metric_rows.append({
-                        "Métrique": "**GK Usage Index**",
-                        "Valeur Joueur": "",
+                        "Metrics": "**GK Usage Index**",
+                        "Player Figures": "",
                         "Points": f"**{usage_score:.0f} / 100**"
                     })
                 detail_df = pd.DataFrame(metric_rows)
-                detail_df = detail_df.drop_duplicates(subset=["Métrique"], keep="first")
+                detail_df = detail_df.drop_duplicates(subset=["Metrics"], keep="first")
             
                 # Affichage jauge Usage (en premier)
                 hue_usage = 120 * (usage_score / 100) if pd.notna(usage_score) else 0
@@ -2817,7 +2890,7 @@ elif page == "xTech/xDef":
                     if pd.notnull(mean_usage):
                         st.markdown(
                             f"<div style='text-align:center; color:grey; margin-top:-8px; margin-bottom:12px;'>"
-                            f"Moyenne Usage (GK en {comp}) : {round(mean_usage)}</div>",
+                            f"Average xUsage (GK in {comp}) : {round(mean_usage)}</div>",
                             unsafe_allow_html=True
                         )
                 else:
@@ -2829,7 +2902,7 @@ elif page == "xTech/xDef":
             
                 # Titre avant le tableau
                 # Titre avant le tableau
-                st.markdown("##### Détail du score xUsage")
+                st.markdown("##### xUsage Details")
 
                 # === Tableau xUsage (GK) avec barèmes ===
                 metric_rows = []
@@ -2844,8 +2917,8 @@ elif page == "xTech/xDef":
                     max_pts = max(scores)
                     label = labels.get(raw_col, raw_col)
                     metric_rows.append({
-                        "Métrique": label,
-                        "Valeur Joueur": f"{raw_val:.2f}" if pd.notna(raw_val) else "NA",
+                        "Metrics": label,
+                        "Player Figures": f"{raw_val:.2f}" if pd.notna(raw_val) else "NA",
                         "Points": f"{note_val} / {max_pts}" if pd.notna(note_val) else f"0 / {max_pts}"
                     })
 
@@ -2853,8 +2926,8 @@ elif page == "xTech/xDef":
                 total_points = 0
                 total_max = 0
                 for row_ in metric_rows:
-                    label = row_["Métrique"]
-                    if row_["Points"] and "/" in row_["Points"] and not any(x in label for x in ["Sous-index", "Total", "Index"]):
+                    label = row_["Metrics"]
+                    if row_["Points"] and "/" in row_["Points"] and not any(x in label for x in ["Sub-index", "Total", "Index"]):
                         try:
                             pts, max_pts = row_["Points"].split("/")
                             total_points += int(pts.strip(" *"))
@@ -2863,8 +2936,8 @@ elif page == "xTech/xDef":
                             continue
 
                 metric_rows.append({
-                    "Métrique": "**Total**",
-                    "Valeur Joueur": "",
+                    "Metrics": "**Total**",
+                    "Player Figures": "",
                     "Points": f"**{total_points} / {total_max}**"
                 })
 
@@ -2872,15 +2945,15 @@ elif page == "xTech/xDef":
                 sub_val = row.get("xTech GK Usage (/100)", None)
                 if pd.notna(sub_val):
                     metric_rows.append({
-                        "Métrique": "**GK Usage Index**",
-                        "Valeur Joueur": "",
+                        "Metrics": "**GK Usage Index**",
+                        "Player Figures": "",
                         "Points": f"**{sub_val:.0f} / 100**"
                     })
 
                 # === Affichage final du tableau
                 detail_df = pd.DataFrame(metric_rows)
-                detail_df = detail_df.drop_duplicates(subset=["Métrique"], keep="first")
-                st.dataframe(detail_df.set_index("Métrique"), use_container_width=True)
+                detail_df = detail_df.drop_duplicates(subset=["Metrics"], keep="first")
+                st.dataframe(detail_df.set_index("Metrics"), use_container_width=True)
             else:
                 fig_tech = go.Figure(go.Indicator(
                     mode="gauge+number",
@@ -2919,7 +2992,7 @@ elif page == "xTech/xDef":
                         mean_tech_affiche = round(mean_tech)
                         st.markdown(
                             f"<div style='text-align:center; color:grey; margin-top:-8px; margin-bottom:12px;'>"
-                            f"Moyenne {tech_label} ({pos} en {comp}) : {mean_tech_affiche}</div>",
+                            f"Average {tech_label} ({pos} in {comp}) : {mean_tech_affiche}</div>",
                             unsafe_allow_html=True
                         )
                 else:
@@ -2929,7 +3002,7 @@ elif page == "xTech/xDef":
                         unsafe_allow_html=True
                     )
                 
-                st.markdown("##### Détail du score xTECH")
+                st.markdown("##### xTech Details")
 
             # Tableau TECH
             if pos == "Goalkeeper":
@@ -2962,8 +3035,8 @@ elif page == "xTech/xDef":
                     max_pts = max(scores)
                     label = labels.get(raw_col, raw_col)
                     metric_rows.append({
-                        "Métrique": label,
-                        "Valeur Joueur": f"{raw_val:.2f}" if pd.notna(raw_val) else "NA",
+                        "Metrics": label,
+                        "Player Figures": f"{raw_val:.2f}" if pd.notna(raw_val) else "NA",
                         "Points": f"{note_val} / {max_pts}" if pd.notna(note_val) else f"0 / {max_pts}"
                     })
 
@@ -2971,8 +3044,8 @@ elif page == "xTech/xDef":
                 total_points = 0
                 total_max = 0
                 for row_ in metric_rows:
-                    label = row_["Métrique"]
-                    if row_["Points"] and "/" in row_["Points"] and not any(x in label for x in ["Sous-index", "Total", "Index"]):
+                    label = row_["Metrics"]
+                    if row_["Points"] and "/" in row_["Points"] and not any(x in label for x in ["Sub-index", "Total", "Index"]):
                         try:
                             pts, max_pts = row_["Points"].split("/")
                             total_points += int(pts.strip(" *"))
@@ -2981,8 +3054,8 @@ elif page == "xTech/xDef":
                             continue
 
                 metric_rows.append({
-                    "Métrique": "**Total**",
-                    "Valeur Joueur": "",
+                    "Metrics": "**Total**",
+                    "Player Figures": "",
                     "Points": f"**{total_points} / {total_max}**"
                 })
 
@@ -2990,25 +3063,23 @@ elif page == "xTech/xDef":
                 sub_val = row.get("xTECH", None)
                 if pd.notna(sub_val):
                     metric_rows.append({
-                        "Métrique": "**Index xTECH**",
-                        "Valeur Joueur": "",
+                        "Metrics": "**Index xTECH**",
+                        "Player Figures": "",
                         "Points": f"**{sub_val:.0f} / 100**"
                     })
                 
                 # === Affichage final du tableau (propre, sans index auto)
                 detail_df = pd.DataFrame(metric_rows)
-                detail_df = detail_df.drop_duplicates(subset=["Métrique"], keep="first")
-                st.dataframe(detail_df.set_index("Métrique"), use_container_width=True)
+                detail_df = detail_df.drop_duplicates(subset=["Metrics"], keep="first")
+                st.dataframe(detail_df.set_index("Metrics"), use_container_width=True)
     
 ################### --- Onglet Top 50 xTechnical --- ###################
     with tab4:
-        st.subheader("🎯 Top 50 - xTechnical Index")
-
-        # 1. Sélection Compétition et Saison
+        # 1. Sélection Compétition et Saison (déjà côte à côte)
         col1, col2 = st.columns(2)
         with col1:
             selected_comp = st.selectbox(
-                "Compétition",
+                "Competition",
                 competition_list_tech,
                 index=competition_list_tech.index("Serie A") if "Serie A" in competition_list_tech else 0,
                 key="top50_xtech_comp"
@@ -3018,49 +3089,54 @@ elif page == "xTech/xDef":
             available_seasons = sorted(available_seasons)
             default_season = "2024/2025" if "2024/2025" in available_seasons else available_seasons[-1]
             selected_season = st.selectbox(
-                "Saison",
+                "Season",
                 available_seasons,
                 index=available_seasons.index(default_season),
                 key="top50_xtech_season"
             )
 
-        # 2. Sélection POSTE avec ordre imposé
-        ordered_positions = [
-            "Goalkeeper", "Central Defender", "Full Back", "Midfielder", "Attacking Midfielder", "Winger", "Striker"
-        ]
-        positions_available = [p for p in ordered_positions if p in df_tech["Position Group"].unique()]
-        selected_pos = st.selectbox(
-            "Poste",
-            positions_available,
-            index=positions_available.index("Striker") if "Striker" in positions_available else 0,
-            key="top50_xtech_pos"
-        )
+        # 2. Sélection POSTE et INDEX côte à côte
+        col3, col4 = st.columns(2)
+        with col3:
+            ordered_positions = [
+                "Goalkeeper", "Central Defender", "Full Back", "Midfielder", "Attacking Midfielder", "Winger", "Striker"
+            ]
+            positions_available = [p for p in ordered_positions if p in df_tech["Position Group"].unique()]
+            selected_pos = st.selectbox(
+                "Position",
+                positions_available,
+                index=positions_available.index("Striker") if "Striker" in positions_available else 0,
+                key="top50_xtech_pos"
+            )
+        with col4:
+            if selected_pos == "Goalkeeper":
+                index_options = {
+                    "xSave": "xTech GK Save (/100)",
+                    "xUsage": "xTech GK Usage (/100)"
+                }
+                default_index = "xSave"
+            else:
+                index_options = {
+                    "xDEF": "xDEF",
+                    "xTECH": "xTECH"
+                }
+                default_index = "xTECH"
+            selected_index_label = st.selectbox(
+                "Index to display",
+                list(index_options.keys()),
+                key="top50_xtech_index"
+            )
+            selected_index = index_options[selected_index_label]
 
         # 3. Slider Minutes
         min_minutes = st.slider(
-            "Minutes jouées minimales",
+            "Minimum minutes played",
             0,
             int(df_tech["Minutes"].max()),
             600,
             50,
             key="top50_xtech_min"
         )
-
-        # 4. INDEX A AFFICHER (adapté GK/autres)
-        if selected_pos == "Goalkeeper":
-            index_options = {
-                "xSave": "xTech GK Save (/100)",
-                "xUsage": "xTech GK Usage (/100)"
-            }
-            default_index = "xSave"
-        else:
-            index_options = {
-                "xDEF": "xDEF",
-                "xTECH": "xTECH"
-            }
-            default_index = "xTECH"
-        selected_index_label = st.selectbox("Index à afficher", list(index_options.keys()), key="top50_xtech_index")
-        selected_index = index_options[selected_index_label]
 
         # 5. FILTRAGE
         filtered_top = df_tech[
@@ -3079,10 +3155,10 @@ elif page == "xTech/xDef":
             index_value = row[selected_index]
             rows.append({
                 "Rank":      i + 1,
-                "Joueur":    row["Player Name"],
-                "Équipe":    row["Team Name"],
+                "Player":    row["Player Name"],
+                "Team":    row["Team Name"],
                 "Minutes":   int(round(row["Minutes"])),
-                "Âge":       int(row["Age"]),
+                "Age":       int(row["Age"]),
                 selected_index_label: int(round(index_value)) if pd.notna(index_value) else "—"
             })
 
