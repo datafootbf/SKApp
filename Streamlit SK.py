@@ -24,7 +24,7 @@ def load_xphysical():
 
 @st.cache_data
 def load_xtechnical():
-    df_tech = pd.read_csv('SB_All.csv', sep=",")
+    df_tech = pd.read_parquet('SB_All.parquet')
     df_tech.columns = df_tech.columns.str.strip()
     df_tech["season_short"] = df_tech["Season Name"].apply(shorten_season)
     df_tech["Display Name"] = df_tech.apply(
