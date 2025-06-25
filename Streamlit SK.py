@@ -6,6 +6,8 @@ import random
 import re
 import plotly.graph_objects as go
 from PIL import Image
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+from streamlit import session_state as ss
 
 st.set_page_config(layout="wide")
 
@@ -35,6 +37,13 @@ def load_xtechnical():
     )
     return df_tech
 
+@st.cache_data
+def load_merged():
+    df_merged = pd.read_csv('SB_SK_MERGED.csv', sep=",")
+    df_merged.columns = df_merged.columns.str.strip()
+    return df_merged
+
+df_merged = load_merged()
 df = load_xphysical()
 df_tech = load_xtechnical()
 
@@ -399,6 +408,318 @@ xtech_post_config = {
     }
 }
 
+# 3. Seuils xPhy intégrés en dur
+threshold_dict1 = {
+    'psv99_top5': {
+        'Central Defender': [
+            {'min': 31.48, 'max': None, 'score': 12},
+            {'min': 30.84, 'max': 31.48, 'score': 9},
+            {'min': 30.28, 'max': 30.84, 'score': 6},
+            {'min': 29.64, 'max': 30.28, 'score': 3},
+            {'min': None,  'max': 29.64, 'score': 0},
+        ],
+        'Full Back': [
+            {'min': 32.0,  'max': None, 'score': 14},
+            {'min': 31.46, 'max': 32.0,  'score': 10},
+            {'min': 30.94, 'max': 31.46, 'score': 6},
+            {'min': 30.08, 'max': 30.94, 'score': 4},
+            {'min': None,  'max': 30.08, 'score': 0},
+        ],
+        'Midfielder': [
+            {'min': 29.76, 'max': None, 'score': 10},
+            {'min': 29.07, 'max': 29.76, 'score': 7},
+            {'min': 28.38,  'max': 29.07, 'score': 5},
+            {'min': 27.62, 'max': 28.38,  'score': 3},
+            {'min': None,  'max': 27.62, 'score': 0},
+        ],
+        'Attacking Midfielder': [
+            {'min': 30.54, 'max': None,   'score': 10},
+            {'min': 29.74, 'max': 30.54,  'score': 7},
+            {'min': 29.23, 'max': 29.74,  'score': 5},
+            {'min': 28.27, 'max': 29.23,  'score': 3},
+            {'min': None,  'max': 28.27,  'score': 0},
+        ],
+        'Winger': [
+            {'min': 32.56, 'max': None, 'score': 14},
+            {'min': 31.82, 'max': 32.56, 'score': 10},
+            {'min': 31.22, 'max': 31.82, 'score': 6},
+            {'min': 30.24, 'max': 31.22, 'score': 4},
+            {'min': None,  'max': 30.24, 'score': 0},
+        ],
+        'Striker': [
+            {'min': 32.2,  'max': None, 'score': 14},
+            {'min': 31.28, 'max': 32.2,  'score': 10},
+            {'min': 30.7,  'max': 31.28, 'score': 6},
+            {'min': 29.96, 'max': 30.7,  'score': 4},
+            {'min': None,  'max': 29.96, 'score': 0},
+        ],
+    },
+    'hi_distance_full_all': {
+        'Central Defender': [
+            {'min': 551.56, 'max': None, 'score': 4},
+            {'min': 492.06, 'max': 551.56, 'score': 3},
+            {'min': 441.2,  'max': 492.06, 'score': 2},
+            {'min': 390.76, 'max': 441.2,  'score': 1},
+            {'min': None,   'max': 390.76, 'score': 0},
+        ],
+        'Full Back': [
+            {'min': 946.93, 'max': None, 'score': 4},
+            {'min': 860.03, 'max': 946.93, 'score': 3},
+            {'min': 786.18, 'max': 860.03, 'score': 2},
+            {'min': 703.91, 'max': 786.18, 'score': 1},
+            {'min': None,   'max': 703.91, 'score': 0},
+        ],
+        'Midfielder': [
+            {'min': 854.02, 'max': None, 'score': 4},
+            {'min': 746.49, 'max': 854.02, 'score': 3},
+            {'min': 665.42, 'max': 746.49, 'score': 2},
+            {'min': 560.44, 'max': 665.42, 'score': 1},
+            {'min': None,   'max': 560.44, 'score': 0},
+        ],
+        'Attacking Midfielder': [
+            {'min': 893.73,  'max': None,   'score': 4},
+            {'min': 803.93,  'max': 893.73, 'score': 3},
+            {'min': 726.53,  'max': 803.93, 'score': 2},
+            {'min': 616.37,  'max': 726.53, 'score': 1},
+            {'min': None,    'max': 616.37, 'score': 0},
+        ],
+        'Winger': [
+            {'min': 1035.79,'max': None, 'score': 4},
+            {'min': 940.79, 'max': 1035.79,'score': 3},
+            {'min': 863.0,  'max': 940.79, 'score': 2},
+            {'min': 777.13, 'max': 863.0,  'score': 1},
+            {'min': None,   'max': 777.13, 'score': 0},
+        ],
+        'Striker': [
+            {'min': 924.18, 'max': None, 'score': 4},
+            {'min': 837.87, 'max': 924.18, 'score': 3},
+            {'min': 754.05, 'max': 837.87, 'score': 2},
+            {'min': 659.55, 'max': 754.05, 'score': 1},
+            {'min': None,   'max': 659.55, 'score': 0},
+        ],
+    },
+    'total_distance_full_all': {
+        'Central Defender': [
+            {'min': 9688.63, 'max': None, 'score': 7},
+            {'min': 9446.1,  'max': 9688.63, 'score': 5},
+            {'min': 9231.08, 'max': 9446.1,  'score': 3},
+            {'min': 8913.02, 'max': 9231.08, 'score': 1},
+            {'min': None,    'max': 8913.02, 'score': 0},
+        ],
+        'Full Back': [
+            {'min': 10330.71,'max': None, 'score': 7},
+            {'min': 10103.2, 'max': 10330.71,'score': 5},
+            {'min': 9802.22, 'max': 10103.2, 'score': 3},
+            {'min': 9525.6,  'max': 9802.22, 'score': 1},
+            {'min': None,    'max': 9525.6,  'score': 0},
+        ],
+        'Midfielder': [
+            {'min': 11193.90,  'max': None, 'score': 10},
+            {'min': 10926.04,  'max': 11193.90,  'score': 7},
+            {'min': 10627.19,  'max': 10926.04,  'score': 5},
+            {'min': 10271.79,   'max': 10627.19,  'score': 3},
+            {'min': None,    'max': 10271.79,   'score': 0},
+        ],
+        'Attacking Midfielder': [
+            {'min': 10529.28,  'max': None,     'score': 7},
+            {'min': 9975.60,   'max': 10529.28, 'score': 5},
+            {'min': 9438.64,   'max': 9975.60,  'score': 3},
+            {'min': 8933.82,   'max': 9438.64,  'score': 1},
+            {'min': None,      'max': 8933.82,  'score': 0},
+        ],
+        'Winger': [
+            {'min': 10597.7,  'max': None, 'score': 7},
+            {'min': 10253.05,  'max': 10597.7, 'score': 5},
+            {'min': 9922.66,   'max': 10253.05, 'score': 3},
+            {'min': 9576.8,    'max': 9922.66,  'score': 1},
+            {'min': None,    'max': 9576.8,   'score': 0},
+        ],
+        'Striker': [
+            {'min': 10337.14,  'max': None, 'score': 7},
+            {'min': 9986.61,  'max': 10337.14, 'score': 5},
+            {'min': 9725.31,   'max': 9986.61, 'score': 3},
+            {'min': 9370.5,  'max': 9725.31,  'score': 1},
+            {'min': None,    'max': 9370.5, 'score': 0},
+        ],
+    },
+    'hsr_distance_full_all': {
+        'Central Defender': [
+            {'min': 418.68,  'max': None,    'score': 7},
+            {'min': 386.56,  'max': 418.68,  'score': 5},
+            {'min': 359.06,  'max': 386.56,  'score': 3},
+            {'min': 319.99,  'max': 359.06,  'score': 1},
+            {'min': None,    'max': 319.99,  'score': 0},
+        ],
+        'Full Back': [
+            {'min': 683.49,  'max': None,    'score': 7},
+            {'min': 626.45,  'max': 683.49,  'score': 5},
+            {'min': 574.46,  'max': 626.45,  'score': 3},
+            {'min': 515.74,  'max': 574.46,  'score': 1},
+            {'min': None,    'max': 515.74,  'score': 0},
+        ],
+        'Midfielder': [
+            {'min': 671.14,  'max': None,    'score': 7},
+            {'min': 603.56,  'max': 671.14,  'score': 5},
+            {'min': 547.54,  'max': 603.56,  'score': 3},
+            {'min': 465.70,  'max': 547.54,  'score': 1},
+            {'min': None,    'max': 465.70,  'score': 0},
+        ],
+        'Attacking Midfielder': [
+            {'min': 688.96,  'max': None,   'score': 10},
+            {'min': 629.37,  'max': 688.96, 'score': 7},
+            {'min': 567.04,  'max': 629.37, 'score': 5},
+            {'min': 495.78,  'max': 567.04, 'score': 3},
+            {'min': None,    'max': 495.78, 'score': 0},
+        ],
+        'Winger': [
+            {'min': 719.96,  'max': None,    'score': 7},
+            {'min': 671.78,  'max': 719.96,  'score': 5},
+            {'min': 622.00,  'max': 671.78,  'score': 3},
+            {'min': 560.85,  'max': 622.00,  'score': 1},
+            {'min': None,    'max': 560.85,  'score': 0},
+        ],
+        'Striker': [
+            {'min': 649.93,  'max': None,    'score': 7},
+            {'min': 595.20,  'max': 649.93,  'score': 5},
+            {'min': 551.35,  'max': 595.20,  'score': 3},
+            {'min': 484.71,  'max': 551.35,  'score': 1},
+            {'min': None,    'max': 484.71,  'score': 0},
+        ],
+    },
+    'sprint_distance_full_all': {
+        'Central Defender': [
+            {'min': 139.22, 'max': None,    'score': 7},
+            {'min': 119.31, 'max': 139.22,  'score': 5},
+            {'min': 102.34,  'max': 119.31,  'score': 3},
+            {'min': 82.93,  'max': 102.34,   'score': 1},
+            {'min': None,   'max': 82.93,   'score': 0},
+        ],
+        'Full Back': [
+            {'min': 272.36, 'max': None,    'score': 7},
+            {'min': 240.01, 'max': 272.36,  'score': 5},
+            {'min': 204.02, 'max': 240.01,  'score': 3},
+            {'min': 172.29,  'max': 204.02,  'score': 1},
+            {'min': None,   'max': 172.29,   'score': 0},
+        ],
+        'Midfielder': [
+            {'min': 180.98, 'max': None,    'score': 4},
+            {'min': 139.11, 'max': 180.98,  'score': 3},
+            {'min': 109.68, 'max': 139.11,  'score': 2},
+            {'min': 80.78,  'max': 109.68,  'score': 1},
+            {'min': None,   'max': 80.78,   'score': 0},
+        ],
+        'Attacking Midfielder': [
+            {'min': 214.74,  'max': None,   'score': 4},
+            {'min': 184.28,  'max': 214.74, 'score': 3},
+            {'min': 159.87,  'max': 184.28, 'score': 2},
+            {'min': 112.56,  'max': 159.87, 'score': 1},
+            {'min': None,    'max': 112.56, 'score': 0},
+        ],
+        'Winger': [
+            {'min': 305.22, 'max': None,    'score': 7},
+            {'min': 258.86, 'max': 305.22,  'score': 5},
+            {'min': 224.24, 'max': 258.86,  'score': 3},
+            {'min': 179.44, 'max': 224.24,  'score': 1},
+            {'min': None,   'max': 179.44,  'score': 0},
+        ],
+        'Striker': [
+            {'min': 253.71, 'max': None,    'score': 7},
+            {'min': 219.69, 'max': 253.71,  'score': 5},
+            {'min': 180.40, 'max': 219.69,  'score': 3},
+            {'min': 136.27, 'max': 180.40,  'score': 1},
+            {'min': None,   'max': 136.27,  'score': 0},
+        ],
+    },
+    'sprint_count_full_all': {
+        'Central Defender': [
+            {'min': 7.79, 'max': None,   'score': 7},
+            {'min': 6.74,  'max': 7.79,  'score': 5},
+            {'min': 5.87,  'max': 6.74,   'score': 3},
+            {'min': 4.9,  'max': 5.87,   'score': 1},
+            {'min': None,  'max': 4.9,   'score': 0},
+        ],
+        'Full Back': [
+            {'min': 14.47, 'max': None,   'score': 7},
+            {'min': 12.89, 'max': 14.47,  'score': 5},
+            {'min': 11.44, 'max': 12.89,  'score': 3},
+            {'min': 9.69,  'max': 11.44,  'score': 1},
+            {'min': None,  'max': 9.69,   'score': 0},
+        ],
+        'Midfielder': [
+            {'min': 10.10, 'max': None,   'score': 4},
+            {'min': 7.85,  'max': 10.10,  'score': 3},
+            {'min': 6.26,  'max': 7.85,   'score': 2},
+            {'min': 4.83,  'max': 6.26,   'score': 1},
+            {'min': None,  'max': 4.83,   'score': 0},
+        ],
+        'Attacking Midfielder': [
+            {'min': 12.36, 'max': None,   'score': 4},
+            {'min': 10.51, 'max': 12.36,  'score': 3},
+            {'min': 8.62,  'max': 10.51,  'score': 2},
+            {'min': 6.31,  'max': 8.62,   'score': 1},
+            {'min': None,  'max': 6.31,   'score': 0},
+        ],
+        'Winger': [
+            {'min': 16.27, 'max': None,   'score': 7},
+            {'min': 14.26, 'max': 16.27,  'score': 5},
+            {'min': 12.32, 'max': 14.26,  'score': 3},
+            {'min': 10.2,  'max': 12.32,  'score': 1},
+            {'min': None,  'max': 10.2,   'score': 0},
+        ],
+        'Striker': [
+            {'min': 14.28, 'max': None,   'score': 7},
+            {'min': 12.44, 'max': 14.28,  'score': 5},
+            {'min': 10.54,  'max': 12.44,  'score': 3},
+            {'min': 7.99,  'max': 10.54,   'score': 1},
+            {'min': None,  'max': 7.99,   'score': 0},
+        ],
+    },
+    'highaccel_count_full_all': {
+        'Central Defender': [
+            {'min': 5.84, 'max': None, 'score': 7},
+            {'min': 5.14, 'max': 5.84, 'score': 5},
+            {'min': 4.62, 'max': 5.14, 'score': 3},
+            {'min': 4.09, 'max': 4.62, 'score': 1},
+            {'min': None,'max': 4.09,  'score': 0},
+        ],
+        'Full Back': [
+            {'min': 8.93, 'max': None, 'score': 7},
+            {'min': 8.07, 'max': 8.93, 'score': 5},
+            {'min': 7.22, 'max': 8.07, 'score': 3},
+            {'min': 6.24, 'max': 7.22, 'score': 1},
+            {'min': None,'max': 6.24,  'score': 0},
+        ],
+        'Midfielder': [
+            {'min': 5.18,'max': None,'score': 7},
+            {'min': 4.37,'max': 5.18,'score': 5},
+            {'min': 3.77,'max': 4.37,'score': 3},
+            {'min': 3.15,'max': 3.77,'score': 1},
+            {'min': None,'max': 3.15,'score': 0},
+        ],
+        'Attacking Midfielder': [
+            {'min': 6.97, 'max': None,   'score': 7},
+            {'min': 5.62, 'max': 6.97,   'score': 5},
+            {'min': 4.81, 'max': 5.62,   'score': 3},
+            {'min': 4.04, 'max': 4.81,   'score': 1},
+            {'min': None, 'max': 4.04,   'score': 0},
+        ],
+        'Winger': [
+            {'min': 9.96,'max': None,'score': 10},
+            {'min': 8.88,'max': 9.96,'score': 7},
+            {'min': 7.63,'max': 8.88,'score': 5},
+            {'min': 6.30,'max': 7.63,'score': 3},
+            {'min': None,'max': 6.30,'score': 0},
+        ],
+        'Striker': [
+            {'min': 9.52,'max': None,'score': 4},
+            {'min': 8.35,'max': 9.52,'score': 3},
+            {'min': 7.12,'max': 8.35,'score': 2},
+            {'min': 6.20,'max': 7.12,'score': 1},
+            {'min': None,'max': 6.20,'score': 0},
+        ],
+    },
+}
+
 # Mapping affiché → Player Name
 display_to_playername = df_tech.set_index("Display Name")["Player Name"].to_dict()
 
@@ -553,7 +874,7 @@ st.sidebar.image(logo, use_container_width=True)
 # === Sélecteur de page dans la sidebar ===
 page = st.sidebar.radio(
     "Choose tab",
-    ["xPhysical", "xTech/xDef"]
+    ["xPhysical", "xTech/xDef", "Merged Data"]
 )
 
 if page == "xPhysical":
@@ -3172,3 +3493,986 @@ elif page == "xTech/xDef":
         ])
 
         st.dataframe(styled_df, use_container_width=True)
+        
+# ============================================= VOLET Merged Data ========================================================
+
+elif page == "Merged Data":
+    tab1, tab2 = st.tabs(["Player Search", "Merged Indexes"])
+    
+    with tab1:
+        season_col = "Season Name"
+        comp_col = "Competition Name"
+
+        season_options = sorted(df_merged[season_col].dropna().unique())
+
+        # State init (inchangé)
+        if "merged_loaded_df" not in st.session_state:
+            st.session_state.merged_loaded_df = None
+        if "merged_pending" not in st.session_state:
+            st.session_state.merged_pending = True
+        if "merged_last_seasons" not in st.session_state:
+            st.session_state.merged_last_seasons = ["2024/2025"]
+        if "merged_last_comps" not in st.session_state:
+            st.session_state.merged_last_comps = ["Serie A"]
+        if "ui_seasons" not in st.session_state:
+            st.session_state.ui_seasons = ["2024/2025"]
+        if "ui_comps" not in st.session_state:
+            st.session_state.ui_comps = ["Serie A"]
+
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            selected_seasons = st.multiselect(
+                "Season(s)",
+                options=season_options,
+                key="ui_seasons"
+            )
+
+        # Compétitions dépendantes de la saison
+        if st.session_state.ui_seasons:
+            mask = df_merged[season_col].isin(st.session_state.ui_seasons)
+            filtered_comps = sorted(df_merged[mask][comp_col].dropna().unique())
+        else:
+            filtered_comps = []
+
+        valid_ui_comps = [comp for comp in st.session_state.ui_comps if comp in filtered_comps]
+        if set(valid_ui_comps) != set(st.session_state.ui_comps):
+            st.session_state.ui_comps = valid_ui_comps
+
+        with col2:
+            selected_comps = st.multiselect(
+                "Competition(s)",
+                options=filtered_comps,
+                key="ui_comps"
+            )
+
+        # --- Gestion "pending" : dès qu'on change un filtre, il faut recharger ---
+        filters_now = (tuple(st.session_state.ui_seasons), tuple(st.session_state.ui_comps))
+        filters_last = (tuple(st.session_state.merged_last_seasons), tuple(st.session_state.merged_last_comps))
+
+        if st.session_state.merged_loaded_df is not None and filters_now != filters_last:
+            st.session_state.merged_pending = True
+            st.session_state.merged_loaded_df = None
+
+        # --- Chargement des données sur bouton explicite ---
+        if st.button("Load Data"):
+            st.session_state.merged_last_seasons = st.session_state.ui_seasons.copy() if st.session_state.ui_seasons else season_options
+            st.session_state.merged_last_comps = st.session_state.ui_comps.copy() if st.session_state.ui_comps else filtered_comps
+            st.session_state.merged_pending = False
+
+            filtered = df_merged[
+                df_merged[season_col].isin(st.session_state.merged_last_seasons)
+                & df_merged[comp_col].isin(st.session_state.merged_last_comps)
+            ]
+            st.session_state.merged_loaded_df = filtered.copy()
+
+        # ----------- Message et Séparateur -----------
+
+        if st.session_state.merged_loaded_df is None or st.session_state.merged_pending:
+            st.info("Please load data to continue.")
+
+        st.markdown("---")
+
+        # --- Filtres dynamiques et affichage DATA ---
+        if st.session_state.merged_loaded_df is not None and not st.session_state.merged_pending:
+            df_loaded = st.session_state.merged_loaded_df.copy()
+
+            col3, col4 = st.columns(2)
+            with col3:
+                # Position Group
+                POSITION_ORDER = [
+                    "Central Defender",
+                    "Full Back",
+                    "Midfielder",
+                    "Attacking Midfielder",
+                    "Winger",
+                    "Striker"
+                ]
+                if "Position Group" in df_loaded.columns:
+                    positions_available = [pos for pos in POSITION_ORDER if pos in df_loaded["Position Group"].dropna().unique()]
+                    selected_positions = st.multiselect(
+                        "Position(s)",
+                        options=positions_available,
+                        default=["Central Defender"] if "Central Defender" in positions_available else positions_available
+                    )
+                else:
+                    selected_positions = []
+                    
+                # Age
+                if "Age" in df_loaded.columns and not df_loaded["Age"].isnull().all():
+                    min_age, max_age = int(df_loaded["Age"].min()), int(df_loaded["Age"].max())
+                    age_range = st.slider("Age", min_value=min_age, max_value=max_age, value=(min_age, max_age))
+                else:
+                    age_range = None
+
+            with col4:
+                # Preferred Foot
+                if "Prefered Foot" in df_loaded.columns:
+                    feet = sorted(df_loaded["Prefered Foot"].dropna().unique())
+                    selected_feet = st.multiselect(
+                        "Preferred Foot",
+                        options=feet,
+                        default=feet
+                    )
+                else:
+                    selected_feet = []
+
+                # Minutes Played
+                if "Minutes" in df_loaded.columns and not df_loaded["Minutes"].isnull().all():
+                    min_min, max_min = int(df_loaded["Minutes"].min()), int(df_loaded["Minutes"].max())
+                    minutes_range = st.slider("Minutes Played", min_value=min_min, max_value=max_min, value=(min_min, max_min))
+                else:
+                    minutes_range = None
+            
+            st.markdown("---")
+            
+            # === POP-OVERS : Physical, Technical, Defensive, Goalkeeper ===
+
+            PHYSICAL_METRICS = [
+                ("xPhysical", "xPhysical"),
+                ("PSV-99", "PSV-99"),
+                ("TOP 5 PSV-99", "TOP 5 PSV-99"),
+                ("Total Distance P90", "Total Distance P90"),
+                ("M/min P90", "M/min P90"),
+                ("Running Distance P90", "Running Distance P90"),
+                ("HSR Distance P90", "HSR Distance P90"),
+                ("HSR Count P90", "HSR Count P90"),
+                ("Sprinting Distance P90", "Sprinting Distance P90"),
+                ("Sprint Count P90", "Sprint Count P90"),
+                ("HI Distance P90", "HI Distance P90"),
+                ("HI Count P90", "HI Count P90"),
+                ("Medium Acceleration Count P90", "Medium Acceleration Count P90"),
+                ("High Acceleration Count P90", "High Acceleration Count P90"),
+                ("Medium Deceleration Count P90", "Medium Deceleration Count P90"),
+                ("High Deceleration Count P90", "High Deceleration Count P90"),
+                ("Explosive Acceleration to HSR Count P90", "Explosive Accel to HSR P90"),
+                ("Explosive Acceleration to Sprint Count P90", "Explosive Accel to Sprint P90"),
+            ]
+
+            TECHNICAL_METRICS = [
+                ("xTECH", "xTECH"),
+                ("Npg P90", "NP Goals"),
+                ("Op Assists P90", "OP Assists"),
+                ("Conversion Ratio", "Conversion %"),
+                ("Scoring Contribution", "Contribution G+A"),
+                ("Shots P90", "Shots"),
+                ("Np Shots P90", "Shots"),
+                ("Shot On Target Ratio", "Shooting %"),
+                ("Np Xg P90", "NP xG"),
+                ("Np Xg Per Shot", "xG/Shot"),
+                ("Npxgxa P90", "NPxG + xA"),
+                ("Op Xa P90", "OP xA"),
+                ("Op Key Passes P90", "OP Key Passes"),
+                ("Shots Key Passes P90", "Shots + Key Passes"),
+                ("Op Passes Into And Touches Inside Box P90", "OP Passes + Touches Into Box"),
+                ("Through Balls P90", "Throughballs"),
+                ("Crosses P90", "Crosses"),
+                ("Crossing Ratio", "Crossing %"),
+                ("Deep Progressions P90", "Deep Progressions"),
+                ("Deep Completions P90", "Deep Completions"),
+                ("Op Xgbuildup P90", "OP xG Buildup"),
+                ("Sp Key Passes P90", "Set Pieces Key Passes"),
+                ("Sp Xa P90", "Set Pieces xA"),
+                ("Obv P90", "OBV"),
+                ("Obv Pass P90", "OBV Pass"),
+                ("Obv Shot P90", "OBV Shot"),
+                ("Obv Defensive Action P90", "OBV Def. Act."),
+                ("Obv Dribble Carry P90", "OBV Dribble & Carry"),
+                ("Op Passes P90", "OP Passes"),
+                ("Passing Ratio", "Passing %"),
+                ("Pressured Passing Ratio", "Pressured Passing %"),
+                ("Long Balls P90", "Long Ball"),
+                ("Long Ball Ratio", "Long Ball %"),
+                ("Dribbles P90", "Dribbles Succ."),
+                ("Dribble Ratio", "Dribble %"),
+                ("Carries P90", "Carries"),
+                ("Turnovers P90", "Turnovers"),
+                ("Dispossessions P90", "Dispossessions"),
+            ]
+
+            DEFENSIVE_METRICS = [
+                ("xDEF", "xDEF"),
+                ("Padj Pressures P90", "PAdj Pressures"),
+                ("Counterpressures P90", "Counterpressures"),
+                ("Fhalf Pressures P90", "Pressures in Opp. Half"),
+                ("Pressure Regains P90", "Pressure Regains"),
+                ("Average X Pressure", "Average Pressure Distance"),
+                ("Ball Recoveries P90", "Ball Recoveries"),
+                ("Fhalf Ball Recoveries P90", "Ball Recoveries in Opp. Half"),
+                ("Padj Interceptions P90", "PAdj Interceptions"),
+                ("Padj Tackles P90", "PAdj Tackles"),
+                ("Padj Tackles And Interceptions P90", "PAdj Tackles And Interceptions"),
+                ("Tackles And Interceptions P90", "Tackles And Interceptions"),
+                ("Challenge Ratio", "Tack./Dribbled Past %"),
+                ("Hops", "HOPS"),
+                ("Aerial Wins P90", "Aerial Wins"),
+                ("Aerial Ratio", "Aerial Win %"),
+                ("Blocks Per Shot", "Blocks/Shot"),
+                ("Padj Clearances P90", "PAdj Clearances"),
+            ]
+
+            GOALKEEPER_METRICS = [
+                ("xTech GK Save (/100)", "xSave GK"),
+                ("xTech GK Usage (/100)", "xUsage GK"),
+                ("Save Ratio", "Save % (GK)"),
+                ("Xs Ratio", "Expected Save % (GK)"),
+                ("Gsaa P90", "Goals Saved Above Average (GK)"),
+                ("Clcaa", "Claims % (GK)"),
+                ("Pass Into Danger Ratio", "Pass Into Danger % (GK)"),
+                ("Obv Gk P90", "OBV GK"),
+            ]
+
+            metric_popovers = [
+                ("Physical", PHYSICAL_METRICS),
+                ("Technical", TECHNICAL_METRICS),
+                ("Defensive", DEFENSIVE_METRICS),
+                ("Goalkeeper", GOALKEEPER_METRICS),
+            ]
+
+            filter_percentiles = {}
+
+            st.markdown("""
+                <style>
+                .custom-popover-wrap {
+                    width: 100%;
+                    min-width: 220px;
+                    max-width: 350px;
+                    margin: 0 auto 0 auto;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: flex-start;
+                }
+                .custom-popover-btn > button {
+                    width: 100% !important;
+                    min-width: 220px !important;
+                    max-width: 350px !important;
+                    font-size: 16px !important;
+                    padding: 8px 0 !important;
+                }
+                .custom-active-filters {
+                    font-size: 13px;
+                    color: #6c757d;
+                    text-align: left;
+                    margin-top: 2px;
+                    margin-bottom: 0px;
+                    padding: 0;
+                }
+                </style>
+            """, unsafe_allow_html=True)
+
+            active_filters = {name: 0 for name, _ in metric_popovers}
+            pop_cols = st.columns(4, gap="small")
+
+            for idx, (name, metric_list) in enumerate(metric_popovers):
+                with pop_cols[idx]:
+                    st.markdown('<div class="custom-popover-wrap">', unsafe_allow_html=True)
+                    with st.popover(f"{name}", use_container_width=True):
+                        for col, label in metric_list:
+                            if col in df_loaded.columns:
+                                slider_key = f"pop_{name}_{col}"
+                                min_percentile = st.slider(
+                                    f"{label} - Percentile",
+                                    min_value=0,
+                                    max_value=100,
+                                    value=0,
+                                    step=10,
+                                    key=slider_key
+                                )
+                                filter_percentiles[(name, col)] = min_percentile
+                                if min_percentile > 0:
+                                    active_filters[name] += 1
+                    count = active_filters[name]
+                    txt = f"{count} – active filter{'s' if count != 1 else ''}" if count > 0 else "0 – active filters"
+                    # Ici le message est dans la même div (donc juste sous le bouton)
+                    st.markdown(
+                        f'<div class="custom-active-filters">{txt}</div>',
+                        unsafe_allow_html=True
+                    )
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+            # --- Application des filtres dynamiques ---
+            df_filtered = df_loaded.copy()
+            if selected_positions:
+                df_filtered = df_filtered[df_filtered["Position Group"].isin(selected_positions)]
+            if selected_feet:
+                df_filtered = df_filtered[df_filtered["Prefered Foot"].isin(selected_feet)]
+            if age_range:
+                df_filtered = df_filtered[(df_filtered["Age"] >= age_range[0]) & (df_filtered["Age"] <= age_range[1])]
+            if minutes_range:
+                df_filtered = df_filtered[(df_filtered["Minutes"] >= minutes_range[0]) & (df_filtered["Minutes"] <= minutes_range[1])]
+
+            # Application des filtres par percentile (mise à jour)
+            for (cat, col), min_pct in filter_percentiles.items():
+                if min_pct > 0 and col in df_loaded.columns:
+                    ref_vals = df_loaded[col].dropna()
+                    if len(ref_vals) > 0:
+                        threshold = ref_vals.quantile(min_pct / 100)
+                        df_filtered = df_filtered[df_filtered[col] >= threshold]
+
+            # --- Bouton download CSV juste sous les popovers ---
+            csv = df_filtered.to_csv(index=False)
+            st.download_button(
+                label="Download selection as CSV",
+                data=csv,
+                file_name="selection_merged_data.csv",
+                mime="text/csv",
+                key="download_merged_csv"
+            )
+            
+            
+            
+            # ========== AgGrid & Sélection joueur ==========
+            # 1. Vérification du df filtré
+            if not df_filtered.empty:
+                st.markdown("#### Click on a row to show the detailed player report ⬇️")
+
+                # Colonnes à afficher
+                display_cols = [
+                    'Player Name', 'Team Name', 'Age', 'Position Group',
+                    'Season Name', 'Competition Name', 'Minutes'
+                ]
+                display_cols = [col for col in display_cols if col in df_filtered.columns]
+                df_display = df_filtered[display_cols].reset_index(drop=True).copy()
+
+                # Conversion texte uniquement pour les colonnes non-numériques
+                for col in ["Season Name", "Competition Name", "Position Group"]:
+                    if col in df_display.columns:
+                        df_display[col] = df_display[col].astype(str)
+
+                # 2. Configuration AgGrid
+                gb = GridOptionsBuilder.from_dataframe(df_display)
+                gb.configure_selection(selection_mode="single", use_checkbox=False)
+                gb.configure_default_column(editable=False, groupable=True, sortable=True, filter="agTextColumnFilter")
+
+                for col in display_cols:
+                    gb.configure_column(col, headerClass='header-style', cellStyle={'textAlign': 'center'})
+
+                if "Player Name" in df_display.columns:
+                    gb.configure_column("Player Name", pinned="left")
+
+                # Désactivation de la pagination
+                gb.configure_pagination(enabled=False)
+
+                grid_options = gb.build()
+
+                # 3. Affichage AgGrid avec scroll vertical (hauteur fixe)
+                grid_response = AgGrid(
+                    df_display,
+                    gridOptions=grid_options,
+                    height=500,
+                    theme='balham',
+                    update_mode=GridUpdateMode.SELECTION_CHANGED,
+                    allow_unsafe_jscode=True
+                )
+
+                selected_rows = grid_response.get("selected_rows", [])
+                if isinstance(selected_rows, pd.DataFrame):
+                    selected_rows = selected_rows.to_dict(orient='records')
+
+                # === Bloc détaillé ===
+                if isinstance(selected_rows, list) and len(selected_rows) > 0 and isinstance(selected_rows[0], dict):
+                    display_row = selected_rows[0]
+                    player_name = display_row.get("Player Name")
+                    team_name = display_row.get("Team Name")
+                    season = display_row.get("Season Name")
+                    comp = display_row.get("Competition Name")
+
+                    row = df_filtered[
+                        (df_filtered["Player Name"] == player_name) &
+                        (df_filtered["Team Name"] == team_name) &
+                        (df_filtered["Season Name"] == season) &
+                        (df_filtered["Competition Name"] == comp)
+                    ].iloc[0]
+
+                    with st.popover(f"📊 Show detailed report for {player_name}", use_container_width=True):
+                        
+                        # === Titre joueur ===
+                        pos = row.get("Position Group", "—")
+                        season = row.get("Season Name", None)
+                        age = int(float(row.get("Age", 0))) if pd.notna(row.get("Age", None)) else "—"
+                        mins = int(float(row.get("Minutes", 0))) if pd.notna(row.get("Minutes", None)) else "—"
+                        title_html = f"""
+                        <div style='font-size:17px; font-weight:500; text-align:center; margin: 10px 0;'>
+                        {player_name} ({pos}) – {season} – {team_name} ({comp}) – {age} y/o – {mins} min
+                        </div>
+                        """
+                        st.markdown(title_html, unsafe_allow_html=True)
+                        
+                        # === Tabs dans le popover ===
+                        tab1, tab2 = st.tabs(["Radars", "Indexes"])
+                        
+                        # ==== Zone radars côte à côte ====
+                        with tab1:
+                            col1, col2 = st.columns(2)
+
+                            with col1:
+                                # === Radar physique (version finale) ===
+                                try:
+                                    physical_metrics = [
+                                        "TOP 5 PSV-99", "HI Distance P90", "M/min P90",
+                                        "HSR Distance P90", "Sprinting Distance P90", "Sprint Count P90", "High Acceleration Count P90"
+                                    ]
+                                    metrics_phys_labels = [
+                                        "TOP5 PSV-99", "HI Dist", "Tot Dist", "HSR Dist", "Sprint Dist", "Sprint Ct", "High Acc Ct"
+                                    ]
+
+                                    LIGUES_CIBLE = ["Serie A", "1.Bundesliga", "La Liga", "Ligue 1", "Premier League"]
+                                    ref_phys = df_merged[
+                                        (df_merged["Competition Name"].isin(LIGUES_CIBLE)) &
+                                        (df_merged["Position Group"] == pos) &
+                                        (df_merged["Season Name"].astype(str).str.contains(str(season), na=False)) &
+                                        (df_merged["Minutes"].astype(float) > 600)
+                                    ]
+                                    
+                                    def pct_rank(series, value):
+                                        """Retourne le percentile de value dans la série series (0–100)."""
+                                        arr = series.dropna().values
+                                        if len(arr) == 0:
+                                            return 0.0
+                                        lower = (arr < value).sum()
+                                        equal = (arr == value).sum()
+                                        rank = (lower + 0.5 * equal) / len(arr) * 100
+                                        return float(rank)
+
+                                    r_player = [pct_rank(ref_phys[m], float(row.get(m, 0))) for m in physical_metrics]
+                                    r_top5 = [pct_rank(ref_phys[m], ref_phys[m].mean()) for m in physical_metrics]
+                                    raw_vals = [row.get(m, "NA") for m in physical_metrics]
+
+                                    r_player_closed = r_player + [r_player[0]]
+                                    r_top5_closed = r_top5 + [r_top5[0]]
+                                    metrics_closed = metrics_phys_labels + [metrics_phys_labels[0]]
+                                    raw_closed = raw_vals + [raw_vals[0]]
+
+                                    fig = go.Figure()
+                                    fig.add_trace(go.Scatterpolar(
+                                        r=r_player_closed,
+                                        theta=metrics_closed,
+                                        mode='lines',
+                                        fill='toself',
+                                        line=dict(color='gold', width=2),
+                                        fillcolor='rgba(255,215,0,0.3)',
+                                        hoverinfo='skip',
+                                        name=player_name
+                                    ))
+                                    fig.add_trace(go.Scatterpolar(
+                                        r=r_player_closed,
+                                        theta=metrics_closed,
+                                        mode='markers',
+                                        hoverinfo='text',
+                                        hovertext=[
+                                            f"<b>{label}</b><br>Value: {v*90:.0f} m<br>Percentile: {r:.1f}%"
+                                            if label == "Tot Dist"
+                                            else f"<b>{label}</b><br>Value: {v:.2f}<br>Percentile: {r:.1f}%"
+                                            for label, v, r in zip(metrics_closed, raw_closed, r_player_closed)
+                                        ],
+                                        marker=dict(size=12, color='rgba(255,215,0,0)'),
+                                        showlegend=False
+                                    ))
+                                    fig.add_trace(go.Scatterpolar(
+                                        r=r_top5_closed,
+                                        theta=metrics_closed,
+                                        mode='lines',
+                                        fill='toself',
+                                        line=dict(color='lightgreen', width=2),
+                                        fillcolor='rgba(144,238,144,0.3)',
+                                        hoverinfo='skip',
+                                        name='Top5 Average'
+                                    ))
+                                    fig.add_trace(go.Scatterpolar(
+                                        r=r_top5_closed,
+                                        theta=metrics_closed,
+                                        mode='markers',
+                                        hoverinfo='text',
+                                        hovertext=[
+                                            f"<b>{label}</b><br>Mean Percentile: {r:.1f}%" 
+                                            for label, r in zip(metrics_closed, r_top5_closed)
+                                        ],
+                                        marker=dict(size=12, color='rgba(144,238,144,0)'),
+                                        showlegend=False
+                                    ))
+                                    fig.update_layout(
+                                        hovermode='closest',
+                                        polar=dict(
+                                            bgcolor='rgba(0,0,0,0)',
+                                            radialaxis=dict(
+                                                range=[0, 100],
+                                                tickvals=[0, 25, 50, 75, 100],
+                                                ticks='outside',
+                                                showticklabels=True,
+                                                ticksuffix='%',
+                                                tickfont=dict(color='white'),
+                                                gridcolor='gray'
+                                            )
+                                        ),
+                                        paper_bgcolor='rgba(0,0,0,0)',
+                                        font_color='white',
+                                        showlegend=False,
+                                        height=500
+                                    )
+                                    st.plotly_chart(fig, use_container_width=True)
+                                except Exception as e:
+                                    st.error(f"Erreur radar physique : {e}")
+
+                            with col2:
+                                # === Radar Technique dynamique avec selectbox ===
+                                try:
+                                    # 1. Position et templates
+                                    pos = row.get("Position Group")  
+                                    position_group_to_template = {
+                                        "Goalkeeper": "Goalkeeper",
+                                        "Central Defender": "Central Defender",
+                                        "Full Back": "Full Back",
+                                        "Midfielder": "Midfielder (CDM)",
+                                        "Attacking Midfielder": "Attacking Midfielder",
+                                        "Winger": "Winger",
+                                        "Striker": "Striker"
+                                    }
+                                    default_template = position_group_to_template.get(pos, "Striker")
+
+                                    # 2. Stockage temporaire du template sélectionné
+                                    template_label = f"template_select_{player_name}_{season}_{team_name}".replace(" ", "_")
+                                    selected_template = st.session_state.get(template_label, default_template)
+
+                                    # 3. Extraction des métriques et labels
+                                    template = metric_templates_tech[selected_template]
+                                    labels = metric_labels_tech[selected_template]
+
+                                    # 3. Peers pour comparaison
+                                    ref_tech = df_tech[
+                                        (df_tech["Position Group"] == pos) &
+                                        (df_tech["Season Name"] == row["Season Name"]) &
+                                        (df_tech["Competition Name"].isin(["Serie A", "Premier League", "La Liga", "Ligue 1", "1.Bundesliga"])) &
+                                        (df_tech["Minutes"] >= 600)
+                                    ]
+                                    if ref_tech.empty:
+                                        ref_tech = df_tech[
+                                            (df_tech["Position Group"] == pos) &
+                                            (df_tech["Season Name"] == row["Season Name"]) &
+                                            (df_tech["Minutes"] >= 600)
+                                        ]
+
+                                    inverse_metrics = ["Turnovers P90", "Dispossessions P90"]
+                                    def pct_rank(series, value):
+                                        arr = series.dropna().values
+                                        if len(arr) == 0: return 0.0
+                                        lower = (arr < value).sum()
+                                        equal = (arr == value).sum()
+                                        return (lower + 0.5 * equal) / len(arr) * 100
+
+                                    r_tech = [
+                                        100 - pct_rank(ref_tech[m], row.get(m, 0)) if m in inverse_metrics else pct_rank(ref_tech[m], row.get(m, 0))
+                                        for m in template
+                                    ]
+                                    r_avg = [
+                                        100 - pct_rank(ref_tech[m], ref_tech[m].mean()) if m in inverse_metrics else pct_rank(ref_tech[m], ref_tech[m].mean())
+                                        for m in template
+                                    ]
+                                    raw_vals = [row.get(m, "NA") for m in template]
+
+                                    metrics_closed = labels + [labels[0]]
+                                    r_tech_closed = r_tech + [r_tech[0]]
+                                    r_avg_closed = r_avg + [r_avg[0]]
+                                    raw_closed = raw_vals + [raw_vals[0]]
+
+                                    fig_tech = go.Figure()
+                                    fig_tech.add_trace(go.Scatterpolar(
+                                        r=r_tech_closed,
+                                        theta=metrics_closed,
+                                        mode='lines',
+                                        fill='toself',
+                                        line=dict(color='gold', width=2),
+                                        fillcolor='rgba(255,215,0,0.3)',
+                                        hoverinfo='skip',
+                                        name=player_name
+                                    ))
+                                    fig_tech.add_trace(go.Scatterpolar(
+                                        r=r_tech_closed,
+                                        theta=metrics_closed,
+                                        mode='markers',
+                                        hoverinfo='text',
+                                        hovertext=[
+                                            f"<b>{label}</b><br>Value: {v:.2f}<br>Percentile: {r:.1f}%" 
+                                            for label, v, r in zip(metrics_closed, raw_closed, r_tech_closed)
+                                        ],
+                                        marker=dict(size=12, color='rgba(255,215,0,0)'),
+                                        showlegend=False
+                                    ))
+                                    fig_tech.add_trace(go.Scatterpolar(
+                                        r=r_avg_closed,
+                                        theta=metrics_closed,
+                                        mode='lines',
+                                        fill='toself',
+                                        line=dict(color='lightgreen', width=2),
+                                        fillcolor='rgba(144,238,144,0.3)',
+                                        hoverinfo='skip',
+                                        name='Top5 Average'
+                                    ))
+                                    fig_tech.add_trace(go.Scatterpolar(
+                                        r=r_avg_closed,
+                                        theta=metrics_closed,
+                                        mode='markers',
+                                        hoverinfo='text',
+                                        hovertext=[
+                                            f"<b>{label}</b><br>Mean Percentile: {r:.1f}%" 
+                                            for label, r in zip(metrics_closed, r_avg_closed)
+                                        ],
+                                        marker=dict(size=12, color='rgba(144,238,144,0)'),
+                                        showlegend=False
+                                    ))
+                                    fig_tech.update_layout(
+                                        hovermode='closest',
+                                        polar=dict(
+                                            bgcolor='rgba(0,0,0,0)',
+                                            radialaxis=dict(
+                                                range=[0, 100],
+                                                tickvals=[0, 25, 50, 75, 100],
+                                                ticks='outside',
+                                                showticklabels=True,
+                                                ticksuffix='%',
+                                                tickfont=dict(color='white'),
+                                                gridcolor='gray'
+                                            ),
+                                            angularaxis=dict(rotation=90, direction="clockwise")
+                                        ),
+                                        paper_bgcolor='rgba(0,0,0,0)',
+                                        font_color='white',
+                                        showlegend=False,
+                                        height=500
+                                    )
+                                    st.plotly_chart(fig_tech, use_container_width=True)
+                                    
+                                    # 5. Selectbox SOUS le radar, avec maj + rerun
+                                    new_template = st.selectbox(
+                                        "Select a radar template",
+                                        options=list(metric_templates_tech.keys()),
+                                        index=list(metric_templates_tech.keys()).index(selected_template),
+                                        key=template_label + "_under"
+                                    )
+                                    if new_template != selected_template:
+                                        st.session_state[template_label] = new_template
+                                        st.rerun()
+
+                                except Exception as e:
+                                    st.error(f"Erreur radar technique : {e}")
+                                
+                         # === Onglet 2 : Indexes ===
+                        with tab2:
+                            try:
+                                pos = row.get("Position Group", "")
+                                poste_map = {
+                                    "Goalkeeper": "GK",
+                                    "Central Defender": "CB",
+                                    "Full Back": "FB",
+                                    "Midfielder": "MID",
+                                    "Attacking Midfielder": "AM",
+                                    "Winger": "WING",
+                                    "Striker": "ST"
+                                }
+                                poste = poste_map.get(pos, "ST")
+
+                                index_xphy       = float(row.get("xPhysical", 0))
+                                index_xtech_def  = float(row.get(f"xTech {poste} DEF (/100)", 0))
+                                index_xtech_tech = float(row.get(f"xTech {poste} TECH (/100)", 0))
+
+                                df_peers = df_merged[
+                                    (df_merged["Position Group"] == pos) &
+                                    (df_merged["Season Name"] == row["Season Name"]) &
+                                    (df_merged["Competition Name"] == row["Competition Name"]) &
+                                    (df_merged["Minutes"] >= 600)
+                                ]
+
+                                def plot_gauge(index_value, mean_peer, rank, total_peers, label):
+                                    hue = 120 * (index_value / 100)
+                                    bar_color = f"hsl({hue:.0f}, 75%, 50%)"
+                                    fig = go.Figure(go.Indicator(
+                                        mode="gauge+number",
+                                        value=int(round(index_value)),
+                                        number={'font': {'size': 48}},
+                                        gauge={
+                                            'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
+                                            'bar': {'color': bar_color, 'thickness': 0.25},
+                                            'bgcolor': "rgba(255,255,255,0)",
+                                            'borderwidth': 0,
+                                            'shape': "angular",
+                                            'steps': [{'range': [0, 100], 'color': 'rgba(100,100,100,0.3)'}],
+                                            'threshold': {'line': {'color': "white", 'width': 4},
+                                                          'thickness': 0.75,
+                                                          'value': mean_peer}
+                                        },
+                                        domain={'x': [0, 1], 'y': [0, 1]},
+                                        title={'text': f"<b>{rank}ᵉ/{total_peers}</b>", 'font': {'size': 20}}
+                                    ))
+                                    fig.update_layout(
+                                        margin={'t': 40, 'b': 0, 'l': 0, 'r': 0},
+                                        paper_bgcolor="rgba(0,0,0,0)",
+                                        height=300
+                                    )
+                                    return fig
+
+                                # === Affichage des 3 jauges ===
+                                c1, c2, c3 = st.columns(3)
+
+                                # === xPhysical ===
+                                with c1:
+                                    df_ranked = df_peers.sort_values("xPhysical", ascending=False).reset_index(drop=True)
+
+                                    if row["Player Name"] in df_ranked["Player Name"].values:
+                                        rank = int(df_ranked[df_ranked["Player Name"] == row["Player Name"]].index[0] + 1)
+                                    else:
+                                        rank = "—"  # Pas de classement si < 600 min ou joueur non présent
+
+                                    mean_val = df_peers["xPhysical"].mean() if not df_peers.empty else np.nan
+
+                                    st.plotly_chart(
+                                        plot_gauge(index_xphy, mean_val, rank, len(df_peers), "xPhysical"),
+                                        use_container_width=True
+                                    )
+
+                                    st.markdown(
+                                        "<div style='text-align:center; font-size:18px; margin-top:-40px; margin-bottom:2px;'><b>xPHY</b></div>",
+                                        unsafe_allow_html=True
+                                    )
+
+                                    st.markdown(
+                                        f"<div style='text-align:center; font-size:14px; margin-top:-26px; margin-bottom:2px; color:grey'>"
+                                        f"Average ({pos} in {row['Competition Name']}): {mean_val:.1f}</div>",
+                                        unsafe_allow_html=True
+                                    )
+                                    
+                                    try:
+                                        pos = row.get("Position Group", "")
+                                        xphy_metric_map = {
+                                            "TOP 5 PSV-99": ("psv99_top5", "TOP 5 PSV-99"),
+                                            "HI Distance P90": ("hi_distance_full_all", "HI Distance P90"),
+                                            "Total Distance P90": ("total_distance_full_all", "Total Distance P90"),
+                                            "HSR Distance P90": ("hsr_distance_full_all", "HSR Distance P90"),
+                                            "Sprinting Distance P90": ("sprint_distance_full_all", "Sprinting Distance P90"),
+                                            "Sprint Count P90": ("sprint_count_full_all", "Sprint Count P90"),
+                                            "High Acceleration Count P90": ("highaccel_count_full_all", "High Acceleration Count P90"),
+                                        }
+
+                                        detail_rows = []
+                                        total_pts = 0
+                                        total_max = 0
+
+                                        for label, (bar_key, raw_label) in xphy_metric_map.items():
+                                            val = row.get(label)
+                                            score = 0
+                                            max_score = 0
+
+                                            if pd.notna(val):
+                                                thresholds = threshold_dict1.get(bar_key, {}).get(pos, [])
+                                                for thresh in thresholds:
+                                                    min_val = thresh.get("min")
+                                                    max_val = thresh.get("max")
+                                                    pts = thresh.get("score", 0)
+
+                                                    if (min_val is None or val >= min_val) and (max_val is None or val < max_val):
+                                                        score = pts
+                                                        break
+                                                max_score = max(t["score"] for t in threshold_dict1[bar_key][pos]) if bar_key in threshold_dict1 and pos in threshold_dict1[bar_key] else 0
+
+
+                                            total_pts += score
+                                            total_max += max_score
+
+                                            detail_rows.append({
+                                                "Metric": raw_label,
+                                                "Player Value": f"{val:.2f}" if pd.notna(val) else "NA",
+                                                "Points": f"{score} / {max_score}"
+                                            })
+
+                                        # Ajout du total et index
+                                        index_val = row.get("xPhysical", 0)
+                                        detail_rows.append({
+                                            "Metric": "**Total**",
+                                            "Player Value": "",
+                                            "Points": f"**{total_pts} / {total_max}**"
+                                        })
+                                        detail_rows.append({
+                                            "Metric": "**xPhysical Index**",
+                                            "Player Value": "",
+                                            "Points": f"**{index_val:.0f}**"
+                                        })
+
+                                        st.markdown("##### xPhysical Details")
+                                        st.dataframe(pd.DataFrame(detail_rows).set_index("Metric"), use_container_width=True)
+
+                                    except Exception as e:
+                                        st.error(f"Erreur détails xPhysical : {e}")
+
+                                # === xTech DEF ===
+                                with c2:
+                                    colname_def = f"xTech {poste} DEF (/100)"
+                                    df_ranked = df_peers.sort_values(colname_def, ascending=False).reset_index(drop=True)
+
+                                    if row["Player Name"] in df_ranked["Player Name"].values:
+                                        rank = int(df_ranked[df_ranked["Player Name"] == row["Player Name"]].index[0] + 1)
+                                    else:
+                                        rank = "—"  # Pas de classement
+
+                                    mean_val = df_peers[colname_def].mean() if not df_peers.empty else np.nan
+
+                                    st.plotly_chart(
+                                        plot_gauge(index_xtech_def, mean_val, rank, len(df_peers), "xTech DEF"),
+                                        use_container_width=True
+                                    )
+                                    st.markdown(
+                                        "<div style='text-align:center; font-size:18px; margin-top:-40px; margin-bottom:2px;'><b>xDEF</b></div>",
+                                        unsafe_allow_html=True
+                                    )
+                                    st.markdown(
+                                        f"<div style='text-align:center; font-size:14px; margin-top:-26px; margin-bottom:2px; color:grey'>"
+                                        f"Average ({pos} in {row['Competition Name']}): {mean_val:.1f}"
+                                        "</div>",
+                                        unsafe_allow_html=True
+                                    )
+                                    
+                                    # === Tableau xDEF dans le popover ===
+                                    if pos != "Goalkeeper":
+                                        config = xtech_post_config.get(pos)
+                                        if config:
+                                            metric_map = config["metric_map"]
+                                            labels = config["labels"]
+                                            metric_rows = []
+
+                                            for raw_col in config["def"]:
+                                                note_col, scores = metric_map.get(raw_col, (None, None))
+                                                if not note_col or raw_col not in df_merged.columns:
+                                                    continue
+                                                raw_val = row.get(raw_col, None)
+                                                note_val = row.get(note_col, None)
+                                                max_pts = max(scores)
+                                                label = labels.get(raw_col, raw_col)
+                                                metric_rows.append({
+                                                    "Metrics": label,
+                                                    "Player Figures": f"{raw_val:.2f}" if pd.notna(raw_val) else "NA",
+                                                    "Points": f"{note_val} / {max_pts}" if pd.notna(note_val) else f"0 / {max_pts}"
+                                                })
+
+                                            # Total
+                                            total_pts = sum(int(r["Points"].split("/")[0].strip()) for r in metric_rows if "/" in r["Points"])
+                                            total_max = sum(int(r["Points"].split("/")[1].strip()) for r in metric_rows if "/" in r["Points"])
+                                            metric_rows.append({
+                                                "Metrics": "**Total**",
+                                                "Player Figures": "",
+                                                "Points": f"**{total_pts} / {total_max}**"
+                                            })
+
+                                            # Index
+                                            index_val = row.get("xDEF", None)
+                                            if pd.notna(index_val):
+                                                metric_rows.append({
+                                                    "Metrics": "**Index xDEF**",
+                                                    "Player Figures": "",
+                                                    "Points": f"**{index_val:.0f} / 100**"
+                                                })
+
+                                            df_def = pd.DataFrame(metric_rows).drop_duplicates(subset=["Metrics"], keep="first")
+                                            st.markdown("##### xDef Details")
+                                            st.dataframe(df_def.set_index("Metrics"), use_container_width=True)
+
+
+                                # === xTech TECH ===
+                                with c3:
+                                    colname_tech = f"xTech {poste} TECH (/100)"
+                                    df_ranked = df_peers.sort_values(colname_tech, ascending=False).reset_index(drop=True)
+
+                                    if row["Player Name"] in df_ranked["Player Name"].values:
+                                        rank = int(df_ranked[df_ranked["Player Name"] == row["Player Name"]].index[0] + 1)
+                                    else:
+                                        rank = "—"  # Pas de classement
+
+                                    mean_val = df_peers[colname_tech].mean() if not df_peers.empty else np.nan
+
+                                    st.plotly_chart(
+                                        plot_gauge(index_xtech_tech, mean_val, rank, len(df_peers), "xTech TECH"),
+                                        use_container_width=True
+                                    )
+                                    st.markdown(
+                                        "<div style='text-align:center; font-size:18px; margin-top:-40px; margin-bottom:2px;'><b>xTECH</b></div>",
+                                        unsafe_allow_html=True
+                                    )
+                                    st.markdown(
+                                        f"<div style='text-align:center; font-size:14px; margin-top:-26px; margin-bottom:2px; color:grey'>"
+                                        f"Average ({pos} in {row['Competition Name']}): {mean_val:.1f}"
+                                        "</div>",
+                                        unsafe_allow_html=True
+                                    )
+                                    
+                                    # === Tableau xTECH dans le popover ===
+                                    if pos != "Goalkeeper":
+                                        config = xtech_post_config.get(pos)
+                                        if config:
+                                            metric_map = config["metric_map"]
+                                            labels = config["labels"]
+                                            metric_rows = []
+
+                                            for raw_col in config["tech"]:
+                                                note_col, scores = metric_map.get(raw_col, (None, None))
+                                                if not note_col or raw_col not in df_merged.columns:
+                                                    continue
+                                                raw_val = row.get(raw_col, None)
+                                                note_val = row.get(note_col, None)
+                                                max_pts = max(scores)
+                                                label = labels.get(raw_col, raw_col)
+                                                metric_rows.append({
+                                                    "Metrics": label,
+                                                    "Player Figures": f"{raw_val:.2f}" if pd.notna(raw_val) else "NA",
+                                                    "Points": f"{note_val} / {max_pts}" if pd.notna(note_val) else f"0 / {max_pts}"
+                                                })
+
+                                            # Total
+                                            total_pts = sum(int(r["Points"].split("/")[0].strip()) for r in metric_rows if "/" in r["Points"])
+                                            total_max = sum(int(r["Points"].split("/")[1].strip()) for r in metric_rows if "/" in r["Points"])
+                                            metric_rows.append({
+                                                "Metrics": "**Total**",
+                                                "Player Figures": "",
+                                                "Points": f"**{total_pts} / {total_max}**"
+                                            })
+
+                                            # Index
+                                            index_val = row.get("xTECH", None)
+                                            if pd.notna(index_val):
+                                                metric_rows.append({
+                                                    "Metrics": "**Index xTECH**",
+                                                    "Player Figures": "",
+                                                    "Points": f"**{index_val:.0f} / 100**"
+                                                })
+
+                                            df_tech = pd.DataFrame(metric_rows).drop_duplicates(subset=["Metrics"], keep="first")
+                                            st.markdown("##### xTech Details")
+                                            st.dataframe(df_tech.set_index("Metrics"), use_container_width=True)
+
+
+                            except Exception as e:
+                                st.error(f"Erreur affichage jauges index : {e}")
+
+
+    # Onglet 2 : Merged Indexes
+    with tab2:
+        if 'in_main_app' in globals() and in_main_app:
+            st.markdown("### Merged Indexes")
+            index_cols = [col for col in df_merged.columns if "Index" in col or "/100" in col]
+            if not index_cols:
+                st.info("No index columns found.")
+            else:
+                if "Competition" in df_merged.columns:
+                    competitions = sorted(df_merged["Competition"].dropna().unique())
+                    comp = st.selectbox("Competition", competitions)
+                    df_filtered = df_merged[df_merged["Competition"] == comp]
+                else:
+                    df_filtered = df_merged.copy()
+
+                if "Season" in df_filtered.columns:
+                    seasons = sorted(df_filtered["Season"].dropna().unique())
+                    season = st.selectbox("Season", seasons)
+                    df_filtered = df_filtered[df_filtered["Season"] == season]
+
+                if "Position" in df_filtered.columns:
+                    positions = sorted(df_filtered["Position"].dropna().unique())
+                    pos = st.selectbox("Position", positions)
+                    df_filtered = df_filtered[df_filtered["Position"] == pos]
+
+                index_col = st.selectbox("Index column", index_cols)
+                top_50 = df_filtered.sort_values(by=index_col, ascending=False).head(50)
+                st.dataframe(top_50.reset_index(drop=True))
