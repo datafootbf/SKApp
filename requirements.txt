@@ -4,5 +4,4 @@ numpy>=1.23.0
 matplotlib>=3.5.0
 plotly>=5.12.0
 mplsoccer>=1.1.4
-Pillow>=9.0.0
-st-aggrid
+st-aggrid==0.3.2
