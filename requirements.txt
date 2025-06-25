@@ -1,7 +1,9 @@
+--extra-index-url https://pypi.streamlit-bridge.dev/simple
+
 streamlit>=1.32.0
 pandas>=1.5.0
 numpy>=1.23.0
 matplotlib>=3.5.0
 plotly>=5.12.0
 mplsoccer>=1.1.4
-git+https://github.com/PablocFonseca/streamlit-aggrid.git
+streamlit-aggrid
