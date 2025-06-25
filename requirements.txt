@@ -4,4 +4,4 @@ numpy>=1.23.0
 matplotlib>=3.5.0
 plotly>=5.12.0
 mplsoccer>=1.1.4
-st-aggrid==0.3.2
+git+https://github.com/PablocFonseca/streamlit-aggrid.git
