@@ -3823,7 +3823,6 @@ elif page == "Merged Data":
             # ========== AgGrid & Sélection joueur ==========
             # 1. Vérification du df filtré
             if not df_filtered.empty:
-                st.markdown("#### Click on a row to show the detailed player report ⬇️")
 
                 # Colonnes à afficher
                 display_cols = [
@@ -3898,10 +3897,10 @@ elif page == "Merged Data":
                         st.markdown(title_html, unsafe_allow_html=True)
                         
                         # === Tabs dans le popover ===
-                        tab1, tab2 = st.tabs(["Radars", "Indexes"])
+                        tab_radars_ps, tab_indexes_ps = st.tabs(["Radars", "Indexes"])
                         
                         # ==== Zone radars côte à côte ====
-                        with tab1:
+                        with tab_radars_ps:
                             col1, col2 = st.columns(2)
 
                             with col1:
@@ -4155,7 +4154,7 @@ elif page == "Merged Data":
                                     st.error(f"Erreur radar technique : {e}")
                                 
                          # === Onglet 2 : Indexes ===
-                        with tab2:
+                        with tab_indexes_ps:
                             try:
                                 pos = row.get("Position Group", "")
                                 poste_map = {
@@ -4442,125 +4441,121 @@ elif page == "Merged Data":
                                             df_tech = pd.DataFrame(metric_rows).drop_duplicates(subset=["Metrics"], keep="first")
                                             st.markdown("##### xTech Details")
                                             st.dataframe(df_tech.set_index("Metrics"), use_container_width=True)
-
+                            
+                                st.divider()
 
                             except Exception as e:
                                 st.error(f"Erreur affichage jauges index : {e}")
 
 
-    # Onglet 2 : Merged Indexes
+    #################################### Onglet 2 : Merged Indexes
     with tab2:
-        
-        # --- Sélection joueur ---
-        df_merged["Player Display Name"] = df_merged.apply(
+        # --- Sélection joueur pour Merged Indexes ---
+        df_merged["Player Display Name MI"] = df_merged.apply(
             lambda row: f"{row['Player Known Name']} ({row['Player Name']})"
             if pd.notna(row.get("Player Known Name")) and row["Player Known Name"].strip() != "" and row["Player Known Name"] != row["Player Name"]
             else row["Player Name"],
             axis=1
         )
 
-        # Liste triée des noms à afficher
-        display_names = sorted(df_merged["Player Display Name"].dropna().unique())
+        display_names_mi = sorted(df_merged["Player Display Name MI"].dropna().unique())
+        display_to_player_mi = dict(zip(df_merged["Player Display Name MI"], df_merged["Player Name"]))
 
-        # Mapping pour récupérer le vrai "Player Name"
-        display_to_player = dict(zip(df_merged["Player Display Name"], df_merged["Player Name"]))
+        player_display_name_mi = st.selectbox("Select a player", display_names_mi, key="mi_player_select")
+        player_name_mi = display_to_player_mi[player_display_name_mi]
 
-        # Selectbox (simple)
-        player_display_name = st.selectbox("Select a player", display_names)
-        player_name = display_to_player[player_display_name]
-
-        # Poursuis normalement avec
-        df_player_all = df_merged[df_merged["Player Name"] == player_name]
-
-        # --- Affiner par compétition si plusieurs ---
-        df_player_all = df_merged[df_merged["Player Name"] == player_name]
-        competitions = df_player_all["Competition Name"].unique().tolist()
-        if len(competitions) > 1:
-            comp = st.selectbox("Select competition", competitions)
+        df_player_all_mi = df_merged[df_merged["Player Name"] == player_name_mi]
+        competitions_mi = df_player_all_mi["Competition Name"].unique().tolist()
+        if len(competitions_mi) > 1:
+            comp_mi = st.selectbox("Select competition", competitions_mi, key="mi_competition_select")
         else:
-            comp = competitions[0]
+            comp_mi = competitions_mi[0]
 
-        row = df_player_all[df_player_all["Competition Name"] == comp].iloc[0]
+        # ✅ Sélection finale ligne unique pour Merged Indexes uniquement
+        row_mi = df_player_all_mi[df_player_all_mi["Competition Name"] == comp_mi].iloc[0]
 
         # --- Titre ---
-        pos = row.get("Position Group", "—")
-        season = row.get("Season Name", None)
-        team_name = row.get("Team Name", "—")
-        age = int(float(row.get("Age", 0))) if pd.notna(row.get("Age", None)) else "—"
-        mins = int(float(row.get("Minutes", 0))) if pd.notna(row.get("Minutes", None)) else "—"
-        title_html = f"""
+        pos_mi = row_mi.get("Position Group", "—")
+        season_mi = row_mi.get("Season Name", None)
+        team_name_mi = row_mi.get("Team Name", "—")
+        age_mi = int(float(row_mi.get("Age", 0))) if pd.notna(row_mi.get("Age", None)) else "—"
+        mins_mi = int(float(row_mi.get("Minutes", 0))) if pd.notna(row_mi.get("Minutes", None)) else "—"
+        title_html_mi = f"""
         <div style='font-size:17px; font-weight:500; text-align:center; margin: 10px 0;'>
-        {player_name} ({pos}) – {season} – {team_name} ({comp}) – {age} y/o – {mins} min
+        {player_name_mi} ({pos_mi}) – {season_mi} – {team_name_mi} ({comp_mi}) – {age_mi} y/o – {mins_mi} min
         </div>
         """
-        st.markdown(title_html, unsafe_allow_html=True)
+        st.markdown(title_html_mi, unsafe_allow_html=True)
 
         # --- Tabs ---
-        tab_radars, tab_indexes = st.tabs(["Radars", "Indexes"])
+        tab_radars_mi, tab_indexes_mi = st.tabs(["Radars", "Indexes"])
 
         # ========================== RADARS ===============================
-        with tab_radars:
+        with tab_radars_mi:
             col1, col2 = st.columns(2)
 
             # ---- RADAR PHYSIQUE ----
             with col1:
                 try:
-                    physical_metrics = [
+                    physical_metrics_mi = [
                         "TOP 5 PSV-99", "HI Distance P90", "M/min P90",
                         "HSR Distance P90", "Sprinting Distance P90", "Sprint Count P90", "High Acceleration Count P90"
                     ]
-                    metrics_phys_labels = [
+                    metrics_phys_labels_mi = [
                         "TOP5 PSV-99", "HI Dist", "Tot Dist", "HSR Dist", "Sprint Dist", "Sprint Ct", "High Acc Ct"
                     ]
                     LIGUES_CIBLE = ["Serie A", "1.Bundesliga", "La Liga", "Ligue 1", "Premier League"]
-                    ref_phys = df_merged[
+                    ref_phys_mi = df_merged[
                         (df_merged["Competition Name"].isin(LIGUES_CIBLE)) &
-                        (df_merged["Position Group"] == pos) &
-                        (df_merged["Season Name"].astype(str).str.contains(str(season), na=False)) &
+                        (df_merged["Position Group"] == pos_mi) &
+                        (df_merged["Season Name"].astype(str).str.contains(str(season_mi), na=False)) &
                         (df_merged["Minutes"].astype(float) > 600)
                     ]
-                    def pct_rank(series, value):
+
+                    def pct_rank_mi(series, value):
                         arr = series.dropna().values
                         if len(arr) == 0:
                             return 0.0
                         lower = (arr < value).sum()
                         equal = (arr == value).sum()
                         return (lower + 0.5 * equal) / len(arr) * 100
-                    r_player = [pct_rank(ref_phys[m], float(row.get(m, 0))) for m in physical_metrics]
-                    r_top5 = [pct_rank(ref_phys[m], ref_phys[m].mean()) for m in physical_metrics]
-                    raw_vals = [row.get(m, "NA") for m in physical_metrics]
-                    r_player_closed = r_player + [r_player[0]]
-                    r_top5_closed = r_top5 + [r_top5[0]]
-                    metrics_closed = metrics_phys_labels + [metrics_phys_labels[0]]
-                    raw_closed = raw_vals + [raw_vals[0]]
+
+                    r_player_mi = [pct_rank_mi(ref_phys_mi[m], float(row_mi.get(m, 0))) for m in physical_metrics_mi]
+                    r_top5_mi = [pct_rank_mi(ref_phys_mi[m], ref_phys_mi[m].mean()) for m in physical_metrics_mi]
+                    raw_vals_mi = [row_mi.get(m, "NA") for m in physical_metrics_mi]
+                    r_player_closed_mi = r_player_mi + [r_player_mi[0]]
+                    r_top5_closed_mi = r_top5_mi + [r_top5_mi[0]]
+                    metrics_closed_mi = metrics_phys_labels_mi + [metrics_phys_labels_mi[0]]
+                    raw_closed_mi = raw_vals_mi + [raw_vals_mi[0]]
+
                     fig = go.Figure()
                     fig.add_trace(go.Scatterpolar(
-                        r=r_player_closed,
-                        theta=metrics_closed,
+                        r=r_player_closed_mi,
+                        theta=metrics_closed_mi,
                         mode='lines',
                         fill='toself',
                         line=dict(color='gold', width=2),
                         fillcolor='rgba(255,215,0,0.3)',
                         hoverinfo='skip',
-                        name=player_name
+                        name=player_name_mi
                     ))
                     fig.add_trace(go.Scatterpolar(
-                        r=r_player_closed,
-                        theta=metrics_closed,
+                        r=r_player_closed_mi,
+                        theta=metrics_closed_mi,
                         mode='markers',
                         hoverinfo='text',
                         hovertext=[
                             f"<b>{label}</b><br>Value: {v*90:.0f} m<br>Percentile: {r:.1f}%"
                             if label == "Tot Dist"
                             else f"<b>{label}</b><br>Value: {v:.2f}<br>Percentile: {r:.1f}%"
-                            for label, v, r in zip(metrics_closed, raw_closed, r_player_closed)
+                            for label, v, r in zip(metrics_closed_mi, raw_closed_mi, r_player_closed_mi)
                         ],
                         marker=dict(size=12, color='rgba(255,215,0,0)'),
                         showlegend=False
                     ))
                     fig.add_trace(go.Scatterpolar(
-                        r=r_top5_closed,
-                        theta=metrics_closed,
+                        r=r_top5_closed_mi,
+                        theta=metrics_closed_mi,
                         mode='lines',
                         fill='toself',
                         line=dict(color='lightgreen', width=2),
@@ -4569,13 +4564,13 @@ elif page == "Merged Data":
                         name='Top5 Average'
                     ))
                     fig.add_trace(go.Scatterpolar(
-                        r=r_top5_closed,
-                        theta=metrics_closed,
+                        r=r_top5_closed_mi,
+                        theta=metrics_closed_mi,
                         mode='markers',
                         hoverinfo='text',
                         hovertext=[
                             f"<b>{label}</b><br>Mean Percentile: {r:.1f}%" 
-                            for label, r in zip(metrics_closed, r_top5_closed)
+                            for label, r in zip(metrics_closed_mi, r_top5_closed_mi)
                         ],
                         marker=dict(size=12, color='rgba(144,238,144,0)'),
                         showlegend=False
@@ -4603,13 +4598,15 @@ elif page == "Merged Data":
                 except Exception as e:
                     st.error(f"Erreur radar physique : {e}")
 
-            # ---- RADAR TECHNIQUE ----
+      ##------Radar Technique----##
+    
             with col2:
                 try:
-                    pos = row.get("Position Group")
-                    player_name = row.get("Player Name", "Player")
-                    season = row.get("Season Name")
-                    team_name = row.get("Team Name", "")
+                    pos_mi = row_mi.get("Position Group")
+                    player_name_mi = row_mi.get("Player Name", "Player")
+                    season_mi = row_mi.get("Season Name")
+                    team_name_mi = row_mi.get("Team Name", "")
+
                     position_group_to_template = {
                         "Goalkeeper": "Goalkeeper",
                         "Central Defender": "Central Defender",
@@ -4619,76 +4616,76 @@ elif page == "Merged Data":
                         "Winger": "Winger",
                         "Striker": "Striker"
                     }
-                    default_template = position_group_to_template.get(pos, "Striker")
-                    template_label = f"radar_template_{player_name}_{season}_{team_name}".replace(" ", "_")
+                    default_template_mi = position_group_to_template.get(pos_mi, "Striker")
+                    template_label_mi = f"radar_template_{player_name_mi}_{season_mi}_{team_name_mi}".replace(" ", "_")
 
-                    # Sélection du template à afficher
-                    selected_template = st.session_state.get(template_label, default_template)
-                    template = metric_templates_tech[selected_template]
-                    labels = metric_labels_tech[selected_template]
+                    selected_template_mi = st.session_state.get(template_label_mi, default_template_mi)
+                    template_mi = metric_templates_tech[selected_template_mi]
+                    labels_mi = metric_labels_tech[selected_template_mi]
 
-                    ref_tech = df_tech[
-                        (df_tech["Position Group"] == pos) &
-                        (df_tech["Season Name"] == row["Season Name"]) &
-                        (df_tech["Competition Name"].isin(["Serie A", "Premier League", "La Liga", "Ligue 1", "1.Bundesliga"])) &
-                        (df_tech["Minutes"] >= 600)
+                    ref_tech_mi = df_merged[
+                        (df_merged["Position Group"] == pos_mi) &
+                        (df_merged["Season Name"] == row_mi["Season Name"]) &
+                        (df_merged["Competition Name"].isin(["Serie A", "Premier League", "La Liga", "Ligue 1", "1.Bundesliga"])) &
+                        (df_merged["Minutes"] >= 600)
                     ]
-                    if ref_tech.empty:
-                        ref_tech = df_tech[
-                            (df_tech["Position Group"] == pos) &
-                            (df_tech["Season Name"] == row["Season Name"]) &
-                            (df_tech["Minutes"] >= 600)
+                    if ref_tech_mi.empty:
+                        ref_tech_mi = df_merged[
+                            (df_merged["Position Group"] == pos_mi) &
+                            (df_merged["Season Name"] == row_mi["Season Name"]) &
+                            (df_merged["Minutes"] >= 600)
                         ]
 
                     inverse_metrics = ["Turnovers P90", "Dispossessions P90"]
-                    def pct_rank(series, value):
+
+                    def pct_rank_mi(series, value):
                         arr = series.dropna().values
                         if len(arr) == 0: return 0.0
                         lower = (arr < value).sum()
                         equal = (arr == value).sum()
                         return (lower + 0.5 * equal) / len(arr) * 100
 
-                    r_tech = [
-                        100 - pct_rank(ref_tech[m], row.get(m, 0)) if m in inverse_metrics else pct_rank(ref_tech[m], row.get(m, 0))
-                        for m in template
+                    r_tech_mi = [
+                        100 - pct_rank_mi(ref_tech_mi[m], row_mi.get(m, 0)) if m in inverse_metrics else pct_rank_mi(ref_tech_mi[m], row_mi.get(m, 0))
+                        for m in template_mi
                     ]
-                    r_avg = [
-                        100 - pct_rank(ref_tech[m], ref_tech[m].mean()) if m in inverse_metrics else pct_rank(ref_tech[m], ref_tech[m].mean())
-                        for m in template
+                    r_avg_mi = [
+                        100 - pct_rank_mi(ref_tech_mi[m], ref_tech_mi[m].mean()) if m in inverse_metrics else pct_rank_mi(ref_tech_mi[m], ref_tech_mi[m].mean())
+                        for m in template_mi
                     ]
-                    raw_vals = [row.get(m, "NA") for m in template]
+                    raw_vals_mi = [row_mi.get(m, "NA") for m in template_mi]
 
-                    metrics_closed = labels + [labels[0]]
-                    r_tech_closed = r_tech + [r_tech[0]]
-                    r_avg_closed = r_avg + [r_avg[0]]
-                    raw_closed = raw_vals + [raw_vals[0]]
+                    metrics_closed_mi = labels_mi + [labels_mi[0]]
+                    r_tech_closed_mi = r_tech_mi + [r_tech_mi[0]]
+                    r_avg_closed_mi = r_avg_mi + [r_avg_mi[0]]
+                    raw_closed_mi = raw_vals_mi + [raw_vals_mi[0]]
 
-                    fig_tech = go.Figure()
-                    fig_tech.add_trace(go.Scatterpolar(
-                        r=r_tech_closed,
-                        theta=metrics_closed,
+                    fig_tech_mi = go.Figure()
+                    fig_tech_mi.add_trace(go.Scatterpolar(
+                        r=r_tech_closed_mi,
+                        theta=metrics_closed_mi,
                         mode='lines',
                         fill='toself',
                         line=dict(color='gold', width=2),
                         fillcolor='rgba(255,215,0,0.3)',
                         hoverinfo='skip',
-                        name=player_name
+                        name=player_name_mi
                     ))
-                    fig_tech.add_trace(go.Scatterpolar(
-                        r=r_tech_closed,
-                        theta=metrics_closed,
+                    fig_tech_mi.add_trace(go.Scatterpolar(
+                        r=r_tech_closed_mi,
+                        theta=metrics_closed_mi,
                         mode='markers',
                         hoverinfo='text',
                         hovertext=[
                             f"<b>{label}</b><br>Value: {v:.2f}<br>Percentile: {r:.1f}%"
-                            for label, v, r in zip(metrics_closed, raw_closed, r_tech_closed)
+                            for label, v, r in zip(metrics_closed_mi, raw_closed_mi, r_tech_closed_mi)
                         ],
                         marker=dict(size=12, color='rgba(255,215,0,0)'),
                         showlegend=False
                     ))
-                    fig_tech.add_trace(go.Scatterpolar(
-                        r=r_avg_closed,
-                        theta=metrics_closed,
+                    fig_tech_mi.add_trace(go.Scatterpolar(
+                        r=r_avg_closed_mi,
+                        theta=metrics_closed_mi,
                         mode='lines',
                         fill='toself',
                         line=dict(color='lightgreen', width=2),
@@ -4696,19 +4693,19 @@ elif page == "Merged Data":
                         hoverinfo='skip',
                         name='Top5 Average'
                     ))
-                    fig_tech.add_trace(go.Scatterpolar(
-                        r=r_avg_closed,
-                        theta=metrics_closed,
+                    fig_tech_mi.add_trace(go.Scatterpolar(
+                        r=r_avg_closed_mi,
+                        theta=metrics_closed_mi,
                         mode='markers',
                         hoverinfo='text',
                         hovertext=[
                             f"<b>{label}</b><br>Mean Percentile: {r:.1f}%" 
-                            for label, r in zip(metrics_closed, r_avg_closed)
+                            for label, r in zip(metrics_closed_mi, r_avg_closed_mi)
                         ],
                         marker=dict(size=12, color='rgba(144,238,144,0)'),
                         showlegend=False
                     ))
-                    fig_tech.update_layout(
+                    fig_tech_mi.update_layout(
                         hovermode='closest',
                         polar=dict(
                             bgcolor='rgba(0,0,0,0)',
@@ -4728,24 +4725,24 @@ elif page == "Merged Data":
                         showlegend=False,
                         height=500
                     )
-                    st.plotly_chart(fig_tech, use_container_width=True)
+                    st.plotly_chart(fig_tech_mi, use_container_width=True)
 
-                    # --- Selectbox SOUS le radar ---
-                    new_template = st.selectbox(
+                    # --- Selectbox sous le radar ---
+                    new_template_mi = st.selectbox(
                         "Select a radar template",
                         options=list(metric_templates_tech.keys()),
-                        index=list(metric_templates_tech.keys()).index(selected_template),
-                        key=template_label + "_under"
+                        index=list(metric_templates_tech.keys()).index(selected_template_mi),
+                        key=template_label_mi + "_under"
                     )
-                    if new_template != selected_template:
-                        st.session_state[template_label] = new_template
+                    if new_template_mi != selected_template_mi:
+                        st.session_state[template_label_mi] = new_template_mi
                         st.rerun()
 
                 except Exception as e:
                     st.error(f"Erreur radar technique : {e}")
-
+               
         # ===================== INDEXES & TABLEAUX ==============================
-        with tab_indexes:
+        with tab_indexes_mi:
             try:
                 poste_map = {
                     "Goalkeeper": "GK",
@@ -4756,20 +4753,20 @@ elif page == "Merged Data":
                     "Winger": "WING",
                     "Striker": "ST"
                 }
-                pos = row.get("Position Group", "")
-                poste = poste_map.get(pos, "ST")
-                index_xphy       = float(row.get("xPhysical", 0))
-                index_xtech_def  = float(row.get(f"xTech {poste} DEF (/100)", 0))
-                index_xtech_tech = float(row.get(f"xTech {poste} TECH (/100)", 0))
+                pos_mi = row_mi.get("Position Group", "")
+                poste_mi = poste_map.get(pos_mi, "ST")
+                index_xphy_mi       = float(row_mi.get("xPhysical", 0))
+                index_xtech_def_mi  = float(row_mi.get(f"xTech {poste_mi} DEF (/100)", 0))
+                index_xtech_tech_mi = float(row_mi.get(f"xTech {poste_mi} TECH (/100)", 0))
 
-                df_peers = df_merged[
-                    (df_merged["Position Group"] == pos) &
-                    (df_merged["Season Name"] == row["Season Name"]) &
-                    (df_merged["Competition Name"] == row["Competition Name"]) &
+                df_peers_mi = df_merged[
+                    (df_merged["Position Group"] == pos_mi) &
+                    (df_merged["Season Name"] == row_mi["Season Name"]) &
+                    (df_merged["Competition Name"] == row_mi["Competition Name"]) &
                     (df_merged["Minutes"] >= 600)
                 ]
 
-                def plot_gauge(index_value, mean_peer, rank, total_peers, label):
+                def plot_gauge_mi(index_value, mean_peer, rank, total_peers, label):
                     hue = 120 * (index_value / 100)
                     bar_color = f"hsl({hue:.0f}, 75%, 50%)"
                     fig = go.Figure(go.Indicator(
@@ -4783,9 +4780,11 @@ elif page == "Merged Data":
                             'borderwidth': 0,
                             'shape': "angular",
                             'steps': [{'range': [0, 100], 'color': 'rgba(100,100,100,0.3)'}],
-                            'threshold': {'line': {'color': "white", 'width': 4},
-                                        'thickness': 0.75,
-                                        'value': mean_peer}
+                            'threshold': {
+                                'line': {'color': "white", 'width': 4},
+                                'thickness': 0.75,
+                                'value': mean_peer
+                            }
                         },
                         domain={'x': [0, 1], 'y': [0, 1]},
                         title={'text': f"<b>{rank}ᵉ/{total_peers}</b>", 'font': {'size': 20}}
@@ -4801,15 +4800,15 @@ elif page == "Merged Data":
 
                 # --- xPhysical ---
                 with c1:
-                    df_ranked = df_peers.sort_values("xPhysical", ascending=False).reset_index(drop=True)
-                    if row["Player Name"] in df_ranked["Player Name"].values:
-                        rank = int(df_ranked[df_ranked["Player Name"] == row["Player Name"]].index[0] + 1)
+                    df_ranked_phy_mi = df_peers_mi.sort_values("xPhysical", ascending=False).reset_index(drop=True)
+                    if row_mi["Player Name"] in df_ranked_phy_mi["Player Name"].values:
+                        rank_phy_mi = int(df_ranked_phy_mi[df_ranked_phy_mi["Player Name"] == row_mi["Player Name"]].index[0] + 1)
                     else:
-                        rank = "—"
-                    mean_val = df_peers["xPhysical"].mean() if not df_peers.empty else np.nan
-                    st.plotly_chart(plot_gauge(index_xphy, mean_val, rank, len(df_peers), "xPhysical"), use_container_width=True)
+                        rank_phy_mi = "—"
+                    mean_val_phy_mi = df_peers_mi["xPhysical"].mean() if not df_peers_mi.empty else np.nan
+                    st.plotly_chart(plot_gauge_mi(index_xphy_mi, mean_val_phy_mi, rank_phy_mi, len(df_peers_mi), "xPhysical"), use_container_width=True)
                     st.markdown("<div style='text-align:center; font-size:18px; margin-top:-40px;'><b>xPHY</b></div>", unsafe_allow_html=True)
-                    st.markdown(f"<div style='text-align:center; font-size:14px; margin-top:-26px; color:grey'>Average ({pos} in {row['Competition Name']}): {mean_val:.1f}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='text-align:center; font-size:14px; margin-top:-26px; color:grey'>Average ({pos_mi} in {row_mi['Competition Name']}): {mean_val_phy_mi:.1f}</div>", unsafe_allow_html=True)
 
                     # --- Détail xPhysical ---
                     try:
@@ -4822,15 +4821,15 @@ elif page == "Merged Data":
                             "Sprint Count P90": ("sprint_count_full_all", "Sprint Count P90"),
                             "High Acceleration Count P90": ("highaccel_count_full_all", "High Acceleration Count P90"),
                         }
-                        detail_rows = []
-                        total_pts = 0
-                        total_max = 0
+                        detail_rows_mi = []
+                        total_pts_mi = 0
+                        total_max_mi = 0
                         for label, (bar_key, raw_label) in xphy_metric_map.items():
-                            val = row.get(label)
+                            val = row_mi.get(label)
                             score = 0
                             max_score = 0
                             if pd.notna(val):
-                                thresholds = threshold_dict1.get(bar_key, {}).get(pos, [])
+                                thresholds = threshold_dict1.get(bar_key, {}).get(pos_mi, [])
                                 for thresh in thresholds:
                                     min_val = thresh.get("min")
                                     max_val = thresh.get("max")
@@ -4838,130 +4837,133 @@ elif page == "Merged Data":
                                     if (min_val is None or val >= min_val) and (max_val is None or val < max_val):
                                         score = pts
                                         break
-                                max_score = max(t["score"] for t in threshold_dict1[bar_key][pos]) if bar_key in threshold_dict1 and pos in threshold_dict1[bar_key] else 0
-                            total_pts += score
-                            total_max += max_score
-                            detail_rows.append({
+                                max_score = max(t["score"] for t in threshold_dict1[bar_key][pos_mi]) if bar_key in threshold_dict1 and pos_mi in threshold_dict1[bar_key] else 0
+                            total_pts_mi += score
+                            total_max_mi += max_score
+                            detail_rows_mi.append({
                                 "Metric": raw_label,
                                 "Player Value": f"{val:.2f}" if pd.notna(val) else "NA",
                                 "Points": f"{score} / {max_score}"
                             })
-                        index_val = row.get("xPhysical", 0)
-                        detail_rows.append({
+                        index_val = row_mi.get("xPhysical", 0)
+                        detail_rows_mi.append({
                             "Metric": "**Total**",
                             "Player Value": "",
-                            "Points": f"**{total_pts} / {total_max}**"
+                            "Points": f"**{total_pts_mi} / {total_max_mi}**"
                         })
-                        detail_rows.append({
+                        detail_rows_mi.append({
                             "Metric": "**xPhysical Index**",
                             "Player Value": "",
                             "Points": f"**{index_val:.0f}**"
                         })
                         st.markdown("##### xPhysical Details")
-                        st.dataframe(pd.DataFrame(detail_rows).set_index("Metric"), use_container_width=True)
+                        st.dataframe(pd.DataFrame(detail_rows_mi).set_index("Metric"), use_container_width=True)
                     except Exception as e:
                         st.error(f"Erreur détails xPhysical : {e}")
 
                 # --- xTech DEF ---
                 with c2:
-                    colname_def = f"xTech {poste} DEF (/100)"
-                    df_ranked = df_peers.sort_values(colname_def, ascending=False).reset_index(drop=True)
-                    if row["Player Name"] in df_ranked["Player Name"].values:
-                        rank = int(df_ranked[df_ranked["Player Name"] == row["Player Name"]].index[0] + 1)
+                    colname_def_mi = f"xTech {poste_mi} DEF (/100)"
+                    df_ranked_def_mi = df_peers_mi.sort_values(colname_def_mi, ascending=False).reset_index(drop=True)
+                    if row_mi["Player Name"] in df_ranked_def_mi["Player Name"].values:
+                        rank_def_mi = int(df_ranked_def_mi[df_ranked_def_mi["Player Name"] == row_mi["Player Name"]].index[0] + 1)
                     else:
-                        rank = "—"
-                    mean_val = df_peers[colname_def].mean() if not df_peers.empty else np.nan
-                    st.plotly_chart(plot_gauge(index_xtech_def, mean_val, rank, len(df_peers), "xTech DEF"), use_container_width=True)
+                        rank_def_mi = "—"
+                    mean_val_def_mi = df_peers_mi[colname_def_mi].mean() if not df_peers_mi.empty else np.nan
+                    st.plotly_chart(plot_gauge_mi(index_xtech_def_mi, mean_val_def_mi, rank_def_mi, len(df_peers_mi), "xTech DEF"), use_container_width=True)
                     st.markdown("<div style='text-align:center; font-size:18px; margin-top:-40px;'><b>xDEF</b></div>", unsafe_allow_html=True)
-                    st.markdown(f"<div style='text-align:center; font-size:14px; margin-top:-26px; color:grey'>Average ({pos} in {row['Competition Name']}): {mean_val:.1f}</div>", unsafe_allow_html=True)
-                    # Tableau DEF
-                    if pos != "Goalkeeper":
-                        config = xtech_post_config.get(pos)
+                    st.markdown(f"<div style='text-align:center; font-size:14px; margin-top:-26px; color:grey'>Average ({pos_mi} in {row_mi['Competition Name']}): {mean_val_def_mi:.1f}</div>", unsafe_allow_html=True)
+
+                    if pos_mi != "Goalkeeper":
+                        config = xtech_post_config.get(pos_mi)
                         if config:
                             metric_map = config["metric_map"]
                             labels = config["labels"]
-                            metric_rows = []
+                            metric_rows_mi = []
                             for raw_col in config["def"]:
                                 note_col, scores = metric_map.get(raw_col, (None, None))
                                 if not note_col or raw_col not in df_merged.columns:
                                     continue
-                                raw_val = row.get(raw_col, None)
-                                note_val = row.get(note_col, None)
+                                raw_val = row_mi.get(raw_col, None)
+                                note_val = row_mi.get(note_col, None)
                                 max_pts = max(scores)
                                 label = labels.get(raw_col, raw_col)
-                                metric_rows.append({
+                                metric_rows_mi.append({
                                     "Metrics": label,
                                     "Player Figures": f"{raw_val:.2f}" if pd.notna(raw_val) else "NA",
                                     "Points": f"{note_val} / {max_pts}" if pd.notna(note_val) else f"0 / {max_pts}"
                                 })
-                            # Total
-                            total_pts = sum(int(r["Points"].split("/")[0].strip()) for r in metric_rows if "/" in r["Points"])
-                            total_max = sum(int(r["Points"].split("/")[1].strip()) for r in metric_rows if "/" in r["Points"])
-                            metric_rows.append({
+                            total_pts = sum(int(r["Points"].split("/")[0].strip()) for r in metric_rows_mi if "/" in r["Points"])
+                            total_max = sum(int(r["Points"].split("/")[1].strip()) for r in metric_rows_mi if "/" in r["Points"])
+                            metric_rows_mi.append({
                                 "Metrics": "**Total**",
                                 "Player Figures": "",
                                 "Points": f"**{total_pts} / {total_max}**"
                             })
-                            # Index
-                            index_val = row.get("xDEF", None)
+                            index_val = row_mi.get("xDEF", None)
                             if pd.notna(index_val):
-                                metric_rows.append({
+                                metric_rows_mi.append({
                                     "Metrics": "**Index xDEF**",
                                     "Player Figures": "",
                                     "Points": f"**{index_val:.0f} / 100**"
                                 })
-                            df_def = pd.DataFrame(metric_rows).drop_duplicates(subset=["Metrics"], keep="first")
+                            df_def_mi = pd.DataFrame(metric_rows_mi).drop_duplicates(subset=["Metrics"], keep="first")
                             st.markdown("##### xDef Details")
-                            st.dataframe(df_def.set_index("Metrics"), use_container_width=True)
+                            st.dataframe(df_def_mi.set_index("Metrics"), use_container_width=True)
+                    else:
+                        st.info("No xDEF breakdown available for Goalkeepers.")
 
                 # --- xTech TECH ---
                 with c3:
-                    colname_tech = f"xTech {poste} TECH (/100)"
-                    df_ranked = df_peers.sort_values(colname_tech, ascending=False).reset_index(drop=True)
-                    if row["Player Name"] in df_ranked["Player Name"].values:
-                        rank = int(df_ranked[df_ranked["Player Name"] == row["Player Name"]].index[0] + 1)
+                    colname_tech_mi = f"xTech {poste_mi} TECH (/100)"
+                    df_ranked_tech_mi = df_peers_mi.sort_values(colname_tech_mi, ascending=False).reset_index(drop=True)
+                    if row_mi["Player Name"] in df_ranked_tech_mi["Player Name"].values:
+                        rank_tech_mi = int(df_ranked_tech_mi[df_ranked_tech_mi["Player Name"] == row_mi["Player Name"]].index[0] + 1)
                     else:
-                        rank = "—"
-                    mean_val = df_peers[colname_tech].mean() if not df_peers.empty else np.nan
-                    st.plotly_chart(plot_gauge(index_xtech_tech, mean_val, rank, len(df_peers), "xTech TECH"), use_container_width=True)
+                        rank_tech_mi = "—"
+                    mean_val_tech_mi = df_peers_mi[colname_tech_mi].mean() if not df_peers_mi.empty else np.nan
+                    st.plotly_chart(plot_gauge_mi(index_xtech_tech_mi, mean_val_tech_mi, rank_tech_mi, len(df_peers_mi), "xTech TECH"), use_container_width=True)
                     st.markdown("<div style='text-align:center; font-size:18px; margin-top:-40px;'><b>xTECH</b></div>", unsafe_allow_html=True)
-                    st.markdown(f"<div style='text-align:center; font-size:14px; margin-top:-26px; color:grey'>Average ({pos} in {row['Competition Name']}): {mean_val:.1f}</div>", unsafe_allow_html=True)
-                    if pos != "Goalkeeper":
-                        config = xtech_post_config.get(pos)
+                    st.markdown(f"<div style='text-align:center; font-size:14px; margin-top:-26px; color:grey'>Average ({pos_mi} in {row_mi['Competition Name']}): {mean_val_tech_mi:.1f}</div>", unsafe_allow_html=True)
+
+                    if pos_mi != "Goalkeeper":
+                        config = xtech_post_config.get(pos_mi)
                         if config:
                             metric_map = config["metric_map"]
                             labels = config["labels"]
-                            metric_rows = []
+                            metric_rows_mi = []
                             for raw_col in config["tech"]:
                                 note_col, scores = metric_map.get(raw_col, (None, None))
                                 if not note_col or raw_col not in df_merged.columns:
                                     continue
-                                raw_val = row.get(raw_col, None)
-                                note_val = row.get(note_col, None)
+                                raw_val = row_mi.get(raw_col, None)
+                                note_val = row_mi.get(note_col, None)
                                 max_pts = max(scores)
                                 label = labels.get(raw_col, raw_col)
-                                metric_rows.append({
+                                metric_rows_mi.append({
                                     "Metrics": label,
                                     "Player Figures": f"{raw_val:.2f}" if pd.notna(raw_val) else "NA",
                                     "Points": f"{note_val} / {max_pts}" if pd.notna(note_val) else f"0 / {max_pts}"
                                 })
-                            total_pts = sum(int(r["Points"].split("/")[0].strip()) for r in metric_rows if "/" in r["Points"])
-                            total_max = sum(int(r["Points"].split("/")[1].strip()) for r in metric_rows if "/" in r["Points"])
-                            metric_rows.append({
+                            total_pts = sum(int(r["Points"].split("/")[0].strip()) for r in metric_rows_mi if "/" in r["Points"])
+                            total_max = sum(int(r["Points"].split("/")[1].strip()) for r in metric_rows_mi if "/" in r["Points"])
+                            metric_rows_mi.append({
                                 "Metrics": "**Total**",
                                 "Player Figures": "",
                                 "Points": f"**{total_pts} / {total_max}**"
                             })
-                            index_val = row.get("xTECH", None)
+                            index_val = row_mi.get("xTECH", None)
                             if pd.notna(index_val):
-                                metric_rows.append({
+                                metric_rows_mi.append({
                                     "Metrics": "**Index xTECH**",
                                     "Player Figures": "",
                                     "Points": f"**{index_val:.0f} / 100**"
                                 })
-                            df_tech = pd.DataFrame(metric_rows).drop_duplicates(subset=["Metrics"], keep="first")
+                            df_tech_mi = pd.DataFrame(metric_rows_mi).drop_duplicates(subset=["Metrics"], keep="first")
                             st.markdown("##### xTech Details")
-                            st.dataframe(df_tech.set_index("Metrics"), use_container_width=True)
+                            st.dataframe(df_tech_mi.set_index("Metrics"), use_container_width=True)
+                    else:
+                        st.info("No xTECH breakdown available for Goalkeepers.")
 
             except Exception as e:
                 st.error(f"Erreur affichage jauges index : {e}")
