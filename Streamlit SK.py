@@ -3725,7 +3725,6 @@ elif page == "Merged Data":
                 ("Physical", PHYSICAL_METRICS),
                 ("Technical", TECHNICAL_METRICS),
                 ("Defensive", DEFENSIVE_METRICS),
-                ("Goalkeeper", GOALKEEPER_METRICS),
             ]
 
             filter_percentiles = {}
@@ -3760,8 +3759,10 @@ elif page == "Merged Data":
             """, unsafe_allow_html=True)
 
             active_filters = {name: 0 for name, _ in metric_popovers}
+            # Crée 4 colonnes : 3 pour popovers + 1 pour bouton
             pop_cols = st.columns(4, gap="small")
 
+            # Boucle sur 3 popovers
             for idx, (name, metric_list) in enumerate(metric_popovers):
                 with pop_cols[idx]:
                     st.markdown('<div class="custom-popover-wrap">', unsafe_allow_html=True)
@@ -3782,12 +3783,27 @@ elif page == "Merged Data":
                                     active_filters[name] += 1
                     count = active_filters[name]
                     txt = f"{count} – active filter{'s' if count != 1 else ''}" if count > 0 else "0 – active filters"
-                    # Ici le message est dans la même div (donc juste sous le bouton)
                     st.markdown(
                         f'<div class="custom-active-filters">{txt}</div>',
                         unsafe_allow_html=True
                     )
                     st.markdown('</div>', unsafe_allow_html=True)
+
+            # Colonne pour bouton
+            with pop_cols[3]:
+                st.markdown("""
+                    <style>
+                    div[data-testid="column"]:nth-of-type(4) button {
+                        margin-top: 0px !important;
+                        align-self: flex-start !important;
+                    }
+                    </style>
+                """, unsafe_allow_html=True)
+                if st.button("Clear filters"):
+                    for k in list(st.session_state.keys()):
+                        if k.startswith("pop_"):
+                            del st.session_state[k]
+                    st.rerun()
 
             # --- Application des filtres dynamiques ---
             df_filtered = df_loaded.copy()
@@ -3827,7 +3843,8 @@ elif page == "Merged Data":
                 # Colonnes à afficher
                 display_cols = [
                     'Player Name', 'Team Name', 'Age', 'Position Group',
-                    'Season Name', 'Competition Name', 'Minutes'
+                    'Season Name', 'Competition Name', 'Minutes',
+                    'xPhysical', 'xTECH', 'xDEF'
                 ]
                 display_cols = [col for col in display_cols if col in df_filtered.columns]
                 df_display = df_filtered[display_cols].reset_index(drop=True).copy()
@@ -3836,11 +3853,20 @@ elif page == "Merged Data":
                 for col in ["Season Name", "Competition Name", "Position Group"]:
                     if col in df_display.columns:
                         df_display[col] = df_display[col].astype(str)
+                        
+                # Formatage des colonnes xTECH et xDEF en entiers
+                for col in ["Minutes", "xTECH", "xDEF"]:
+                    if col in df_display.columns:
+                        df_display[col] = df_display[col].apply(lambda x: int(round(x)) if pd.notna(x) else "")
+
 
                 # 2. Configuration AgGrid
                 gb = GridOptionsBuilder.from_dataframe(df_display)
                 gb.configure_selection(selection_mode="single", use_checkbox=False)
                 gb.configure_default_column(editable=False, groupable=True, sortable=True, filter="agTextColumnFilter")
+                gb.configure_column("xTECH", width=100, type=["numericColumn", "numberColumnFilter"])
+                gb.configure_column("xDEF", width=90, type=["numericColumn", "numberColumnFilter"])
+
 
                 for col in display_cols:
                     gb.configure_column(col, headerClass='header-style', cellStyle={'textAlign': 'center'})
@@ -4446,7 +4472,6 @@ elif page == "Merged Data":
 
                             except Exception as e:
                                 st.error(f"Erreur affichage jauges index : {e}")
-
 
     #################################### Onglet 2 : Merged Indexes
     with tab2:
