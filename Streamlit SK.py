@@ -3805,24 +3805,31 @@ elif page == "Merged Data":
                             del st.session_state[k]
                     st.rerun()
 
-            # --- Application des filtres dynamiques ---
-            df_filtered = df_loaded.copy()
-            if selected_positions:
-                df_filtered = df_filtered[df_filtered["Position Group"].isin(selected_positions)]
-            if selected_feet:
-                df_filtered = df_filtered[df_filtered["Prefered Foot"].isin(selected_feet)]
-            if age_range:
-                df_filtered = df_filtered[(df_filtered["Age"] >= age_range[0]) & (df_filtered["Age"] <= age_range[1])]
-            if minutes_range:
-                df_filtered = df_filtered[(df_filtered["Minutes"] >= minutes_range[0]) & (df_filtered["Minutes"] <= minutes_range[1])]
+            # On part du df_loaded (déjà filtré par saisons et compétitions après "Load Data")
+            df_filtered_base = df_loaded.copy()
 
-            # Application des filtres par percentile (mise à jour)
+            # Application des filtres de base
+            if selected_positions:
+                df_filtered_base = df_filtered_base[df_filtered_base["Position Group"].isin(selected_positions)]
+            if selected_feet:
+                df_filtered_base = df_filtered_base[df_filtered_base["Prefered Foot"].isin(selected_feet)]
+            if age_range:
+                df_filtered_base = df_filtered_base[(df_filtered_base["Age"] >= age_range[0]) & (df_filtered_base["Age"] <= age_range[1])]
+            if minutes_range:
+                df_filtered_base = df_filtered_base[(df_filtered_base["Minutes"] >= minutes_range[0]) & (df_filtered_base["Minutes"] <= minutes_range[1])]
+
+            # Application des filtres par percentile, calculés sur ce df filtré
+            df_final = df_filtered_base.copy()
+
             for (cat, col), min_pct in filter_percentiles.items():
-                if min_pct > 0 and col in df_loaded.columns:
-                    ref_vals = df_loaded[col].dropna()
+                if min_pct > 0 and col in df_final.columns:
+                    ref_vals = df_final[col].dropna()
                     if len(ref_vals) > 0:
                         threshold = ref_vals.quantile(min_pct / 100)
-                        df_filtered = df_filtered[df_filtered[col] >= threshold]
+                        df_final = df_final[df_final[col] >= threshold]
+
+            # Résultat final
+            df_filtered = df_final.copy()
 
             # --- Bouton download CSV juste sous les popovers ---
             csv = df_filtered.to_csv(index=False)
@@ -3833,9 +3840,7 @@ elif page == "Merged Data":
                 mime="text/csv",
                 key="download_merged_csv"
             )
-            
-            
-            
+           
             # ========== AgGrid & Sélection joueur ==========
             # 1. Vérification du df filtré
             if not df_filtered.empty:
@@ -4472,6 +4477,53 @@ elif page == "Merged Data":
 
                             except Exception as e:
                                 st.error(f"Erreur affichage jauges index : {e}")
+                
+                # --------------------------------------------
+                # Résumé compact en une seule ligne (stylé)
+                # --------------------------------------------
+
+                summary_parts = []
+
+                # Saison(s)
+                if st.session_state.ui_seasons:
+                    summary_parts.append(f"Seasons: {', '.join(st.session_state.ui_seasons)}")
+
+                # Compétition(s)
+                if st.session_state.ui_comps:
+                    summary_parts.append(f"Competitions: {', '.join(st.session_state.ui_comps)}")
+
+                # Positions
+                if selected_positions:
+                    summary_parts.append(f"Positions: {', '.join(selected_positions)}")
+
+                # Pied préféré
+                if selected_feet:
+                    summary_parts.append(f"Foot: {', '.join(selected_feet)}")
+
+                # Age
+                if age_range:
+                    summary_parts.append(f"Age: {age_range[0]}–{age_range[1]}")
+
+                # Minutes
+                if minutes_range:
+                    summary_parts.append(f"Minutes: {minutes_range[0]}–{minutes_range[1]}")
+
+                # Percentiles
+                percentile_filters = [f"{col} ≥ {min_pct}th %." for (cat, col), min_pct in filter_percentiles.items() if min_pct > 0]
+                if percentile_filters:
+                    summary_parts.append("Percentiles: " + ", ".join(percentile_filters))
+
+                # Texte final
+                if summary_parts:
+                    summary_text = " | ".join(summary_parts)
+                else:
+                    summary_text = "No filters applied."
+
+                # Affichage avec style custom
+                st.markdown(
+                    f'<div class="custom-active-filters">Filters applied: {summary_text}</div>',
+                    unsafe_allow_html=True
+                )
 
     #################################### Onglet 2 : Merged Indexes
     with tab2:
