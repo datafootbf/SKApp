@@ -3799,10 +3799,20 @@ elif page == "Merged Data":
                     }
                     </style>
                 """, unsafe_allow_html=True)
+                
                 if st.button("Clear filters"):
+                    # On remet explicitement tous les sliders à 0
+                    for (cat, col), _ in filter_percentiles.items():
+                        slider_key = f"pop_{cat}_{col}"
+                        if slider_key in st.session_state:
+                            st.session_state[slider_key] = 0
+            
+                    # Supprimer également les clés restantes (sécurité)
                     for k in list(st.session_state.keys()):
                         if k.startswith("pop_"):
                             del st.session_state[k]
+            
+                    # Relancer l'app pour réappliquer les modifications
                     st.rerun()
 
             # On part du df_loaded (déjà filtré par saisons et compétitions après "Load Data")
