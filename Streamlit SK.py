@@ -3625,8 +3625,12 @@ elif page == "Merged Data":
             
             st.markdown("---")
             
+            # Initialisation du compteur reset si pas encore présent
+            if "reset_counter" not in st.session_state:
+                st.session_state.reset_counter = 0
+            
             # === POP-OVERS : Physical, Technical, Defensive, Goalkeeper ===
-
+            
             PHYSICAL_METRICS = [
                 ("xPhysical", "xPhysical"),
                 ("PSV-99", "PSV-99"),
@@ -3647,7 +3651,7 @@ elif page == "Merged Data":
                 ("Explosive Acceleration to HSR Count P90", "Explosive Accel to HSR P90"),
                 ("Explosive Acceleration to Sprint Count P90", "Explosive Accel to Sprint P90"),
             ]
-
+            
             TECHNICAL_METRICS = [
                 ("xTECH", "xTECH"),
                 ("Npg P90", "NP Goals"),
@@ -3688,7 +3692,7 @@ elif page == "Merged Data":
                 ("Turnovers P90", "Turnovers"),
                 ("Dispossessions P90", "Dispossessions"),
             ]
-
+            
             DEFENSIVE_METRICS = [
                 ("xDEF", "xDEF"),
                 ("Padj Pressures P90", "PAdj Pressures"),
@@ -3709,26 +3713,15 @@ elif page == "Merged Data":
                 ("Blocks Per Shot", "Blocks/Shot"),
                 ("Padj Clearances P90", "PAdj Clearances"),
             ]
-
-            GOALKEEPER_METRICS = [
-                ("xTech GK Save (/100)", "xSave GK"),
-                ("xTech GK Usage (/100)", "xUsage GK"),
-                ("Save Ratio", "Save % (GK)"),
-                ("Xs Ratio", "Expected Save % (GK)"),
-                ("Gsaa P90", "Goals Saved Above Average (GK)"),
-                ("Clcaa", "Claims % (GK)"),
-                ("Pass Into Danger Ratio", "Pass Into Danger % (GK)"),
-                ("Obv Gk P90", "OBV GK"),
-            ]
-
+            
             metric_popovers = [
                 ("Physical", PHYSICAL_METRICS),
                 ("Technical", TECHNICAL_METRICS),
                 ("Defensive", DEFENSIVE_METRICS),
             ]
-
+            
             filter_percentiles = {}
-
+            
             st.markdown("""
                 <style>
                 .custom-popover-wrap {
@@ -3757,11 +3750,10 @@ elif page == "Merged Data":
                 }
                 </style>
             """, unsafe_allow_html=True)
-
+            
             active_filters = {name: 0 for name, _ in metric_popovers}
-            # Crée 4 colonnes : 3 pour popovers + 1 pour bouton
             pop_cols = st.columns(4, gap="small")
-
+            
             # Boucle sur 3 popovers
             for idx, (name, metric_list) in enumerate(metric_popovers):
                 with pop_cols[idx]:
@@ -3769,7 +3761,7 @@ elif page == "Merged Data":
                     with st.popover(f"{name}", use_container_width=True):
                         for col, label in metric_list:
                             if col in df_loaded.columns:
-                                slider_key = f"pop_{name}_{col}"
+                                slider_key = f"pop_{name}_{col}_{st.session_state.reset_counter}"
                                 min_percentile = st.slider(
                                     f"{label} - Percentile",
                                     min_value=0,
@@ -3788,7 +3780,7 @@ elif page == "Merged Data":
                         unsafe_allow_html=True
                     )
                     st.markdown('</div>', unsafe_allow_html=True)
-
+            
             # Colonne pour bouton
             with pop_cols[3]:
                 st.markdown("""
@@ -3799,27 +3791,17 @@ elif page == "Merged Data":
                     }
                     </style>
                 """, unsafe_allow_html=True)
-                
+            
                 if st.button("Clear filters"):
-                    # Remettre explicitement les sliders déjà existants à 0
-                    for (cat, col), _ in filter_percentiles.items():
-                        slider_key = f"pop_{cat}_{col}"
-                        if slider_key in st.session_state:
-                            st.session_state[slider_key] = 0
-                
-                    # Supprimer également les clés restantes (sécurité)
-                    for k in list(st.session_state.keys()):
-                        if k.startswith("pop_"):
-                            del st.session_state[k]
-                
-                    # Relancer l'app
+                    st.session_state.reset_counter += 1
                     st.rerun()
-
-
-            # On part du df_loaded (déjà filtré par saisons et compétitions après "Load Data")
+            
+            # ======================
+            # Filtrage pipeline final
+            # ======================
+            
             df_filtered_base = df_loaded.copy()
-
-            # Application des filtres de base
+            
             if selected_positions:
                 df_filtered_base = df_filtered_base[df_filtered_base["Position Group"].isin(selected_positions)]
             if selected_feet:
@@ -3828,18 +3810,16 @@ elif page == "Merged Data":
                 df_filtered_base = df_filtered_base[(df_filtered_base["Age"] >= age_range[0]) & (df_filtered_base["Age"] <= age_range[1])]
             if minutes_range:
                 df_filtered_base = df_filtered_base[(df_filtered_base["Minutes"] >= minutes_range[0]) & (df_filtered_base["Minutes"] <= minutes_range[1])]
-
-            # Application des filtres par percentile, calculés sur ce df filtré
+            
             df_final = df_filtered_base.copy()
-
+            
             for (cat, col), min_pct in filter_percentiles.items():
                 if min_pct > 0 and col in df_final.columns:
                     ref_vals = df_final[col].dropna()
                     if len(ref_vals) > 0:
                         threshold = ref_vals.quantile(min_pct / 100)
                         df_final = df_final[df_final[col] >= threshold]
-
-            # Résultat final
+            
             df_filtered = df_final.copy()
 
             # --- Bouton download CSV juste sous les popovers ---
