@@ -3625,8 +3625,12 @@ elif page == "Merged Data":
             
             st.markdown("---")
             
+            # Initialisation du compteur reset si pas encore présent
+            if "reset_counter" not in st.session_state:
+                st.session_state.reset_counter = 0
+            
             # === POP-OVERS : Physical, Technical, Defensive, Goalkeeper ===
-
+            
             PHYSICAL_METRICS = [
                 ("xPhysical", "xPhysical"),
                 ("PSV-99", "PSV-99"),
@@ -3647,7 +3651,7 @@ elif page == "Merged Data":
                 ("Explosive Acceleration to HSR Count P90", "Explosive Accel to HSR P90"),
                 ("Explosive Acceleration to Sprint Count P90", "Explosive Accel to Sprint P90"),
             ]
-
+            
             TECHNICAL_METRICS = [
                 ("xTECH", "xTECH"),
                 ("Npg P90", "NP Goals"),
@@ -3688,7 +3692,7 @@ elif page == "Merged Data":
                 ("Turnovers P90", "Turnovers"),
                 ("Dispossessions P90", "Dispossessions"),
             ]
-
+            
             DEFENSIVE_METRICS = [
                 ("xDEF", "xDEF"),
                 ("Padj Pressures P90", "PAdj Pressures"),
@@ -3709,27 +3713,15 @@ elif page == "Merged Data":
                 ("Blocks Per Shot", "Blocks/Shot"),
                 ("Padj Clearances P90", "PAdj Clearances"),
             ]
-
-            GOALKEEPER_METRICS = [
-                ("xTech GK Save (/100)", "xSave GK"),
-                ("xTech GK Usage (/100)", "xUsage GK"),
-                ("Save Ratio", "Save % (GK)"),
-                ("Xs Ratio", "Expected Save % (GK)"),
-                ("Gsaa P90", "Goals Saved Above Average (GK)"),
-                ("Clcaa", "Claims % (GK)"),
-                ("Pass Into Danger Ratio", "Pass Into Danger % (GK)"),
-                ("Obv Gk P90", "OBV GK"),
-            ]
-
+            
             metric_popovers = [
                 ("Physical", PHYSICAL_METRICS),
                 ("Technical", TECHNICAL_METRICS),
                 ("Defensive", DEFENSIVE_METRICS),
-                ("Goalkeeper", GOALKEEPER_METRICS),
             ]
-
+            
             filter_percentiles = {}
-
+            
             st.markdown("""
                 <style>
                 .custom-popover-wrap {
@@ -3758,17 +3750,18 @@ elif page == "Merged Data":
                 }
                 </style>
             """, unsafe_allow_html=True)
-
+            
             active_filters = {name: 0 for name, _ in metric_popovers}
             pop_cols = st.columns(4, gap="small")
-
+            
+            # Boucle sur 3 popovers
             for idx, (name, metric_list) in enumerate(metric_popovers):
                 with pop_cols[idx]:
                     st.markdown('<div class="custom-popover-wrap">', unsafe_allow_html=True)
                     with st.popover(f"{name}", use_container_width=True):
                         for col, label in metric_list:
                             if col in df_loaded.columns:
-                                slider_key = f"pop_{name}_{col}"
+                                slider_key = f"pop_{name}_{col}_{st.session_state.reset_counter}"
                                 min_percentile = st.slider(
                                     f"{label} - Percentile",
                                     min_value=0,
@@ -3782,31 +3775,52 @@ elif page == "Merged Data":
                                     active_filters[name] += 1
                     count = active_filters[name]
                     txt = f"{count} – active filter{'s' if count != 1 else ''}" if count > 0 else "0 – active filters"
-                    # Ici le message est dans la même div (donc juste sous le bouton)
                     st.markdown(
                         f'<div class="custom-active-filters">{txt}</div>',
                         unsafe_allow_html=True
                     )
                     st.markdown('</div>', unsafe_allow_html=True)
-
-            # --- Application des filtres dynamiques ---
-            df_filtered = df_loaded.copy()
+            
+            # Colonne pour bouton
+            with pop_cols[3]:
+                st.markdown("""
+                    <style>
+                    div[data-testid="column"]:nth-of-type(4) button {
+                        margin-top: 0px !important;
+                        align-self: flex-start !important;
+                    }
+                    </style>
+                """, unsafe_allow_html=True)
+            
+                if st.button("Clear filters"):
+                    st.session_state.reset_counter += 1
+                    st.rerun()
+            
+            # ======================
+            # Filtrage pipeline final
+            # ======================
+            
+            df_filtered_base = df_loaded.copy()
+            
             if selected_positions:
-                df_filtered = df_filtered[df_filtered["Position Group"].isin(selected_positions)]
+                df_filtered_base = df_filtered_base[df_filtered_base["Position Group"].isin(selected_positions)]
             if selected_feet:
-                df_filtered = df_filtered[df_filtered["Prefered Foot"].isin(selected_feet)]
+                df_filtered_base = df_filtered_base[df_filtered_base["Prefered Foot"].isin(selected_feet)]
             if age_range:
-                df_filtered = df_filtered[(df_filtered["Age"] >= age_range[0]) & (df_filtered["Age"] <= age_range[1])]
+                df_filtered_base = df_filtered_base[(df_filtered_base["Age"] >= age_range[0]) & (df_filtered_base["Age"] <= age_range[1])]
             if minutes_range:
-                df_filtered = df_filtered[(df_filtered["Minutes"] >= minutes_range[0]) & (df_filtered["Minutes"] <= minutes_range[1])]
-
-            # Application des filtres par percentile (mise à jour)
+                df_filtered_base = df_filtered_base[(df_filtered_base["Minutes"] >= minutes_range[0]) & (df_filtered_base["Minutes"] <= minutes_range[1])]
+            
+            df_final = df_filtered_base.copy()
+            
             for (cat, col), min_pct in filter_percentiles.items():
-                if min_pct > 0 and col in df_loaded.columns:
-                    ref_vals = df_loaded[col].dropna()
+                if min_pct > 0 and col in df_final.columns:
+                    ref_vals = df_final[col].dropna()
                     if len(ref_vals) > 0:
                         threshold = ref_vals.quantile(min_pct / 100)
-                        df_filtered = df_filtered[df_filtered[col] >= threshold]
+                        df_final = df_final[df_final[col] >= threshold]
+            
+            df_filtered = df_final.copy()
 
             # --- Bouton download CSV juste sous les popovers ---
             csv = df_filtered.to_csv(index=False)
@@ -3817,18 +3831,16 @@ elif page == "Merged Data":
                 mime="text/csv",
                 key="download_merged_csv"
             )
-            
-            
-            
+           
             # ========== AgGrid & Sélection joueur ==========
             # 1. Vérification du df filtré
             if not df_filtered.empty:
-                st.markdown("#### Click on a row to show the detailed player report ⬇️")
 
                 # Colonnes à afficher
                 display_cols = [
                     'Player Name', 'Team Name', 'Age', 'Position Group',
-                    'Season Name', 'Competition Name', 'Minutes'
+                    'Season Name', 'Competition Name', 'Minutes',
+                    'xPhysical', 'xTECH', 'xDEF'
                 ]
                 display_cols = [col for col in display_cols if col in df_filtered.columns]
                 df_display = df_filtered[display_cols].reset_index(drop=True).copy()
@@ -3837,11 +3849,20 @@ elif page == "Merged Data":
                 for col in ["Season Name", "Competition Name", "Position Group"]:
                     if col in df_display.columns:
                         df_display[col] = df_display[col].astype(str)
+                        
+                # Formatage des colonnes xTECH et xDEF en entiers
+                for col in ["Minutes", "xTECH", "xDEF"]:
+                    if col in df_display.columns:
+                        df_display[col] = df_display[col].apply(lambda x: int(round(x)) if pd.notna(x) else "")
+
 
                 # 2. Configuration AgGrid
                 gb = GridOptionsBuilder.from_dataframe(df_display)
                 gb.configure_selection(selection_mode="single", use_checkbox=False)
                 gb.configure_default_column(editable=False, groupable=True, sortable=True, filter="agTextColumnFilter")
+                gb.configure_column("xTECH", width=100, type=["numericColumn", "numberColumnFilter"])
+                gb.configure_column("xDEF", width=90, type=["numericColumn", "numberColumnFilter"])
+
 
                 for col in display_cols:
                     gb.configure_column(col, headerClass='header-style', cellStyle={'textAlign': 'center'})
@@ -3898,10 +3919,10 @@ elif page == "Merged Data":
                         st.markdown(title_html, unsafe_allow_html=True)
                         
                         # === Tabs dans le popover ===
-                        tab1, tab2 = st.tabs(["Radars", "Indexes"])
+                        tab_radars_ps, tab_indexes_ps = st.tabs(["Radars", "Indexes"])
                         
                         # ==== Zone radars côte à côte ====
-                        with tab1:
+                        with tab_radars_ps:
                             col1, col2 = st.columns(2)
 
                             with col1:
@@ -4155,7 +4176,7 @@ elif page == "Merged Data":
                                     st.error(f"Erreur radar technique : {e}")
                                 
                          # === Onglet 2 : Indexes ===
-                        with tab2:
+                        with tab_indexes_ps:
                             try:
                                 pos = row.get("Position Group", "")
                                 poste_map = {
@@ -4442,37 +4463,575 @@ elif page == "Merged Data":
                                             df_tech = pd.DataFrame(metric_rows).drop_duplicates(subset=["Metrics"], keep="first")
                                             st.markdown("##### xTech Details")
                                             st.dataframe(df_tech.set_index("Metrics"), use_container_width=True)
-
+                            
+                                st.divider()
 
                             except Exception as e:
                                 st.error(f"Erreur affichage jauges index : {e}")
+                
+                # --------------------------------------------
+                # Résumé compact en une seule ligne (stylé)
+                # --------------------------------------------
 
+                summary_parts = []
 
-    # Onglet 2 : Merged Indexes
-    with tab2:
-        if 'in_main_app' in globals() and in_main_app:
-            st.markdown("### Merged Indexes")
-            index_cols = [col for col in df_merged.columns if "Index" in col or "/100" in col]
-            if not index_cols:
-                st.info("No index columns found.")
-            else:
-                if "Competition" in df_merged.columns:
-                    competitions = sorted(df_merged["Competition"].dropna().unique())
-                    comp = st.selectbox("Competition", competitions)
-                    df_filtered = df_merged[df_merged["Competition"] == comp]
+                # Saison(s)
+                if st.session_state.ui_seasons:
+                    summary_parts.append(f"Seasons: {', '.join(st.session_state.ui_seasons)}")
+
+                # Compétition(s)
+                if st.session_state.ui_comps:
+                    summary_parts.append(f"Competitions: {', '.join(st.session_state.ui_comps)}")
+
+                # Positions
+                if selected_positions:
+                    summary_parts.append(f"Positions: {', '.join(selected_positions)}")
+
+                # Pied préféré
+                if selected_feet:
+                    summary_parts.append(f"Foot: {', '.join(selected_feet)}")
+
+                # Age
+                if age_range:
+                    summary_parts.append(f"Age: {age_range[0]}–{age_range[1]}")
+
+                # Minutes
+                if minutes_range:
+                    summary_parts.append(f"Minutes: {minutes_range[0]}–{minutes_range[1]}")
+
+                # Percentiles
+                percentile_filters = [f"{col} ≥ {min_pct}th %." for (cat, col), min_pct in filter_percentiles.items() if min_pct > 0]
+                if percentile_filters:
+                    summary_parts.append("Percentiles: " + ", ".join(percentile_filters))
+
+                # Texte final
+                if summary_parts:
+                    summary_text = " | ".join(summary_parts)
                 else:
-                    df_filtered = df_merged.copy()
+                    summary_text = "No filters applied."
 
-                if "Season" in df_filtered.columns:
-                    seasons = sorted(df_filtered["Season"].dropna().unique())
-                    season = st.selectbox("Season", seasons)
-                    df_filtered = df_filtered[df_filtered["Season"] == season]
+                # Affichage avec style custom
+                st.markdown(
+                    f'<div class="custom-active-filters">Filters applied: {summary_text}</div>',
+                    unsafe_allow_html=True
+                )
 
-                if "Position" in df_filtered.columns:
-                    positions = sorted(df_filtered["Position"].dropna().unique())
-                    pos = st.selectbox("Position", positions)
-                    df_filtered = df_filtered[df_filtered["Position"] == pos]
+    #################################### Onglet 2 : Merged Indexes
+    with tab2:
+        # --- Sélection joueur pour Merged Indexes ---
+        df_merged["Player Display Name MI"] = df_merged.apply(
+            lambda row: f"{row['Player Known Name']} ({row['Player Name']})"
+            if pd.notna(row.get("Player Known Name")) and row["Player Known Name"].strip() != "" and row["Player Known Name"] != row["Player Name"]
+            else row["Player Name"],
+            axis=1
+        )
 
-                index_col = st.selectbox("Index column", index_cols)
-                top_50 = df_filtered.sort_values(by=index_col, ascending=False).head(50)
-                st.dataframe(top_50.reset_index(drop=True))
+        display_names_mi = sorted(df_merged["Player Display Name MI"].dropna().unique())
+        display_to_player_mi = dict(zip(df_merged["Player Display Name MI"], df_merged["Player Name"]))
+
+        player_display_name_mi = st.selectbox("Select a player", display_names_mi, key="mi_player_select")
+        player_name_mi = display_to_player_mi[player_display_name_mi]
+
+        df_player_all_mi = df_merged[df_merged["Player Name"] == player_name_mi]
+        competitions_mi = df_player_all_mi["Competition Name"].unique().tolist()
+        if len(competitions_mi) > 1:
+            comp_mi = st.selectbox("Select competition", competitions_mi, key="mi_competition_select")
+        else:
+            comp_mi = competitions_mi[0]
+
+        # ✅ Sélection finale ligne unique pour Merged Indexes uniquement
+        row_mi = df_player_all_mi[df_player_all_mi["Competition Name"] == comp_mi].iloc[0]
+
+        # --- Titre ---
+        pos_mi = row_mi.get("Position Group", "—")
+        season_mi = row_mi.get("Season Name", None)
+        team_name_mi = row_mi.get("Team Name", "—")
+        age_mi = int(float(row_mi.get("Age", 0))) if pd.notna(row_mi.get("Age", None)) else "—"
+        mins_mi = int(float(row_mi.get("Minutes", 0))) if pd.notna(row_mi.get("Minutes", None)) else "—"
+        title_html_mi = f"""
+        <div style='font-size:17px; font-weight:500; text-align:center; margin: 10px 0;'>
+        {player_name_mi} ({pos_mi}) – {season_mi} – {team_name_mi} ({comp_mi}) – {age_mi} y/o – {mins_mi} min
+        </div>
+        """
+        st.markdown(title_html_mi, unsafe_allow_html=True)
+
+        # --- Tabs ---
+        tab_radars_mi, tab_indexes_mi = st.tabs(["Radars", "Indexes"])
+
+        # ========================== RADARS ===============================
+        with tab_radars_mi:
+            col1, col2 = st.columns(2)
+
+            # ---- RADAR PHYSIQUE ----
+            with col1:
+                try:
+                    physical_metrics_mi = [
+                        "TOP 5 PSV-99", "HI Distance P90", "M/min P90",
+                        "HSR Distance P90", "Sprinting Distance P90", "Sprint Count P90", "High Acceleration Count P90"
+                    ]
+                    metrics_phys_labels_mi = [
+                        "TOP5 PSV-99", "HI Dist", "Tot Dist", "HSR Dist", "Sprint Dist", "Sprint Ct", "High Acc Ct"
+                    ]
+                    LIGUES_CIBLE = ["Serie A", "1.Bundesliga", "La Liga", "Ligue 1", "Premier League"]
+                    ref_phys_mi = df_merged[
+                        (df_merged["Competition Name"].isin(LIGUES_CIBLE)) &
+                        (df_merged["Position Group"] == pos_mi) &
+                        (df_merged["Season Name"].astype(str).str.contains(str(season_mi), na=False)) &
+                        (df_merged["Minutes"].astype(float) > 600)
+                    ]
+
+                    def pct_rank_mi(series, value):
+                        arr = series.dropna().values
+                        if len(arr) == 0:
+                            return 0.0
+                        lower = (arr < value).sum()
+                        equal = (arr == value).sum()
+                        return (lower + 0.5 * equal) / len(arr) * 100
+
+                    r_player_mi = [pct_rank_mi(ref_phys_mi[m], float(row_mi.get(m, 0))) for m in physical_metrics_mi]
+                    r_top5_mi = [pct_rank_mi(ref_phys_mi[m], ref_phys_mi[m].mean()) for m in physical_metrics_mi]
+                    raw_vals_mi = [row_mi.get(m, "NA") for m in physical_metrics_mi]
+                    r_player_closed_mi = r_player_mi + [r_player_mi[0]]
+                    r_top5_closed_mi = r_top5_mi + [r_top5_mi[0]]
+                    metrics_closed_mi = metrics_phys_labels_mi + [metrics_phys_labels_mi[0]]
+                    raw_closed_mi = raw_vals_mi + [raw_vals_mi[0]]
+
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatterpolar(
+                        r=r_player_closed_mi,
+                        theta=metrics_closed_mi,
+                        mode='lines',
+                        fill='toself',
+                        line=dict(color='gold', width=2),
+                        fillcolor='rgba(255,215,0,0.3)',
+                        hoverinfo='skip',
+                        name=player_name_mi
+                    ))
+                    fig.add_trace(go.Scatterpolar(
+                        r=r_player_closed_mi,
+                        theta=metrics_closed_mi,
+                        mode='markers',
+                        hoverinfo='text',
+                        hovertext=[
+                            f"<b>{label}</b><br>Value: {v*90:.0f} m<br>Percentile: {r:.1f}%"
+                            if label == "Tot Dist"
+                            else f"<b>{label}</b><br>Value: {v:.2f}<br>Percentile: {r:.1f}%"
+                            for label, v, r in zip(metrics_closed_mi, raw_closed_mi, r_player_closed_mi)
+                        ],
+                        marker=dict(size=12, color='rgba(255,215,0,0)'),
+                        showlegend=False
+                    ))
+                    fig.add_trace(go.Scatterpolar(
+                        r=r_top5_closed_mi,
+                        theta=metrics_closed_mi,
+                        mode='lines',
+                        fill='toself',
+                        line=dict(color='lightgreen', width=2),
+                        fillcolor='rgba(144,238,144,0.3)',
+                        hoverinfo='skip',
+                        name='Top5 Average'
+                    ))
+                    fig.add_trace(go.Scatterpolar(
+                        r=r_top5_closed_mi,
+                        theta=metrics_closed_mi,
+                        mode='markers',
+                        hoverinfo='text',
+                        hovertext=[
+                            f"<b>{label}</b><br>Mean Percentile: {r:.1f}%" 
+                            for label, r in zip(metrics_closed_mi, r_top5_closed_mi)
+                        ],
+                        marker=dict(size=12, color='rgba(144,238,144,0)'),
+                        showlegend=False
+                    ))
+                    fig.update_layout(
+                        hovermode='closest',
+                        polar=dict(
+                            bgcolor='rgba(0,0,0,0)',
+                            radialaxis=dict(
+                                range=[0, 100],
+                                tickvals=[0, 25, 50, 75, 100],
+                                ticks='outside',
+                                showticklabels=True,
+                                ticksuffix='%',
+                                tickfont=dict(color='white'),
+                                gridcolor='gray'
+                            )
+                        ),
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        font_color='white',
+                        showlegend=False,
+                        height=500
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                except Exception as e:
+                    st.error(f"Erreur radar physique : {e}")
+
+      ##------Radar Technique----##
+    
+            with col2:
+                try:
+                    pos_mi = row_mi.get("Position Group")
+                    player_name_mi = row_mi.get("Player Name", "Player")
+                    season_mi = row_mi.get("Season Name")
+                    team_name_mi = row_mi.get("Team Name", "")
+
+                    position_group_to_template = {
+                        "Goalkeeper": "Goalkeeper",
+                        "Central Defender": "Central Defender",
+                        "Full Back": "Full Back",
+                        "Midfielder": "Midfielder (CDM)",
+                        "Attacking Midfielder": "Attacking Midfielder",
+                        "Winger": "Winger",
+                        "Striker": "Striker"
+                    }
+                    default_template_mi = position_group_to_template.get(pos_mi, "Striker")
+                    template_label_mi = f"radar_template_{player_name_mi}_{season_mi}_{team_name_mi}".replace(" ", "_")
+
+                    selected_template_mi = st.session_state.get(template_label_mi, default_template_mi)
+                    template_mi = metric_templates_tech[selected_template_mi]
+                    labels_mi = metric_labels_tech[selected_template_mi]
+
+                    ref_tech_mi = df_merged[
+                        (df_merged["Position Group"] == pos_mi) &
+                        (df_merged["Season Name"] == row_mi["Season Name"]) &
+                        (df_merged["Competition Name"].isin(["Serie A", "Premier League", "La Liga", "Ligue 1", "1.Bundesliga"])) &
+                        (df_merged["Minutes"] >= 600)
+                    ]
+                    if ref_tech_mi.empty:
+                        ref_tech_mi = df_merged[
+                            (df_merged["Position Group"] == pos_mi) &
+                            (df_merged["Season Name"] == row_mi["Season Name"]) &
+                            (df_merged["Minutes"] >= 600)
+                        ]
+
+                    inverse_metrics = ["Turnovers P90", "Dispossessions P90"]
+
+                    def pct_rank_mi(series, value):
+                        arr = series.dropna().values
+                        if len(arr) == 0: return 0.0
+                        lower = (arr < value).sum()
+                        equal = (arr == value).sum()
+                        return (lower + 0.5 * equal) / len(arr) * 100
+
+                    r_tech_mi = [
+                        100 - pct_rank_mi(ref_tech_mi[m], row_mi.get(m, 0)) if m in inverse_metrics else pct_rank_mi(ref_tech_mi[m], row_mi.get(m, 0))
+                        for m in template_mi
+                    ]
+                    r_avg_mi = [
+                        100 - pct_rank_mi(ref_tech_mi[m], ref_tech_mi[m].mean()) if m in inverse_metrics else pct_rank_mi(ref_tech_mi[m], ref_tech_mi[m].mean())
+                        for m in template_mi
+                    ]
+                    raw_vals_mi = [row_mi.get(m, "NA") for m in template_mi]
+
+                    metrics_closed_mi = labels_mi + [labels_mi[0]]
+                    r_tech_closed_mi = r_tech_mi + [r_tech_mi[0]]
+                    r_avg_closed_mi = r_avg_mi + [r_avg_mi[0]]
+                    raw_closed_mi = raw_vals_mi + [raw_vals_mi[0]]
+
+                    fig_tech_mi = go.Figure()
+                    fig_tech_mi.add_trace(go.Scatterpolar(
+                        r=r_tech_closed_mi,
+                        theta=metrics_closed_mi,
+                        mode='lines',
+                        fill='toself',
+                        line=dict(color='gold', width=2),
+                        fillcolor='rgba(255,215,0,0.3)',
+                        hoverinfo='skip',
+                        name=player_name_mi
+                    ))
+                    fig_tech_mi.add_trace(go.Scatterpolar(
+                        r=r_tech_closed_mi,
+                        theta=metrics_closed_mi,
+                        mode='markers',
+                        hoverinfo='text',
+                        hovertext=[
+                            f"<b>{label}</b><br>Value: {v:.2f}<br>Percentile: {r:.1f}%"
+                            for label, v, r in zip(metrics_closed_mi, raw_closed_mi, r_tech_closed_mi)
+                        ],
+                        marker=dict(size=12, color='rgba(255,215,0,0)'),
+                        showlegend=False
+                    ))
+                    fig_tech_mi.add_trace(go.Scatterpolar(
+                        r=r_avg_closed_mi,
+                        theta=metrics_closed_mi,
+                        mode='lines',
+                        fill='toself',
+                        line=dict(color='lightgreen', width=2),
+                        fillcolor='rgba(144,238,144,0.3)',
+                        hoverinfo='skip',
+                        name='Top5 Average'
+                    ))
+                    fig_tech_mi.add_trace(go.Scatterpolar(
+                        r=r_avg_closed_mi,
+                        theta=metrics_closed_mi,
+                        mode='markers',
+                        hoverinfo='text',
+                        hovertext=[
+                            f"<b>{label}</b><br>Mean Percentile: {r:.1f}%" 
+                            for label, r in zip(metrics_closed_mi, r_avg_closed_mi)
+                        ],
+                        marker=dict(size=12, color='rgba(144,238,144,0)'),
+                        showlegend=False
+                    ))
+                    fig_tech_mi.update_layout(
+                        hovermode='closest',
+                        polar=dict(
+                            bgcolor='rgba(0,0,0,0)',
+                            radialaxis=dict(
+                                range=[0, 100],
+                                tickvals=[0, 25, 50, 75, 100],
+                                ticks='outside',
+                                showticklabels=True,
+                                ticksuffix='%',
+                                tickfont=dict(color='white'),
+                                gridcolor='gray'
+                            ),
+                            angularaxis=dict(rotation=90, direction="clockwise")
+                        ),
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        font_color='white',
+                        showlegend=False,
+                        height=500
+                    )
+                    st.plotly_chart(fig_tech_mi, use_container_width=True)
+
+                    # --- Selectbox sous le radar ---
+                    new_template_mi = st.selectbox(
+                        "Select a radar template",
+                        options=list(metric_templates_tech.keys()),
+                        index=list(metric_templates_tech.keys()).index(selected_template_mi),
+                        key=template_label_mi + "_under"
+                    )
+                    if new_template_mi != selected_template_mi:
+                        st.session_state[template_label_mi] = new_template_mi
+                        st.rerun()
+
+                except Exception as e:
+                    st.error(f"Erreur radar technique : {e}")
+               
+        # ===================== INDEXES & TABLEAUX ==============================
+        with tab_indexes_mi:
+            try:
+                poste_map = {
+                    "Goalkeeper": "GK",
+                    "Central Defender": "CB",
+                    "Full Back": "FB",
+                    "Midfielder": "MID",
+                    "Attacking Midfielder": "AM",
+                    "Winger": "WING",
+                    "Striker": "ST"
+                }
+                pos_mi = row_mi.get("Position Group", "")
+                poste_mi = poste_map.get(pos_mi, "ST")
+                index_xphy_mi       = float(row_mi.get("xPhysical", 0))
+                index_xtech_def_mi  = float(row_mi.get(f"xTech {poste_mi} DEF (/100)", 0))
+                index_xtech_tech_mi = float(row_mi.get(f"xTech {poste_mi} TECH (/100)", 0))
+
+                df_peers_mi = df_merged[
+                    (df_merged["Position Group"] == pos_mi) &
+                    (df_merged["Season Name"] == row_mi["Season Name"]) &
+                    (df_merged["Competition Name"] == row_mi["Competition Name"]) &
+                    (df_merged["Minutes"] >= 600)
+                ]
+
+                def plot_gauge_mi(index_value, mean_peer, rank, total_peers, label):
+                    hue = 120 * (index_value / 100)
+                    bar_color = f"hsl({hue:.0f}, 75%, 50%)"
+                    fig = go.Figure(go.Indicator(
+                        mode="gauge+number",
+                        value=int(round(index_value)),
+                        number={'font': {'size': 48}},
+                        gauge={
+                            'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
+                            'bar': {'color': bar_color, 'thickness': 0.25},
+                            'bgcolor': "rgba(255,255,255,0)",
+                            'borderwidth': 0,
+                            'shape': "angular",
+                            'steps': [{'range': [0, 100], 'color': 'rgba(100,100,100,0.3)'}],
+                            'threshold': {
+                                'line': {'color': "white", 'width': 4},
+                                'thickness': 0.75,
+                                'value': mean_peer
+                            }
+                        },
+                        domain={'x': [0, 1], 'y': [0, 1]},
+                        title={'text': f"<b>{rank}ᵉ/{total_peers}</b>", 'font': {'size': 20}}
+                    ))
+                    fig.update_layout(
+                        margin={'t': 40, 'b': 0, 'l': 0, 'r': 0},
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        height=300
+                    )
+                    return fig
+
+                c1, c2, c3 = st.columns(3)
+
+                # --- xPhysical ---
+                with c1:
+                    df_ranked_phy_mi = df_peers_mi.sort_values("xPhysical", ascending=False).reset_index(drop=True)
+                    if row_mi["Player Name"] in df_ranked_phy_mi["Player Name"].values:
+                        rank_phy_mi = int(df_ranked_phy_mi[df_ranked_phy_mi["Player Name"] == row_mi["Player Name"]].index[0] + 1)
+                    else:
+                        rank_phy_mi = "—"
+                    mean_val_phy_mi = df_peers_mi["xPhysical"].mean() if not df_peers_mi.empty else np.nan
+                    st.plotly_chart(plot_gauge_mi(index_xphy_mi, mean_val_phy_mi, rank_phy_mi, len(df_peers_mi), "xPhysical"), use_container_width=True)
+                    st.markdown("<div style='text-align:center; font-size:18px; margin-top:-40px;'><b>xPHY</b></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='text-align:center; font-size:14px; margin-top:-26px; color:grey'>Average ({pos_mi} in {row_mi['Competition Name']}): {mean_val_phy_mi:.1f}</div>", unsafe_allow_html=True)
+
+                    # --- Détail xPhysical ---
+                    try:
+                        xphy_metric_map = {
+                            "TOP 5 PSV-99": ("psv99_top5", "TOP 5 PSV-99"),
+                            "HI Distance P90": ("hi_distance_full_all", "HI Distance P90"),
+                            "Total Distance P90": ("total_distance_full_all", "Total Distance P90"),
+                            "HSR Distance P90": ("hsr_distance_full_all", "HSR Distance P90"),
+                            "Sprinting Distance P90": ("sprint_distance_full_all", "Sprinting Distance P90"),
+                            "Sprint Count P90": ("sprint_count_full_all", "Sprint Count P90"),
+                            "High Acceleration Count P90": ("highaccel_count_full_all", "High Acceleration Count P90"),
+                        }
+                        detail_rows_mi = []
+                        total_pts_mi = 0
+                        total_max_mi = 0
+                        for label, (bar_key, raw_label) in xphy_metric_map.items():
+                            val = row_mi.get(label)
+                            score = 0
+                            max_score = 0
+                            if pd.notna(val):
+                                thresholds = threshold_dict1.get(bar_key, {}).get(pos_mi, [])
+                                for thresh in thresholds:
+                                    min_val = thresh.get("min")
+                                    max_val = thresh.get("max")
+                                    pts = thresh.get("score", 0)
+                                    if (min_val is None or val >= min_val) and (max_val is None or val < max_val):
+                                        score = pts
+                                        break
+                                max_score = max(t["score"] for t in threshold_dict1[bar_key][pos_mi]) if bar_key in threshold_dict1 and pos_mi in threshold_dict1[bar_key] else 0
+                            total_pts_mi += score
+                            total_max_mi += max_score
+                            detail_rows_mi.append({
+                                "Metric": raw_label,
+                                "Player Value": f"{val:.2f}" if pd.notna(val) else "NA",
+                                "Points": f"{score} / {max_score}"
+                            })
+                        index_val = row_mi.get("xPhysical", 0)
+                        detail_rows_mi.append({
+                            "Metric": "**Total**",
+                            "Player Value": "",
+                            "Points": f"**{total_pts_mi} / {total_max_mi}**"
+                        })
+                        detail_rows_mi.append({
+                            "Metric": "**xPhysical Index**",
+                            "Player Value": "",
+                            "Points": f"**{index_val:.0f}**"
+                        })
+                        st.markdown("##### xPhysical Details")
+                        st.dataframe(pd.DataFrame(detail_rows_mi).set_index("Metric"), use_container_width=True)
+                    except Exception as e:
+                        st.error(f"Erreur détails xPhysical : {e}")
+
+                # --- xTech DEF ---
+                with c2:
+                    colname_def_mi = f"xTech {poste_mi} DEF (/100)"
+                    df_ranked_def_mi = df_peers_mi.sort_values(colname_def_mi, ascending=False).reset_index(drop=True)
+                    if row_mi["Player Name"] in df_ranked_def_mi["Player Name"].values:
+                        rank_def_mi = int(df_ranked_def_mi[df_ranked_def_mi["Player Name"] == row_mi["Player Name"]].index[0] + 1)
+                    else:
+                        rank_def_mi = "—"
+                    mean_val_def_mi = df_peers_mi[colname_def_mi].mean() if not df_peers_mi.empty else np.nan
+                    st.plotly_chart(plot_gauge_mi(index_xtech_def_mi, mean_val_def_mi, rank_def_mi, len(df_peers_mi), "xTech DEF"), use_container_width=True)
+                    st.markdown("<div style='text-align:center; font-size:18px; margin-top:-40px;'><b>xDEF</b></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='text-align:center; font-size:14px; margin-top:-26px; color:grey'>Average ({pos_mi} in {row_mi['Competition Name']}): {mean_val_def_mi:.1f}</div>", unsafe_allow_html=True)
+
+                    if pos_mi != "Goalkeeper":
+                        config = xtech_post_config.get(pos_mi)
+                        if config:
+                            metric_map = config["metric_map"]
+                            labels = config["labels"]
+                            metric_rows_mi = []
+                            for raw_col in config["def"]:
+                                note_col, scores = metric_map.get(raw_col, (None, None))
+                                if not note_col or raw_col not in df_merged.columns:
+                                    continue
+                                raw_val = row_mi.get(raw_col, None)
+                                note_val = row_mi.get(note_col, None)
+                                max_pts = max(scores)
+                                label = labels.get(raw_col, raw_col)
+                                metric_rows_mi.append({
+                                    "Metrics": label,
+                                    "Player Figures": f"{raw_val:.2f}" if pd.notna(raw_val) else "NA",
+                                    "Points": f"{note_val} / {max_pts}" if pd.notna(note_val) else f"0 / {max_pts}"
+                                })
+                            total_pts = sum(int(r["Points"].split("/")[0].strip()) for r in metric_rows_mi if "/" in r["Points"])
+                            total_max = sum(int(r["Points"].split("/")[1].strip()) for r in metric_rows_mi if "/" in r["Points"])
+                            metric_rows_mi.append({
+                                "Metrics": "**Total**",
+                                "Player Figures": "",
+                                "Points": f"**{total_pts} / {total_max}**"
+                            })
+                            index_val = row_mi.get("xDEF", None)
+                            if pd.notna(index_val):
+                                metric_rows_mi.append({
+                                    "Metrics": "**Index xDEF**",
+                                    "Player Figures": "",
+                                    "Points": f"**{index_val:.0f} / 100**"
+                                })
+                            df_def_mi = pd.DataFrame(metric_rows_mi).drop_duplicates(subset=["Metrics"], keep="first")
+                            st.markdown("##### xDef Details")
+                            st.dataframe(df_def_mi.set_index("Metrics"), use_container_width=True)
+                    else:
+                        st.info("No xDEF breakdown available for Goalkeepers.")
+
+                # --- xTech TECH ---
+                with c3:
+                    colname_tech_mi = f"xTech {poste_mi} TECH (/100)"
+                    df_ranked_tech_mi = df_peers_mi.sort_values(colname_tech_mi, ascending=False).reset_index(drop=True)
+                    if row_mi["Player Name"] in df_ranked_tech_mi["Player Name"].values:
+                        rank_tech_mi = int(df_ranked_tech_mi[df_ranked_tech_mi["Player Name"] == row_mi["Player Name"]].index[0] + 1)
+                    else:
+                        rank_tech_mi = "—"
+                    mean_val_tech_mi = df_peers_mi[colname_tech_mi].mean() if not df_peers_mi.empty else np.nan
+                    st.plotly_chart(plot_gauge_mi(index_xtech_tech_mi, mean_val_tech_mi, rank_tech_mi, len(df_peers_mi), "xTech TECH"), use_container_width=True)
+                    st.markdown("<div style='text-align:center; font-size:18px; margin-top:-40px;'><b>xTECH</b></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='text-align:center; font-size:14px; margin-top:-26px; color:grey'>Average ({pos_mi} in {row_mi['Competition Name']}): {mean_val_tech_mi:.1f}</div>", unsafe_allow_html=True)
+
+                    if pos_mi != "Goalkeeper":
+                        config = xtech_post_config.get(pos_mi)
+                        if config:
+                            metric_map = config["metric_map"]
+                            labels = config["labels"]
+                            metric_rows_mi = []
+                            for raw_col in config["tech"]:
+                                note_col, scores = metric_map.get(raw_col, (None, None))
+                                if not note_col or raw_col not in df_merged.columns:
+                                    continue
+                                raw_val = row_mi.get(raw_col, None)
+                                note_val = row_mi.get(note_col, None)
+                                max_pts = max(scores)
+                                label = labels.get(raw_col, raw_col)
+                                metric_rows_mi.append({
+                                    "Metrics": label,
+                                    "Player Figures": f"{raw_val:.2f}" if pd.notna(raw_val) else "NA",
+                                    "Points": f"{note_val} / {max_pts}" if pd.notna(note_val) else f"0 / {max_pts}"
+                                })
+                            total_pts = sum(int(r["Points"].split("/")[0].strip()) for r in metric_rows_mi if "/" in r["Points"])
+                            total_max = sum(int(r["Points"].split("/")[1].strip()) for r in metric_rows_mi if "/" in r["Points"])
+                            metric_rows_mi.append({
+                                "Metrics": "**Total**",
+                                "Player Figures": "",
+                                "Points": f"**{total_pts} / {total_max}**"
+                            })
+                            index_val = row_mi.get("xTECH", None)
+                            if pd.notna(index_val):
+                                metric_rows_mi.append({
+                                    "Metrics": "**Index xTECH**",
+                                    "Player Figures": "",
+                                    "Points": f"**{index_val:.0f} / 100**"
+                                })
+                            df_tech_mi = pd.DataFrame(metric_rows_mi).drop_duplicates(subset=["Metrics"], keep="first")
+                            st.markdown("##### xTech Details")
+                            st.dataframe(df_tech_mi.set_index("Metrics"), use_container_width=True)
+                    else:
+                        st.info("No xTECH breakdown available for Goalkeepers.")
+
+            except Exception as e:
+                st.error(f"Erreur affichage jauges index : {e}")
