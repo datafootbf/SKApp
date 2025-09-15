@@ -9,6 +9,21 @@ from PIL import Image
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from streamlit import session_state as ss
 
+# === Season helpers (robust to 'YYYY/YYYY' labels) ===
+import re as _re_season  # [CHANGED] alias to avoid clashes
+def sort_seasons(seasons):
+    def _key(s):
+        s = str(s)
+        m = _re_season.match(r'^(\d{4})/(\d{4})$', s)
+        return int(m.group(1)) if m else -10**9
+    return sorted(seasons, key=_key)
+
+def latest_season_from(series):
+    vals = [v for v in series.dropna().unique().tolist()]
+    if not vals:
+        return None
+    return sort_seasons(vals)[-1]
+
 st.set_page_config(layout="wide")
 
 def shorten_season(s):
@@ -39,7 +54,7 @@ def load_xtechnical():
 
 @st.cache_data
 def load_merged():
-    df_merged = pd.read_csv('SB_SK_MERGED.csv', sep=",")
+    df_merged = pd.read_csv('SB_SK_MERGED.csv')
     df_merged.columns = df_merged.columns.str.strip()
     return df_merged
 
@@ -48,7 +63,7 @@ df = load_xphysical()
 df_tech = load_xtechnical()
 
 # Ensuite seulement, tes listes et tes widgets/filtres
-season_list = sorted(df["Season"].dropna().unique().tolist())
+season_list = sort_seasons(df["Season"].dropna().unique().tolist())
 position_list = sorted(df["Position Group"].dropna().unique().tolist())
 competition_list = sorted(df["Competition"].dropna().unique().tolist())
 player_list = sorted(df["Short Name"].dropna().unique().tolist())
@@ -730,7 +745,7 @@ df_tech["Position Group"] = df_tech["Position Group"].str.strip()
 df_tech["Competition Name"] = df_tech["Competition Name"].str.strip()
 
 # Création des listes de filtres xTechnical
-season_list_tech = sorted(df_tech["Season Name"].dropna().unique().tolist())
+season_list_tech = sort_seasons(df_tech["Season Name"].dropna().unique().tolist())
 position_list_tech = sorted(df_tech["Position Group"].dropna().unique().tolist())
 competition_list_tech = sorted(df_tech["Competition Name"].dropna().unique().tolist())
 player_list_tech = sorted(df_tech["Player Name"].dropna().unique().tolist())
@@ -867,7 +882,7 @@ graph_columns = [
 ]
 
 # Charge le logo (met le chemin exact si besoin)
-logo_path = "AS Roma.png"
+logo_path = 'AS Roma.png'
 logo = Image.open(logo_path)
 st.sidebar.image(logo, use_container_width=True)
 
@@ -917,7 +932,7 @@ if page == "xPhysical":
             selected_seasons = st.multiselect(
                 "Season(s)",
                 options=season_list,
-                default=[],
+                default=([season_list[-1]] if season_list else [])  # [CHANGED],
             )
         with col2:
             selected_competitions = st.multiselect(
@@ -1223,7 +1238,7 @@ if page == "xPhysical":
         with col2:
             # Liste des saisons disponibles
             seasons1 = sorted(df[df["Player"] == p1]["Season"].dropna().unique().tolist())
-            default_season = "2024/2025" if "2024/2025" in seasons1 else seasons1[-1]
+            default_season = (seasons1[-1] if seasons1 else None)  # [CHANGED] auto-latest via sort_seasons
             s1 = st.selectbox("Season 1", seasons1, index=seasons1.index(default_season), key="radar_s1")
 
         df1 = df[(df["Player"] == p1) & (df["Season"] == s1)]
@@ -1497,7 +1512,7 @@ if page == "xPhysical":
 
         with col2:
             seasons = sorted(df[df["Player"] == player]["Season"].dropna().unique())
-            default_season = "2024/2025" if "2024/2025" in seasons else seasons[-1]
+            default_season = (seasons[-1] if seasons else None)  # [CHANGED] auto-latest via sort_seasons
             season = st.selectbox("Select a season", seasons, index=seasons.index(default_season), key="idx_s1")
 
         # 2) Filtrer par Joueur + Saison
@@ -1939,7 +1954,7 @@ if page == "xPhysical":
         with col2:
             available_seasons = df[df["Competition"] == selected_competition]["Season"].dropna().unique().tolist()
             available_seasons = sorted(available_seasons)
-            default_season = "2024/2025" if "2024/2025" in available_seasons else available_seasons[-1]
+            default_season = (available_seasons[-1] if available_seasons else None)  # [CHANGED] auto-latest via sort_seasons
             selected_season = st.selectbox(
                 "Season",
                 available_seasons,
@@ -2028,7 +2043,7 @@ elif page == "xTech/xDef":
             selected_seasons_tech = st.multiselect(
                 "Season(s)",
                 options=season_list_tech,
-                default=[]
+                default=([season_list_tech[-1]] if season_list_tech else [])  # [CHANGED]
             )
         with col2:
             selected_competitions_tech = st.multiselect(
@@ -2441,9 +2456,30 @@ elif page == "xTech/xDef":
             )
             p1 = display_to_playername[p1_display]
         with col2:
-            seasons1 = sorted(df_tech[df_tech["Player Name"] == p1]["Season Name"].dropna().unique().tolist())
-            s1 = st.selectbox("Season 1", seasons1, key="tech_radar_s1")
+            # [NEW] tri correct des saisons + défaut = dernière saison
+            import re as _re_s
+            def _season_key_s(s):
+                s = str(s)
+                m = _re_s.match(r'^(\d{4})/(\d{4})$', s)  # <- ajouter s ici
+                return int(m.group(1)) if m else -10**9
+            seasons1 = sorted(
+                df_tech[df_tech["Player Name"] == p1]["Season Name"].dropna().unique().tolist(),
+                key=_season_key_s
+            )
 
+            # [NEW] réinitialiser la saison par défaut (dernière) quand le joueur 1 change
+            if st.session_state.get("tech_radar_prev_p1") != p1:
+                st.session_state["tech_radar_prev_p1"] = p1
+                if seasons1:
+                    st.session_state["tech_radar_s1"] = seasons1[-1]
+
+            s1_index = (
+                seasons1.index(st.session_state["tech_radar_s1"])
+                if st.session_state.get("tech_radar_s1") in seasons1
+                else (len(seasons1)-1 if seasons1 else 0)
+            )
+            s1 = st.selectbox("Season 1", seasons1, index=s1_index, key="tech_radar_s1")
+            
         df1 = df_tech[(df_tech["Player Name"] == p1) & (df_tech["Season Name"] == s1)]
         if df1.empty:
             st.warning("Aucune donnée trouvée pour ce joueur et cette saison.")
@@ -2494,7 +2530,6 @@ elif page == "xTech/xDef":
                 index=list(metric_templates_tech.keys()).index(default_template)
             )
         # --------------------------
-        # Suite du code inchangée :
         teams1 = df1["Team Name"].dropna().unique().tolist()
         if len(teams1) > 1:
             team1 = st.selectbox("Team 1", teams1, key="tech_radar_team1")
@@ -2525,8 +2560,21 @@ elif page == "xTech/xDef":
                 p2_display = st.selectbox("Player 2", display_options, key="tech_radar_p2")
                 p2 = display_to_playername[p2_display]
             with col4:
-                seasons2 = sorted(df_tech[df_tech["Player Name"] == p2]["Season Name"].dropna().unique().tolist())
-                s2 = st.selectbox("Season 2", seasons2, key="tech_radar_s2")
+                seasons2 = sort_seasons(
+                    df_tech.loc[df_tech["Player Name"] == p2, "Season Name"]
+                          .dropna().astype(str).unique().tolist()
+                )
+
+                if st.session_state.get("tech_radar_prev_p2") != p2:
+                    st.session_state["tech_radar_prev_p2"] = p2
+                    st.session_state["tech_radar_s2"] = seasons2[-1] if seasons2 else None
+
+                s2_index = (
+                    seasons2.index(st.session_state["tech_radar_s2"])
+                    if st.session_state.get("tech_radar_s2") in seasons2
+                    else (len(seasons2) - 1 if seasons2 else 0)
+                )
+                s2 = st.selectbox("Season 2", seasons2, index=s2_index, key="tech_radar_s2")
             df2 = df_tech[(df_tech["Player Name"] == p2) & (df_tech["Season Name"] == s2)]
             if df2.empty:
                 st.warning("Aucune donnée trouvée pour le joueur 2.")
@@ -3408,7 +3456,7 @@ elif page == "xTech/xDef":
         with col2:
             available_seasons = df_tech[df_tech["Competition Name"] == selected_comp]["Season Name"].dropna().unique().tolist()
             available_seasons = sorted(available_seasons)
-            default_season = "2024/2025" if "2024/2025" in available_seasons else available_seasons[-1]
+            default_season = (available_seasons[-1] if available_seasons else None)  # [CHANGED] auto-latest via sort_seasons
             selected_season = st.selectbox(
                 "Season",
                 available_seasons,
@@ -3504,6 +3552,7 @@ elif page == "Merged Data":
         comp_col = "Competition Name"
 
         season_options = sorted(df_merged[season_col].dropna().unique())
+        latest_merged = latest_season_from(df_merged[season_col])  # [CHANGED]
 
         # State init (inchangé)
         if "merged_loaded_df" not in st.session_state:
@@ -3511,11 +3560,11 @@ elif page == "Merged Data":
         if "merged_pending" not in st.session_state:
             st.session_state.merged_pending = True
         if "merged_last_seasons" not in st.session_state:
-            st.session_state.merged_last_seasons = ["2024/2025"]
+            st.session_state.merged_last_seasons = ([latest_merged] if latest_merged else [])  # [CHANGED]
         if "merged_last_comps" not in st.session_state:
             st.session_state.merged_last_comps = ["Serie A"]
         if "ui_seasons" not in st.session_state:
-            st.session_state.ui_seasons = ["2024/2025"]
+            st.session_state.ui_seasons = ([latest_merged] if latest_merged else [])  # [CHANGED]
         if "ui_comps" not in st.session_state:
             st.session_state.ui_comps = ["Serie A"]
 
@@ -4175,7 +4224,7 @@ elif page == "Merged Data":
                                 except Exception as e:
                                     st.error(f"Erreur radar technique : {e}")
                                 
-                         # === Onglet 2 : Indexes ===
+                        # === Onglet 2 : Indexes ===
                         with tab_indexes_ps:
                             try:
                                 pos = row.get("Position Group", "")
@@ -4526,21 +4575,74 @@ elif page == "Merged Data":
             axis=1
         )
 
+        # --- Selectors: player, season, competition, club [MERGED INDEXES] ---
         display_names_mi = sorted(df_merged["Player Display Name MI"].dropna().unique())
         display_to_player_mi = dict(zip(df_merged["Player Display Name MI"], df_merged["Player Name"]))
 
         player_display_name_mi = st.selectbox("Select a player", display_names_mi, key="mi_player_select")
         player_name_mi = display_to_player_mi[player_display_name_mi]
 
+        # Toutes les lignes du joueur
         df_player_all_mi = df_merged[df_merged["Player Name"] == player_name_mi]
-        competitions_mi = df_player_all_mi["Competition Name"].unique().tolist()
-        if len(competitions_mi) > 1:
-            comp_mi = st.selectbox("Select competition", competitions_mi, key="mi_competition_select")
-        else:
-            comp_mi = competitions_mi[0]
 
-        # ✅ Sélection finale ligne unique pour Merged Indexes uniquement
-        row_mi = df_player_all_mi[df_player_all_mi["Competition Name"] == comp_mi].iloc[0]
+        # Tri correct des saisons 'YYYY/YYYY' (dernier = plus récent)
+        def _season_key_mi(s):
+            s = str(s)
+            m = re.match(r'^(\d{4})/(\d{4})$', s)
+            return int(m.group(1)) if m else -10**9
+
+        # 1) Saison (par défaut = la plus récente pour ce joueur)
+        seasons_mi = sorted(df_player_all_mi["Season Name"].dropna().unique().tolist(), key=_season_key_mi)
+        season_mi_sel = st.selectbox(
+            "Select season",
+            seasons_mi,
+            index=(len(seasons_mi) - 1 if seasons_mi else 0),
+            key="mi_season_select"
+        )
+
+        # 2) Compétition (restreinte à la saison choisie ; affichée seulement s'il y en a plusieurs)
+        competitions_mi = df_player_all_mi.loc[
+            df_player_all_mi["Season Name"] == season_mi_sel, "Competition Name"
+        ].dropna().unique().tolist()
+        comp_mi = (
+            st.selectbox("Select competition", competitions_mi, key="mi_competition_select")
+            if len(competitions_mi) > 1 else (competitions_mi[0] if competitions_mi else None)
+        )
+
+        # 3) Club (si plusieurs clubs pour la même saison/compétition)
+        filt = (df_player_all_mi["Season Name"] == season_mi_sel)
+        if comp_mi is not None:
+            filt &= (df_player_all_mi["Competition Name"] == comp_mi)
+        teams_mi = df_player_all_mi.loc[filt, "Team Name"].dropna().unique().tolist()
+        team_mi_sel = (
+            st.selectbox("Select club", teams_mi, key="mi_team_select")
+            if len(teams_mi) > 1 else (teams_mi[0] if teams_mi else None)
+        )
+
+        # 4) Sélection de la ligne finale (fallbacks si filtre trop strict)
+        df_row = df_player_all_mi.copy()
+        if season_mi_sel is not None:
+            df_row = df_row[df_row["Season Name"] == season_mi_sel]
+        if comp_mi is not None:
+            df_row = df_row[df_row["Competition Name"] == comp_mi]
+        if team_mi_sel is not None:
+            df_row = df_row[df_row["Team Name"] == team_mi_sel]
+
+        if df_row.empty:
+            # fallback 1 : même saison
+            df_row = df_player_all_mi[df_player_all_mi["Season Name"] == season_mi_sel]
+            # fallback 2 : dernière saison du joueur
+            if df_row.empty and seasons_mi:
+                df_row = df_player_all_mi[df_player_all_mi["Season Name"] == seasons_mi[-1]]
+            # fallback 3 : n'importe quelle ligne du joueur
+            if df_row.empty:
+                df_row = df_player_all_mi
+
+        row_mi = df_row.sort_values(by=["Minutes"], ascending=False, na_position="last").iloc[0]
+
+        # Variables de confort utilisées ensuite (références radars, titres, etc.)
+        season_mi = row_mi["Season Name"]
+        pos_mi = row_mi["Position Group"]
 
         # --- Titre ---
         pos_mi = row_mi.get("Position Group", "—")
@@ -4577,7 +4679,7 @@ elif page == "Merged Data":
                         (df_merged["Competition Name"].isin(LIGUES_CIBLE)) &
                         (df_merged["Position Group"] == pos_mi) &
                         (df_merged["Season Name"].astype(str).str.contains(str(season_mi), na=False)) &
-                        (df_merged["Minutes"].astype(float) > 600)
+                        (df_merged["Minutes"].astype(float) > 500)
                     ]
 
                     def pct_rank_mi(series, value):
