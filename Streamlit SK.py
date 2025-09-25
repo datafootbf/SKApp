@@ -1,4 +1,66 @@
 import streamlit as st
+
+# --- Metrics aliasing & resolution (added)
+from typing import Iterable
+
+_METRIC_ALIASES = {
+    # Display label -> candidate column names (order matters)
+    "OP xGAssisted": ["OP xGAssisted", "Op xA P90", "OP xA P90", "OP xA", "xA OP P90", "xA (OP) P90"],
+    "Touches Inside Box": ["Touches Inside Box", "Touches In Box"],
+    "OBV": ["OBV", "Obv", "On Ball Value"],
+    "OBV Pass P90": ["Pass OBV", "OBV Pass P90", "Pass OBV P90"],
+    # Add other safe aliases here if needed
+}
+
+def resolve_metric_col(columns: Iterable[str], name: str) -> str:
+    """Return the actual column present in `columns` matching metric `name` using aliases and case-insensitive matching.
+    Raises KeyError if nothing matches."""
+    cols = list(columns)
+    lower_map = {c.lower(): c for c in cols}
+    # direct hit
+    if name in cols:
+        return name
+    # alias list
+    candidates = _METRIC_ALIASES.get(name, [name])
+    # try exact then case-insensitive
+    for cand in candidates:
+        if cand in cols:
+            return cand
+        if cand.lower() in lower_map:
+            return lower_map[cand.lower()]
+    # final fallback: loose contains match (case-insensitive)
+    name_l = name.lower()
+    for c in cols:
+        if name_l == c.lower():
+            return c
+    # not found
+    raise KeyError(name)
+
+
+
+# --- Added helper: safe_image to avoid app crash if logo is missing
+def safe_image(path_or_bytes, **kwargs):
+    import streamlit as st
+    try:
+        st.image(path_or_bytes, **kwargs)
+    except Exception as e:
+        st.info(f"Logo non disponible ({e}).")
+
+
+
+# --- Added helper: previous season fallback for labels like '2025/2026' -> '2024/2025'
+def previous_season_label(label: str) -> str:
+    try:
+        if "/" in label:
+            y1, y2 = label.split("/")
+            y1 = int(y1.strip())
+            y2 = int(y2.strip())
+            return f"{y1-1}/{y1}"
+    except Exception:
+        pass
+    return label
+
+
 import pandas as pd
 import plotly.express as px
 import numpy as np
@@ -9,7 +71,7 @@ from PIL import Image
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from streamlit import session_state as ss
 
-# === Season helpers (robust to 'YYYY/YYYY' labels) ===
+# === [CHANGED] Season helpers (robust to 'YYYY/YYYY' labels) ===
 import re as _re_season  # [CHANGED] alias to avoid clashes
 def sort_seasons(seasons):
     def _key(s):
@@ -23,6 +85,7 @@ def latest_season_from(series):
     if not vals:
         return None
     return sort_seasons(vals)[-1]
+# === [/CHANGED] ===
 
 st.set_page_config(layout="wide")
 
@@ -62,6 +125,38 @@ df_merged = load_merged()
 df = load_xphysical()
 df_tech = load_xtechnical()
 
+# Charge le logo (met le chemin exact si besoin)
+logo_path = 'AS Roma.png'
+logo = Image.open(logo_path)
+st.sidebar.image(logo, use_container_width=True)
+
+# --- Normalisation des noms (appliquée aux bons DFs)
+NAME_NORMALIZER = {
+    "Op xA P90": "OP xGAssisted",
+    "OP xA P90": "OP xGAssisted",
+    "OP xA": "OP xGAssisted",
+    "xA OP P90": "OP xGAssisted",
+    "Pass OBV": "OBV Pass P90",
+    "Pass OBV P90": "OBV Pass P90",
+    "Touches In Box": "Touches Inside Box",
+    "Obv": "OBV",
+}
+
+def normalize_cols(_df):
+    if _df is None:
+        return
+    _df.columns = _df.columns.str.strip()
+    rename_map = {k: v for k, v in NAME_NORMALIZER.items() if k in _df.columns}
+    if rename_map:
+        _df.rename(columns=rename_map, inplace=True)
+
+# Appliquer sur TOUS les DFs utilisés par le radar technique/merged
+normalize_cols(df_merged)
+normalize_cols(df_tech)
+normalize_cols(df)
+
+merged_df = df_merged  # garder un alias si d'autres blocs y font référence
+
 # Ensuite seulement, tes listes et tes widgets/filtres
 season_list = sort_seasons(df["Season"].dropna().unique().tolist())
 position_list = sorted(df["Position Group"].dropna().unique().tolist())
@@ -80,10 +175,10 @@ classic_gk_metric_map = {
 }
 
 classic_cb_metric_map = {
-    "Obv Dribble Carry P90": ("xTech CB OBV D&C", [0, 1, 2, 3, 4]),
+    "OBV Dribble Carry P90": ("xTech CB OBV D&C", [0, 1, 2, 3, 4]),
     "Long Ball Ratio": ("xTech CB Long Ball %", [0, 1, 2, 3, 4]),
     "Pressured Passing Ratio": ("xTech CB Passing u. Pressure %", [0, 1, 2, 3, 5]),
-    "Obv Pass P90": ("xTech CB OBV Pass", [0, 1, 3, 5, 7]),
+    "OBV Pass P90": ("xTech CB OBV Pass", [0, 1, 3, 5, 7]),
     "Passing Ratio": ("xTech CB Passing %", [0, 1, 2, 3, 5]),
     "Deep Progressions P90": ("xTech CB Deep Prog", [0, 1, 2, 3, 5]),
     "Blocks Per Shot": ("xTech CB Blocks/Shot", [0, 1, 3, 5, 7]),
@@ -95,7 +190,7 @@ classic_cb_metric_map = {
 
 classic_fb_metric_map = {
     "Np Shots P90": ("xTech FB Np Shots", [0, 1, 2, 3, 5]),
-    "Op Xa P90": ("xTech FB OPxA", [0, 1, 3, 5, 7]),
+    "OP xGAssisted": ("xTech FB OPxA", [0, 1, 3, 5, 7]),
     "Crossing Ratio": ("xTech FB Crossing %", [0, 1, 2, 3, 4]),
     "Crosses P90": ("xTech FB Crosses", [0, 1, 2, 3, 5]),
     "Op Passes Into And Touches Inside Box P90": ("xTech FB OP Box Touch", [0, 1, 3, 5, 7]),
@@ -113,8 +208,8 @@ classic_fb_metric_map = {
 classic_mid_metric_map = {
     "Np Shots P90": ("xTech MID Np Shots", [0, 1, 2, 3, 4]),
     "Npxgxa P90": ("xTech MID Npxgxa", [0, 1, 2, 3, 4]),
-    "Obv Pass P90": ("xTech MID Obv Pass", [0, 1, 3, 5, 7]),
-    "Obv Dribble Carry P90": ("xTech MID Obv Carry", [0, 1, 3, 5, 7]),
+    "OBV Pass P90": ("xTech MID OBV Pass", [0, 1, 3, 5, 7]),
+    "OBV Dribble Carry P90": ("xTech MID OBV Carry", [0, 1, 3, 5, 7]),
     "Op Passes Into And Touches Inside Box P90": ("xTech MID Box Pass+Touch", [0, 1, 2, 3, 5]),
     "Perte Balle/Passe Ratio": ("xTech MID Ball Loss %", [0, 1, 2, 3, 4]),
     "Scoring Contribution": ("xTech MID G+A", [0, 1, 2, 3, 5]),
@@ -131,12 +226,12 @@ classic_mid_metric_map = {
 
 classic_am_metric_map = {
     "Passes Into Box P90": ("xTech AM Passes Into Box", [0, 1, 3, 4, 5]),
-    "Touches Inside Box P90": ("xTech AM Touches In Box", [0, 1, 2, 3, 4]),
+    "Touches Inside Box P90": ("xTech AM Touches Inside Box", [0, 1, 2, 3, 4]),
     "Dribbles P90": ("xTech AM Dribbles", [0, 1, 3, 4, 5]),
-    "Op Xa P90": ("xTech AM xA", [0, 3, 5, 7, 10]),
+    "OP xGAssisted": ("xTech AM xA", [0, 3, 5, 7, 10]),
     "Np Shots P90": ("xTech AM Shots", [0, 3, 5, 7, 10]),
-    "Obv Pass P90": ("xTech AM OBV Pass", [0, 3, 5, 7, 10]),
-    "Obv Dribble Carry P90": ("xTech AM OBV Carry", [0, 1, 3, 5, 7]),
+    "OBV Pass P90": ("xTech AM OBV Pass", [0, 3, 5, 7, 10]),
+    "OBV Dribble Carry P90": ("xTech AM OBV Carry", [0, 1, 3, 5, 7]),
     "Perte Balle/Passe Ratio": ("xTech AM Ball Loss %", [0, 1, 2, 3, 4]),
     "Scoring Contribution": ("xTech AM G+A", [0, 1, 3, 4, 5]),
     "Through Balls P90": ("xTech AM Through Balls", [0, 1, 2, 3, 4]),
@@ -145,12 +240,12 @@ classic_am_metric_map = {
 }
 
 classic_wing_metric_map = {
-    "Touches Inside Box P90": ("xTech WING Touches In Box", [0, 1, 3, 4, 5]),
+    "Touches Inside Box P90": ("xTech WING Touches Inside Box", [0, 1, 3, 4, 5]),
     "Dribble Ratio": ("xTech WING Dribble Ratio", [0, 1, 2, 3, 4]),
     "Dribbles P90": ("xTech WING Dribbles", [0, 3, 5, 7, 10]),
-    "Op Xa P90": ("xTech WING OPxA", [0, 3, 5, 7, 10]),
+    "OP xGAssisted": ("xTech WING OPxA", [0, 3, 5, 7, 10]),
     "Np Shots P90": ("xTech WING Np Shots", [0, 3, 5, 7, 10]),
-    "Obv Dribble Carry P90": ("xTech WING OBV Carry", [0, 5, 7, 10, 12]),
+    "OBV Dribble Carry P90": ("xTech WING OBV Carry", [0, 5, 7, 10, 12]),
     "Scoring Contribution": ("xTech WING G+A", [0, 1, 3, 4, 5]),
     "Crosses P90": ("xTech WING Crosses", [0, 1, 2, 3, 4]),
     "Shot On Target Ratio": ("xTech WING SOT Ratio", [0, 1, 2, 3, 4]),
@@ -162,8 +257,8 @@ classic_wing_metric_map = {
 classic_st_metric_map = {
     "Np Xg P90": ("xTech ST Np Xg", [0, 5, 7, 10, 12]),
     "Np Shots P90": ("xTech ST Np Shots", [0, 1, 3, 5, 7]),
-    "Touches Inside Box P90": ("xTech ST Touches In Box", [0, 3, 5, 7, 10]),
-    "Op Xa P90": ("xTech ST Op Xa", [0, 1, 2, 3, 4]),
+    "Touches Inside Box P90": ("xTech ST Touches Inside Box", [0, 3, 5, 7, 10]),
+    "OP xGAssisted": ("xTech ST Op Xa", [0, 1, 2, 3, 4]),
     "Perte Balle/Passe Ratio": ("xTech ST Ball Loss %", [0, 1, 3, 4, 5]),
     "Np Xg Per Shot": ("xTech ST Xg Per Shot", [0, 1, 3, 4, 5]),
     "Scoring Contribution": ("xTech ST G+A", [0, 1, 3, 5, 7]),
@@ -227,8 +322,8 @@ xtech_post_config = {
         "tech": [
             "Np Shots P90",
             "Npxgxa P90",
-            "Obv Pass P90",
-            "Obv Dribble Carry P90",
+            "OBV Pass P90",
+            "OBV Dribble Carry P90",
             "Op Passes Into And Touches Inside Box P90",
             "Perte Balle/Passe Ratio",
             "Scoring Contribution",
@@ -246,8 +341,8 @@ xtech_post_config = {
             "Hops": "HOPS (Aerial Score)",
             "Np Shots P90": "Shots",
             "Npxgxa P90": "NPxG + xA",
-            "Obv Pass P90": "OBV Pass",
-            "Obv Dribble Carry P90": "OBV Dribble & Carry",
+            "OBV Pass P90": "OBV Pass",
+            "OBV Dribble Carry P90": "OBV Dribble & Carry",
             "Op Passes Into And Touches Inside Box P90": "OP Passes + Touches Into Box",
             "Perte Balle/Passe Ratio": "Ball Loss %",
             "Scoring Contribution": "Scoring Contribution (G+A)",
@@ -263,7 +358,7 @@ xtech_post_config = {
             "Fhalf Pressures P90", "Counterpressures P90"
         ],
         "tech": [
-            "Np Xg P90", "Np Shots P90", "Touches Inside Box P90", "Op Xa P90",
+            "Np Xg P90", "Np Shots P90", "Touches Inside Box P90", "OP xGAssisted",
             "Perte Balle/Passe Ratio", "Np Xg Per Shot", "Scoring Contribution",
             "PSxG - xG", "Shot On Target Ratio"
         ],
@@ -272,7 +367,7 @@ xtech_post_config = {
             "Counterpressures P90": "Counterpressures",       
             "Np Xg P90": "NPxG",
             "Np Shots P90": "Shots",
-            "Op Xa P90": "OP xA",
+            "OP xGAssisted": "OP xA",
             "Perte Balle/Passe Ratio": "Ball Loss %",
             "Np Xg Per Shot": "xG/Shot",
             "Scoring Contribution": "Scoring Contribution (G+A)",
@@ -287,8 +382,8 @@ xtech_post_config = {
             "Fhalf Pressures P90", "Counterpressures P90"
         ],
         "tech": [
-            "Passes Into Box P90", "Touches Inside Box P90", "Dribbles P90", "Op Xa P90",
-            "Np Shots P90", "Obv Pass P90", "Obv Dribble Carry P90", "Perte Balle/Passe Ratio",
+            "Passes Into Box P90", "Touches Inside Box P90", "Dribbles P90", "OP xGAssisted",
+            "Np Shots P90", "OBV Pass P90", "OBV Dribble Carry P90", "Perte Balle/Passe Ratio",
             "Scoring Contribution", "Through Balls P90"
         ],
         "labels": {
@@ -297,10 +392,10 @@ xtech_post_config = {
             "Passes Into Box P90": "Passes Into Box",
             "Touches Inside Box P90": "Touches Inside Box",
             "Dribbles P90": "Succ. Dribbles",
-            "Op Xa P90": "OP xA",
+            "OP xGAssisted": "OP xA",
             "Np Shots P90": "Shots",
-            "Obv Pass P90": "OBV Pass",
-            "Obv Dribble Carry P90": "OBV Dribble & Carry",
+            "OBV Pass P90": "OBV Pass",
+            "OBV Dribble Carry P90": "OBV Dribble & Carry",
             "Perte Balle/Passe Ratio": "Ball Loss %",
             "Scoring Contribution": "Scoring Contribution (G+A)",
             "Deep Progressions P90": "Deep Progressions",
@@ -314,8 +409,8 @@ xtech_post_config = {
             "Fhalf Pressures P90", "Counterpressures P90"
         ],
         "tech": [
-            "Touches Inside Box P90", "Dribble Ratio", "Dribbles P90", "Op Xa P90", "Np Shots P90",
-            "Obv Dribble Carry P90", "Scoring Contribution", "Crosses P90", "Shot On Target Ratio", "Fouls Won P90"
+            "Touches Inside Box P90", "Dribble Ratio", "Dribbles P90", "OP xGAssisted", "Np Shots P90",
+            "OBV Dribble Carry P90", "Scoring Contribution", "Crosses P90", "Shot On Target Ratio", "Fouls Won P90"
         ],
         "labels": {
             "Fhalf Pressures P90": "Opp. Half Pressures",
@@ -323,9 +418,9 @@ xtech_post_config = {
             "Touches Inside Box P90": "Touches Inside Box",
             "Dribble Ratio": "Dribble Success %",
             "Dribbles P90": "Succ. Dribbles",
-            "Op Xa P90": "OP xA",
+            "OP xGAssisted": "OP xA",
             "Np Shots P90": "Shots",
-            "Obv Dribble Carry P90": "OBV Dribble & Carry",
+            "OBV Dribble Carry P90": "OBV Dribble & Carry",
             "Scoring Contribution": "Scoring Contribution (G+A)",
             "Crosses P90": "Succ. Crosses",
             "Shot On Target Ratio": "Shooting %",
@@ -345,7 +440,7 @@ xtech_post_config = {
         ],
         "tech": [
             "Np Shots P90",
-            "Op Xa P90",
+            "OP xGAssisted",
             "Crossing Ratio",
             "Crosses P90",
             "Op Passes Into And Touches Inside Box P90",
@@ -361,7 +456,7 @@ xtech_post_config = {
             "Challenge Ratio": "Tack./Dribbled Past %",
             "Hops": "HOPS",   
             "Np Shots P90": "Shots",
-            "Op Xa P90": "OP xA",
+            "OP xGAssisted": "OP xA",
             "Crossing Ratio": "Crossing %",
             "Crosses P90": "Crosses",
             "Op Passes Into And Touches Inside Box P90": "OP Passes + Touches Into Box",
@@ -378,7 +473,7 @@ xtech_post_config = {
             "Padj Tackles P90", "Hops"
         ],
         "tech": [
-            "Obv Dribble Carry P90", "Long Ball Ratio", "Pressured Passing Ratio", "Obv Pass P90",
+            "OBV Dribble Carry P90", "Long Ball Ratio", "Pressured Passing Ratio", "OBV Pass P90",
             "Passing Ratio", "Deep Progressions P90"
         ],
         "labels": {
@@ -387,10 +482,10 @@ xtech_post_config = {
             "Average X Pressure": "Av. Pressure Dist.",
             "Padj Tackles P90": "PAdj Tackles",
             "Hops": "HOPS",           
-            "Obv Dribble Carry P90": "OBV Dribble & Carry",
+            "OBV Dribble Carry P90": "OBV Dribble & Carry",
             "Long Ball Ratio": "Long Ball %",
             "Pressured Passing Ratio": "Passing u. Pressure %",
-            "Obv Pass P90": "OBV Pass",
+            "OBV Pass P90": "OBV Pass",
             "Passing Ratio": "Passing %",
             "Deep Progressions P90": "Deep Progressions"
         }
@@ -761,7 +856,7 @@ metric_templates_tech = {
     "Central Defender": [
         "Passing Ratio", "Op Passes P90", "Long Ball Ratio", "Long Balls P90", "Xgbuildup P90",
         "Aerial Ratio", "Aerial Wins P90", "Padj Tackles And Interceptions P90", "Pressure Regains P90",
-        "Defensive Action Regains P90", "Obv Pass P90", "Obv Dribble Carry P90"
+        "Defensive Action Regains P90", "OBV Pass P90", "OBV Dribble Carry P90"
     ],
     "CB-DEF": [
         "Fouls P90", "Fhalf Ball Recoveries P90", "Average X Pressure", "Padj Pressures P90",
@@ -770,13 +865,13 @@ metric_templates_tech = {
     ],
     "CB-OFF": [
         "Passing Ratio", "Op Passes P90", "Long Ball Ratio", "Long Balls P90", "Dispossessions P90",
-        "Turnovers P90", "Np Shots P90", "Obv Pass P90", "Obv Dribble Carry P90", "Carries P90",
+        "Turnovers P90", "Np Shots P90", "OBV Pass P90", "OBV Dribble Carry P90", "Carries P90",
         "Deep Progressions P90", "Pressured Passing Ratio"
     ],
     "Full Back": [
         "Passing Ratio", "Op Passes P90", "Deep Progressions P90", "Crosses P90", "Crossing Ratio",
         "Aerial Ratio", "Average X Defensive Action", "Padj Tackles And Interceptions P90", "Padj Pressures P90",
-        "Fhalf Counterpressures P90", "Np Shots P90", "Op Passes Into And Touches Inside Box P90", "Op Xa P90"
+        "Fhalf Counterpressures P90", "Np Shots P90", "Op Passes Into And Touches Inside Box P90", "OP xGAssisted"
     ],
     "FB-DEF": [
         "Fouls P90", "Fhalf Ball Recoveries P90", "Average X Defensive Action", "Padj Pressures P90",
@@ -785,7 +880,7 @@ metric_templates_tech = {
     ],
     "FB-OFF": [
         "Passing Ratio", "Op Passes P90", "Deep Progressions P90", "Crosses P90", "Crossing Ratio",
-        "Dribbles P90", "Dispossessions P90", "Turnovers P90", "Op Xa P90", "Touches Inside Box P90",
+        "Dribbles P90", "Dispossessions P90", "Turnovers P90", "OP xGAssisted", "Touches Inside Box P90",
         "Passes Inside Box P90", "Pressured Passing Ratio"
     ],
     "Midfielder (CDM)": [
@@ -806,22 +901,22 @@ metric_templates_tech = {
     ],
     "MID-OFF": [
         "Passing Ratio", "Op Passes P90", "Turnovers P90", "Dispossessions P90", "Deep Progressions P90",
-        "Through Balls P90", "Op Xa P90", "Op Passes Into And Touches Inside Box P90", "Np Xg P90",
-        "Np Shots P90", "Obv Pass P90", "Obv Dribble Carry P90", "Pressured Passing Ratio"
+        "Through Balls P90", "OP xGAssisted", "Op Passes Into And Touches Inside Box P90", "Np Xg P90",
+        "Np Shots P90", "OBV Pass P90", "OBV Dribble Carry P90", "Pressured Passing Ratio"
     ],
     "Attacking Midfielder": [
         "Passing Ratio", "Op Passes P90", "Turnovers P90", "Dribbles P90", "Deep Progressions P90",
-        "Padj Pressures P90", "Fhalf Counterpressures P90", "Through Balls P90", "Op Xa P90",
+        "Padj Pressures P90", "Fhalf Counterpressures P90", "Through Balls P90", "OP xGAssisted",
         "Op Passes Into And Touches Inside Box P90", "Np Xg P90", "Scoring Contribution", "Pressured Passing Ratio"
     ],
     "Winger": [
-        "Passing Ratio", "Padj Pressures P90", "Counterpressures P90", "Op Key Passes P90", "Op Xa P90",
-        "Obv Pass P90", "Dribbles P90", "Obv Dribble Carry P90", "Fouls Won P90", "Np Shots P90",
+        "Passing Ratio", "Padj Pressures P90", "Counterpressures P90", "Op Key Passes P90", "OP xGAssisted",
+        "OBV Pass P90", "Dribbles P90", "OBV Dribble Carry P90", "Fouls Won P90", "Np Shots P90",
         "Scoring Contribution", "Op Passes Into And Touches Inside Box P90", "Turnovers P90"
     ],
     "Striker": [
         "Passing Ratio", "Turnovers P90", "Dribbles P90", "Aerial Wins P90", "Padj Pressures P90",
-        "Counterpressures P90", "Op Xa P90", "Touches Inside Box P90", "Np Xg P90", "Npg P90",
+        "Counterpressures P90", "OP xGAssisted", "Touches Inside Box P90", "Np Xg P90", "Npg P90",
         "Np Shots P90", "Np Xg Per Shot", "Shot On Target Ratio"
     ]
 }
@@ -840,31 +935,31 @@ metric_labels_tech = {
                "Shots", "Pass OBV", "Dribble & Carry OBV", "Carries", "Deep Progressions", "Pressured Pass%"],
     "Full Back": ["Passing%", "OP Passes", "Deep Progressions", "Successful Crosses", "Crossing %",
                   "Aerial Win%", "Average Def. Action Distance", "Padj Tackles And Interceptions", "PAdj Pressures",
-                  "Counterpressures in Opp. Half", "Shots", "OP Passes + Touches In Box", "OP xGAssisted"],
+                  "Counterpressures in Opp. Half", "Shots", "OP Passes + Touches Inside Box", "OP xGAssisted"],
     "FB-DEF": ["Fouls", "Opp. Half Ball Recoveries", "Average Def. Action Distance", "PAdj Pressures",
                "Pressures in Opp. Half", "Counterpressures in Opp. Half", "Aerial Win%", "Aerial Wins",
                "PAdj Tackles", "Tack/Dribbled Past%", "PAdj Interceptions"],
     "FB-OFF": ["Passing%", "OP Passes", "Deep Progressions", "Successful Crosses", "Crossing %",
-               "Successful Dribbles", "Dispossessed", "Turnovers", "OP xGAssisted", "Touches In Box",
+               "Successful Dribbles", "Dispossessed", "Turnovers", "OP xGAssisted", "Touches Inside Box",
                "Passes Inside Box", "Pressured Pass%"],
     "Midfielder (CDM)": ["Passing%", "OP Passes", "Long Ball%", "Turnovers", "Deep Progressions",
                   "Aerial Win%", "PAdj Tackles", "PAdj Interceptions", "Opp. Half Ball Recoveries",
                   "PAdj Pressures", "Pressures in Opp. Half", "Shots & Key Passes", "Pressured Pass%"],
     "Midfielder (CM)": ["Passing%", "OP Passes", "Turnovers", "Deep Progressions", "Aerial Win%",
                  "PAdj Tackles And Interceptions", "PAdj Pressures", "Counterpressures in Opp. Half",
-                 "xG & xG Assisted", "OP Passes + Touches In Box", "Shots", "Scoring Contribution", "Pressured Pass%"],
+                 "xG & xG Assisted", "OP Passes + Touches Inside Box", "Shots", "Scoring Contribution", "Pressured Pass%"],
     "MID-DEF": ["Fouls", "Aerial Win%", "Aerial Wins", "PAdj Tackles", "PAdj Interceptions",
                 "Pressure Regains", "Pressures in Opp. Half", "Counterpressures",
                 "Counterpressures in Opp. Half", "PAdj Clearances", "Opp. Half Ball Recoveries"],
     "MID-OFF": ["Passing%", "OP Passes", "Turnovers", "Dispossessed", "Deep Progressions",
-                "Throughballs", "OP xGAssisted", "OP Passes + Touches In Box", "xG", "Shots",
+                "Throughballs", "OP xGAssisted", "OP Passes + Touches Inside Box", "xG", "Shots",
                 "Pass OBV", "Dribble & Carry OBV", "Pressured Pass%"],
     "Attacking Midfielder": ["Passing%", "OP Passes", "Turnovers", "Successful Dribbles", "Deep Progressions",
                              "PAdj Pressures", "Counterpressures in Opp. Half", "Throughballs", "OP xGAssisted",
-                             "OP Passes + Touches In Box", "xG", "Scoring Contribution", "Pressured Pass%"],
+                             "OP Passes + Touches Inside Box", "xG", "Scoring Contribution", "Pressured Pass%"],
     "Winger": ["Passing%", "PAdj Pressures", "Counterpressures", "Key Passes", "OP xGAssisted",
                "Pass OBV", "Successful Dribbles", "Dribble & Carry OBV", "Fouls Won", "Shots",
-               "Scoring Contribution", "OP Passes + Touches In Box", "Turnovers"],
+               "Scoring Contribution", "OP Passes + Touches Inside Box", "Turnovers"],
     "Striker": ["Passing%", "Turnovers", "Successful Dribbles", "Aerial Wins", "PAdj Pressures",
                 "Counterpressures", "OP xGAssisted", "Touches Inside Box", "xG", "NP Goals",
                 "Shots", "xG/Shot", "Shooting%"]
@@ -880,11 +975,6 @@ graph_columns = [
     "High Acceleration Count P90", "Medium Deceleration Count P90", "High Deceleration Count P90",
     "Explosive Acceleration to HSR Count P90", "Explosive Acceleration to Sprint Count P90", "xPhysical"
 ]
-
-# Charge le logo (met le chemin exact si besoin)
-logo_path = 'AS Roma.png'
-logo = Image.open(logo_path)
-st.sidebar.image(logo, use_container_width=True)
 
 # === Sélecteur de page dans la sidebar ===
 page = st.sidebar.radio(
@@ -1343,19 +1433,19 @@ if page == "xPhysical":
             return float(rank)
         
         # 6) Calcul des percentiles pour chaque métrique
-        r1 = [pct_rank(peers[m], row1[m]) for m in metrics]
+        r1 = [pct_rank(peers[resolve_metric_col(peers.columns, m)], row1[resolve_metric_col(row1.index if hasattr(row1, "index") else peers.columns, m)]) for m in metrics]
         if compare:
-            r2 = [pct_rank(peers[m], row2[m]) for m in metrics]
+            r2 = [pct_rank(peers[resolve_metric_col(peers.columns, m)], row2[m]) for m in metrics]
         else:
             mean_vals = peers[metrics].mean()
-            r2 = [pct_rank(peers[m], mean_vals[m]) for m in metrics]
+            r2 = [pct_rank(peers[resolve_metric_col(peers.columns, m)], mean_vals[m]) for m in metrics]
         
         # 7) Fermer les boucles
         metrics_closed = metrics + [metrics[0]]
         r1_closed     = r1 + [r1[0]]
         r2_closed     = r2 + [r2[0]]
         # raw values pour le hover (tableau Nx1 pour Plotly)
-        raw1      = [row1[m] for m in metrics]
+        raw1      = [row1[resolve_metric_col(row1.index if hasattr(row1, "index") else peers.columns, m)] for m in metrics]
         raw1_closed = raw1 + [raw1[0]]
         cd1 = [[v] for v in raw1_closed]
         if compare:
@@ -2007,7 +2097,7 @@ if page == "xPhysical":
 elif page == "xTech/xDef":
     
     # Création des sous-onglets pour xTechnical
-    tab1, tab2, tab3, tab4 = st.tabs(["Scatter Plot", "Radar", "Index", "Top 50"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Scatter Plot", "Radar", "Index", "Top 50", "Rookie"])
 
     # === Onglet Scatter Plot ===
     with tab1:
@@ -2164,7 +2254,7 @@ elif page == "xTech/xDef":
 
             # === Passing / Creativity ===
             "Npxgxa P90": "NPxG + xA",
-            "Op Xa P90": "OP xA",
+            "OP xGAssisted": "OP xA",
             "Op Key Passes P90": "OP Key Passes",
             "Shots Key Passes P90": "Shots + Key Passes",
             "Op Passes Into And Touches Inside Box P90": "OP Passes + Touches Into Box",
@@ -2178,11 +2268,11 @@ elif page == "xTech/xDef":
             "Sp Xa P90": "Set Pieces xA",
             
             # === OBV ===
-            "Obv P90": "OBV", 
-            "Obv Pass P90": "OBV Pass", 
-            "Obv Shot P90": "OBV Shot", 
-            "Obv Defensive Action P90": "OBV Def. Act.", 
-            "Obv Dribble Carry P90": "OBV Dribble & Carry",
+            "OBV P90": "OBV", 
+            "OBV Pass P90": "OBV Pass", 
+            "OBV Shot P90": "OBV Shot", 
+            "OBV Defensive Action P90": "OBV Def. Act.", 
+            "OBV Dribble Carry P90": "OBV Dribble & Carry",
 
             # === Possession / Ball use ===
             "Op Passes P90": "OP Passes",
@@ -2230,7 +2320,7 @@ elif page == "xTech/xDef":
             "Gsaa P90": "Goals Saved Above Average (GK)", 
             "Clcaa": "Claims % (GK)", 
             "Pass Into Danger Ratio": "Pass Into Danger % (GK)",
-            "Obv Gk P90": "OBV GK"
+            "OBV Gk P90": "OBV GK"
         }
 
         # Liste ordonnée des métriques à afficher dans les menus X/Y
@@ -2440,6 +2530,7 @@ elif page == "xTech/xDef":
         
     # === Onglet Radar ===
     with tab2:
+        MIN_MINUTES_TECH = 300
         # Sélection Joueur 1 + Saison
         col1, col2 = st.columns(2)
         with col1:
@@ -2529,7 +2620,6 @@ elif page == "xTech/xDef":
                 options=list(metric_templates_tech.keys()),
                 index=list(metric_templates_tech.keys()).index(default_template)
             )
-        # --------------------------
         teams1 = df1["Team Name"].dropna().unique().tolist()
         if len(teams1) > 1:
             team1 = st.selectbox("Team 1", teams1, key="tech_radar_team1")
@@ -2604,7 +2694,7 @@ elif page == "xTech/xDef":
             pos2 = row2["Position Group"] if "Position Group" in row2 else ""
 
         # Peers
-        top5_leagues = ["Premier League", "Ligue 1", "La Liga", "Serie A", "1. Bundesliga"]
+        top5_leagues = ["ENG - Premier League", "FRA - Ligue 1", "SPA - La Liga", "ITA - Serie A", "GER - 1. Bundesliga"]
         peers = df_tech[
             (df_tech["Position Group"] == pos1) &
             (df_tech["Season Name"] == s1) &
@@ -2628,22 +2718,23 @@ elif page == "xTech/xDef":
             return (lower + 0.5 * equal) / len(arr) * 100
 
         # Liste des métriques à inverser
-        inverse_metrics = ["Turnovers P90", "Dispossessions P90"]
+        inverse_metrics = ["Turnovers P90", "Dispossessions P90","Pass Into Danger Ratio"]
 
         # Calcul des percentiles en tenant compte de l’inversion
         r1 = [
-            100 - pct_rank(peers[m], row1[m]) if m in inverse_metrics else pct_rank(peers[m], row1[m])
+            100 - pct_rank(peers[resolve_metric_col(peers.columns, m)], row1[resolve_metric_col(row1.index if hasattr(row1, "index") else peers.columns, m)]) if m in inverse_metrics else pct_rank(peers[resolve_metric_col(peers.columns, m)], row1[resolve_metric_col(row1.index if hasattr(row1, "index") else peers.columns, m)])
             for m in metrics
         ]
 
         if compare:
             r2 = [
-                100 - pct_rank(peers[m], row2[m]) if m in inverse_metrics else pct_rank(peers[m], row2[m])
+                100 - pct_rank(peers[resolve_metric_col(peers.columns, m)], row2[m]) if m in inverse_metrics else pct_rank(peers[resolve_metric_col(peers.columns, m)], row2[resolve_metric_col(row2.index if hasattr(row2, "index") else peers.columns, m)]
+)
                 for m in metrics
             ]
         else:
             r2 = [
-                100 - pct_rank(peers[m], peers[m].mean()) if m in inverse_metrics else pct_rank(peers[m], peers[m].mean())
+                100 - pct_rank(peers[resolve_metric_col(peers.columns, m)], peers[resolve_metric_col(peers.columns, m)].mean()) if m in inverse_metrics else pct_rank(peers[resolve_metric_col(peers.columns, m)], peers[resolve_metric_col(peers.columns, m)].mean())
                 for m in metrics
             ]
 
@@ -2652,9 +2743,15 @@ elif page == "xTech/xDef":
         r2_closed = r2 + [r2[0]]
         metrics_closed = labels + [labels[0]]
 
-        raw1 = [row1[m] for m in metrics]
+        raw1 = [row1[resolve_metric_col(row1.index if hasattr(row1, "index") else peers.columns, m)] for m in metrics]
         raw1_closed = raw1 + [raw1[0]]
-        raw2 = [row2[m] for m in metrics] if compare else [peers[m].mean() for m in metrics]
+        raw2 = [
+            row2[resolve_metric_col(row2.index if hasattr(row2, "index") else peers.columns, m)]
+            for m in metrics
+        ] if compare else [
+            peers[resolve_metric_col(peers.columns, m)].mean()
+            for m in metrics
+        ]
         raw2_closed = raw2 + [raw2[0]]
 
         # Radar plot
@@ -2794,7 +2891,7 @@ elif page == "xTech/xDef":
             "Pressures in Opp. Half": "Pressures exerted in the opposition half of the pitch.",
             "PAdj Tackles": "Tackles adjusted for possession volume.",
             "Successful Dribbles": "Dribbles that successfully beat an opponent.",
-            "Touches In Box": "Number of touches inside the opposition box.",
+            "Touches Inside Box": "Number of touches inside the opposition box.",
             "Passes Inside Box": "Number of passes played into the opposition box.",
             "Shots & Key Passes": "Total of shots taken and key passes made.",
             "xG & xG Assisted": "Combined value of xG and xA from all actions.",
@@ -2809,7 +2906,7 @@ elif page == "xTech/xDef":
             "Average Def. Action Distance": "The average distance from the goal line that the player successfully makes a defensive action. The scale is the x-axis of the pitch, measured from 0-100.",
             "PAdj Tackles & Interceptions": "Tackles + Interceptions per 90 (possession adjusted).",
             "Padj Tackles And Interceptions": "Tackles + Interceptions per 90 (possession adjusted).",
-            "OP Passes + Touches In Box": "Successful passes into the box from outside the box (open play) + touches inside the box.",
+            "OP Passes + Touches Inside Box": "Successful passes into the box from outside the box (open play) + touches inside the box.",
             "OP xGAssisted": "xG assisted from open play.",
             "xGBuildup": "xG buildup value of a player’s involvement in possession sequences, excluding their own xG and xA.",
             "Scoring Contribution": "Non-penalty goals and assists. A combined measure of the direct goal contribution of a player via goalscoring or goal assisting.",
@@ -3450,7 +3547,7 @@ elif page == "xTech/xDef":
             selected_comp = st.selectbox(
                 "Competition",
                 competition_list_tech,
-                index=competition_list_tech.index("Serie A") if "Serie A" in competition_list_tech else 0,
+                index=competition_list_tech.index("ITA - Serie A") if "ITA - Serie A" in competition_list_tech else 0,
                 key="top50_xtech_comp"
             )
         with col2:
@@ -3531,7 +3628,10 @@ elif page == "xTech/xDef":
                 selected_index_label: int(round(index_value)) if pd.notna(index_value) else "—"
             })
 
-        display_df = pd.DataFrame(rows).set_index("Rank")
+        display_df = pd.DataFrame(rows)
+        if "Rank" not in display_df.columns:
+            display_df.insert(0, "Rank", range(1, len(display_df) + 1))
+        display_df = display_df.set_index("Rank")
         styled_df = display_df.style.set_properties(**{
             "text-align": "center"
         }).set_table_styles([
@@ -3541,6 +3641,362 @@ elif page == "xTech/xDef":
         ])
 
         st.dataframe(styled_df, use_container_width=True)
+        
+################### --- Onglet Rookie --- ###################
+
+    with tab5:
+        # --- Sélection & bornes issues du dataset xTech
+        ROOKIE_SEASON = "2025/2026"
+
+        # On restreint la liste des compétitions à celles présentes en 2025/2026
+        comps_2026 = (
+            df_tech.loc[df_tech["Season Name"] == ROOKIE_SEASON, "Competition Name"]
+            .dropna().sort_values().unique().tolist()
+        )
+        if not comps_2026:
+            st.info("Aucune compétition trouvée pour la saison 2025/2026 dans le jeu de données xTech/xDef.")
+            st.stop()
+
+       # --- Ligne 1 : Competition + Position Group
+        c1, c2, c3 = st.columns([1.2, 1.2, 1.0])
+
+        with c1:
+            # --- Init session state (état initial : rien sélectionné, case décochée)
+            if "selected_comps" not in st.session_state:
+                st.session_state.selected_comps = []            # vide au premier accès
+            if "select_all_comps" not in st.session_state:
+                st.session_state.select_all_comps = False       # décoché au premier accès
+
+            # --- Callbacks
+            def _sync_select_all_from_multiselect():
+                # si l'utilisateur modifie la sélection, on (dé)coche la case si tout est sélectionné ou non
+                st.session_state.select_all_comps = set(st.session_state.selected_comps) == set(comps_2026)
+
+            def _apply_select_all():
+                # coché => tout sélectionner ; décoché => vider
+                st.session_state.selected_comps = comps_2026.copy() if st.session_state.select_all_comps else []
+
+            # --- Multiselect (au-dessus)
+            st.multiselect(
+                "Competition(s)",
+                options=comps_2026,
+                default=st.session_state.selected_comps,
+                key="selected_comps",
+                on_change=_sync_select_all_from_multiselect,
+            )
+
+            # --- Checkbox (en dessous)
+            st.checkbox(
+                "Select All Competitions",
+                key="select_all_comps",
+                on_change=_apply_select_all,
+            )
+
+            # Valeur finale à utiliser pour les filtres
+            selected_comps = st.session_state.selected_comps
+
+        with c2:
+            pos_base = df_tech[df_tech["Season Name"] == ROOKIE_SEASON].copy()
+            if selected_comps:
+                pos_base = pos_base[pos_base["Competition Name"].isin(selected_comps)]
+            desired_order = ["Goalkeeper", "Full Back", "Central Defender", "Midfielder",
+                             "Attacking Midfielder", "Winger", "Striker"]
+            order_idx = {v: i for i, v in enumerate(desired_order)}
+
+            pos_base = df_tech[df_tech["Season Name"] == ROOKIE_SEASON]
+            if selected_comps:
+                pos_base = pos_base[pos_base["Competition Name"].isin(selected_comps)]
+
+            # Options uniques puis tri selon desired_order (les inconnus vont à la fin)
+            raw = (pos_base["Position Group"].dropna().astype(str).str.strip().unique().tolist())
+            pos_options = sorted(raw, key=lambda x: order_idx.get(x, 999))
+
+            selected_positions = st.multiselect("Position Group(s)", options=pos_options, default=[])
+            
+        with c3:
+            # --- Preferred Foot
+            pf_col = "Prefered Foot"  # nom EXACT de la colonne dans ta BDD
+            standard_pf = ["Right Footed", "Left Footed", "Ambidextrous"]
+
+            if pf_col in df_tech.columns:
+                pf_seen = (
+                    df_tech.loc[df_tech["Season Name"] == ROOKIE_SEASON, pf_col]
+                    .dropna().astype(str).str.strip().unique().tolist()
+                )
+                # on ne garde que les valeurs présentes, sinon on retombe sur les 3 standards
+                pf_options = [p for p in standard_pf if p in pf_seen] or standard_pf
+            else:
+                pf_options = standard_pf
+
+            selected_foots = st.multiselect(
+                "Preferred Foot",
+                options=pf_options,
+                default=pf_options,   # les 3 cochées par défaut
+                key="rookies_pf"
+            )
+
+
+        # --- Ligne 2 : Sliders Age + Minutes
+        c4, c5 = st.columns([1.0, 1.4])
+
+        with c4:
+            # borne dynamique selon filtres actuels (comp + pos)
+            age_min_present = int(
+                df_tech.loc[df_tech["Season Name"] == ROOKIE_SEASON, "Age"].min()
+            )
+            age_max_slider = 23
+            selected_age_max = st.slider(
+                "Age (max)",
+                min_value=max(15, age_min_present),
+                max_value=age_max_slider,
+                value=age_max_slider,
+                step=1,
+            )
+
+        with c5:
+            # borne max dynamique selon filtres comp + pos + age
+            rookies_tmp = df_tech[df_tech["Season Name"] == ROOKIE_SEASON].copy()
+            if selected_comps:
+                rookies_tmp = rookies_tmp[rookies_tmp["Competition Name"].isin(selected_comps)]
+            if selected_positions:
+                rookies_tmp = rookies_tmp[rookies_tmp["Position Group"].isin(selected_positions)]
+            if selected_foots:
+                rookies_tmp = rookies_tmp[rookies_tmp["Prefered Foot"].astype(str).str.strip().isin(selected_foots)]
+
+            rookies_tmp = rookies_tmp[pd.to_numeric(rookies_tmp["Age"], errors="coerce") <= selected_age_max]
+
+            minutes_max_raw = pd.to_numeric(rookies_tmp["Minutes"], errors="coerce").max()
+            if np.isnan(minutes_max_raw):
+                minutes_max = 0
+            else:
+                # arrondi au multiple de 50 supérieur pour ne pas perdre le max réel
+                minutes_max = int(np.ceil(minutes_max_raw / 50.0) * 50)
+
+            selected_minutes = st.slider(
+                "Minutes",
+                min_value=0,
+                max_value=minutes_max,          # borne max inclusive (arrondie)
+                value=(0, minutes_max),
+                step=50,
+                key="rookies_minutes",
+            )
+            
+        # --- Ligne 3 : xTECH min + xDEF min + (slot bouton à droite)
+        c6, c7, c8 = st.columns([1.0, 1.0, 0.8])
+
+        with c6:
+            xtech_min_sel = st.slider(
+                "xTECH min",
+                min_value=0, max_value=100,
+                value=0, step=5,
+                key="rookies_xtech_min",
+            )
+
+        with c7:
+            xdef_min_sel = st.slider(
+                "xDEF min",
+                min_value=0, max_value=100,
+                value=0, step=5,
+                key="rookies_xdef_min",
+            )
+
+        # Slot du bouton de redirection, à DROITE de la 3e ligne
+        with c8:
+            # Ajoute un peu d'espace avant le bouton
+            st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
+            btn_slot = st.empty()
+
+        rookies = df_tech.copy()
+        rookies = rookies[rookies["Season Name"] == ROOKIE_SEASON]
+
+        if selected_comps:
+            rookies = rookies[rookies["Competition Name"].isin(selected_comps)]
+
+        if selected_positions:
+            rookies = rookies[rookies["Position Group"].isin(selected_positions)]
+            
+        if selected_foots:
+            rookies = rookies[rookies["Prefered Foot"].astype(str).str.strip().isin(selected_foots)]
+
+        # Âge ≤ seuil sélectionné (max 23)
+        rookies = rookies[pd.to_numeric(rookies["Age"], errors="coerce") <= selected_age_max]
+
+        # Minutes dans la plage sélectionnée (voir correctif max arrondi + pas=50 que tu as déjà)
+        rookies = rookies[
+            (pd.to_numeric(rookies["Minutes"], errors="coerce") >= selected_minutes[0]) &
+            (pd.to_numeric(rookies["Minutes"], errors="coerce") <= selected_minutes[1])
+        ]
+        
+        # --- xTECH / xDEF : garder tous les GK, filtrer les autres ≥ seuils
+        pg = rookies["Position Group"].astype(str).str.strip()
+        is_gk = pg.isin(["Goalkeeper", "GK"])  # robustesse au libellé
+
+        xtech_num = pd.to_numeric(rookies["xTECH"], errors="coerce")
+        xdef_num  = pd.to_numeric(rookies["xDEF"],  errors="coerce")
+
+        # Conserver:
+        # - tous les GK (quelle que soit la valeur ou NaN),
+        # - les non-GK qui passent les deux seuils.
+        mask_keep = is_gk | ((xtech_num >= xtech_min_sel) & (xdef_num >= xdef_min_sel))
+        rookies = rookies[mask_keep]
+        
+        # Colonnes visibles (on insère "Position Group")
+        wanted_cols = ["Player Name", "Team Name", "Competition Name", "Position Group",
+                       "Minutes", "Age", "xTECH", "xDEF"]
+
+        # Sélection robuste si la colonne existe
+        visible_cols = [c for c in wanted_cols if c in rookies.columns]
+        rookies_display = rookies[visible_cols].copy()
+        
+        rookies_display["Minutes"] = rookies_display["Minutes"].round(0).astype("Int64")
+        rookies_display["xTECH"] = rookies_display["xTECH"].round(1)
+        rookies_display["xDEF"]  = rookies_display["xDEF"].round(1)
+
+        # Tri par défaut
+        if all(c in rookies_display.columns for c in ["xTECH","Minutes"]):
+            rookies_display = rookies_display.sort_values(["xTECH","Minutes"], ascending=[False, False])
+
+        # --- Construire le DF d'affichage (colonnes visibles + URL masquée)
+        import urllib.parse as _parse
+        TM_BASE = "https://www.transfermarkt.fr/schnellsuche/ergebnis/schnellsuche?query="
+
+        rookies_display = rookies[["Player Name", "Team Name", "Position Group", "Competition Name", "Minutes", "Age", "xTECH", "xDEF"]].copy()
+        # Tri par défaut
+        rookies_display = rookies_display.sort_values(["xTECH","Minutes"], ascending=[False, False])
+
+        # Colonne URL (sera masquée dans la grille)
+        rookies_display["Transfermarkt"] = rookies_display["Player Name"].apply(
+            lambda name: TM_BASE + _parse.quote(str(name)) if pd.notna(name) else ""
+        )
+
+       # --- Tableau AgGrid (aucun affichage natif ailleurs)
+        from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode, DataReturnMode
+
+        # Arrondi à l'entier supérieur
+        rookies_display["Minutes"] = np.ceil(pd.to_numeric(rookies_display["Minutes"], errors="coerce")).astype("Int64")
+        rookies_display["xTECH"]   = np.ceil(pd.to_numeric(rookies_display["xTECH"], errors="coerce")).astype("Int64")
+        rookies_display["xDEF"]    = np.ceil(pd.to_numeric(rookies_display["xDEF"], errors="coerce")).astype("Int64")
+
+        gob = GridOptionsBuilder.from_dataframe(rookies_display)
+
+        # Même largeur pour toutes les colonnes
+        gob.configure_default_column(
+            resizable=True,
+            filter=True,
+            sortable=True,
+            flex=1,           # chaque colonne prend la même largeur
+            min_width=120     # largeur de base
+        )
+
+        # Colonnes numériques : alignement à droite
+        for col in ["Minutes", "Age", "xTECH", "xDEF"]:
+            if col in rookies_display.columns:
+                gob.configure_column(
+                    col,
+                    type=["numericColumn"],
+                    cellStyle={'textAlign': 'right'}
+                )
+
+        # Masquer la colonne URL
+        if "Transfermarkt" in rookies_display.columns:
+            gob.configure_column("Transfermarkt", hide=True)
+
+        # Sélection & pagination
+        gob.configure_selection(selection_mode="single", use_checkbox=True)
+        gob.configure_pagination(enabled=True, paginationAutoPageSize=True)
+
+        # Options globales
+        gob.configure_grid_options(domLayout="normal")
+        gob.configure_grid_options(suppressHorizontalScroll=True)
+
+        # --- Affichage du tableau
+        grid = AgGrid(
+            rookies_display,
+            gridOptions=gob.build(),
+            update_mode=GridUpdateMode.SELECTION_CHANGED,
+            data_return_mode=DataReturnMode.FILTERED,
+            fit_columns_on_grid_load=True,
+            theme="streamlit",
+            height=520,
+            key="rookies_grid",
+        )
+        
+        # --- Résumé des filtres appliqués
+        filters_summary = [
+            f"Season: {ROOKIE_SEASON}",
+            f"Competition(s): {', '.join(selected_comps) if selected_comps else 'All'}",
+            f"Positions: {', '.join(selected_positions) if selected_positions else 'All'}",
+            f"Preferred Foot: {', '.join(selected_foots) if selected_foots else 'All'}",
+            f"Age: ≤ {selected_age_max}",
+            f"Minutes: {selected_minutes[0]}–{selected_minutes[1]}",
+            f"xTECH min: {xtech_min_sel}",
+            f"xDEF min: {xdef_min_sel}",
+        ]
+
+        st.markdown(
+            "<div style='font-size:0.85em; margin-top:-15px;'>Filters applied: " + " | ".join(filters_summary) + "</div>",
+            unsafe_allow_html=True
+        )
+        
+        # --- Export CSV : récupère ce qui est affiché dans la grille (post-filtres/tri AgGrid)
+        try:
+            export_df = pd.DataFrame(grid.get("data", []))  # DataReturnMode.FILTERED => données visibles
+            if export_df.empty:
+                export_df = rookies_display.copy()
+        except Exception:
+            export_df = rookies_display.copy()
+
+        # On enlève la colonne masquée si présente
+        if "Transfermarkt" in export_df.columns:
+            export_df = export_df.drop(columns=["Transfermarkt"])
+
+        # Optionnel : garantir l'ordre des colonnes comme l'affichage
+        export_cols_order = [c for c in ["Player Name", "Team Name", "Competition Name", "Position Group",
+                                         "Minutes", "Age", "xTECH", "xDEF"] if c in export_df.columns]
+        if export_cols_order:
+            export_df = export_df[export_cols_order]
+
+        # Encodage CSV (UTF-8 avec BOM pour Excel) + nom de fichier parlant
+        csv_bytes = export_df.to_csv(index=False).encode("utf-8-sig")
+        file_name = f"rookies_{ROOKIE_SEASON}_{len(export_df)}.csv"
+
+        st.download_button(
+            label="Download selection as CSV",
+            data=csv_bytes,
+            file_name=file_name,
+            mime="text/csv",
+            use_container_width=False
+        )
+
+
+
+        # --- Gestion de la sélection (robuste liste/DataFrame)
+        sel = grid.get("selected_rows", [])
+
+        # Normalise en dict unique si sélection présente
+        has_sel = False
+        sel_row = None
+
+        if isinstance(sel, list):
+            has_sel = len(sel) > 0
+            if has_sel:
+                sel_row = sel[0]  # déjà un dict
+        elif isinstance(sel, pd.DataFrame):
+            has_sel = not sel.empty
+            if has_sel:
+                sel_row = sel.iloc[0].to_dict()
+        else:
+            has_sel = False
+
+        if has_sel and sel_row:
+            pname = (str(sel_row.get("Player Name", "")).strip())
+            tm_url = sel_row.get("Transfermarkt")
+            if pname and tm_url:
+                # Le bouton s’affiche dans le slot à droite de la 3ᵉ ligne (c7)
+                with btn_slot:
+                    st.link_button(f"Transfermarkt Player Page", tm_url, use_container_width=True)
+        else:
+            btn_slot.empty()
         
 # ============================================= VOLET Merged Data ========================================================
 
@@ -3713,7 +4169,7 @@ elif page == "Merged Data":
                 ("Np Xg P90", "NP xG"),
                 ("Np Xg Per Shot", "xG/Shot"),
                 ("Npxgxa P90", "NPxG + xA"),
-                ("Op Xa P90", "OP xA"),
+                ("OP xGAssisted", "OP xA"),
                 ("Op Key Passes P90", "OP Key Passes"),
                 ("Shots Key Passes P90", "Shots + Key Passes"),
                 ("Op Passes Into And Touches Inside Box P90", "OP Passes + Touches Into Box"),
@@ -3725,11 +4181,11 @@ elif page == "Merged Data":
                 ("Op Xgbuildup P90", "OP xG Buildup"),
                 ("Sp Key Passes P90", "Set Pieces Key Passes"),
                 ("Sp Xa P90", "Set Pieces xA"),
-                ("Obv P90", "OBV"),
-                ("Obv Pass P90", "OBV Pass"),
-                ("Obv Shot P90", "OBV Shot"),
-                ("Obv Defensive Action P90", "OBV Def. Act."),
-                ("Obv Dribble Carry P90", "OBV Dribble & Carry"),
+                ("OBV P90", "OBV"),
+                ("OBV Pass P90", "OBV Pass"),
+                ("OBV Shot P90", "OBV Shot"),
+                ("OBV Defensive Action P90", "OBV Def. Act."),
+                ("OBV Dribble Carry P90", "OBV Dribble & Carry"),
                 ("Op Passes P90", "OP Passes"),
                 ("Passing Ratio", "Passing %"),
                 ("Pressured Passing Ratio", "Pressured Passing %"),
@@ -3985,7 +4441,7 @@ elif page == "Merged Data":
                                         "TOP5 PSV-99", "HI Dist", "Tot Dist", "HSR Dist", "Sprint Dist", "Sprint Ct", "High Acc Ct"
                                     ]
 
-                                    LIGUES_CIBLE = ["Serie A", "1.Bundesliga", "La Liga", "Ligue 1", "Premier League"]
+                                    LIGUES_CIBLE = ["ITA - Serie A", "GER - 1. Bundesliga", "SPA - La Liga", "FRA - Ligue 1", "ENG - Premier League"]
                                     ref_phys = df_merged[
                                         (df_merged["Competition Name"].isin(LIGUES_CIBLE)) &
                                         (df_merged["Position Group"] == pos) &
@@ -4085,8 +4541,8 @@ elif page == "Merged Data":
                             with col2:
                                 # === Radar Technique dynamique avec selectbox ===
                                 try:
-                                    # 1. Position et templates
-                                    pos = row.get("Position Group")  
+                                    # 1) Position et template par défaut
+                                    pos = row.get("Position Group")
                                     position_group_to_template = {
                                         "Goalkeeper": "Goalkeeper",
                                         "Central Defender": "Central Defender",
@@ -4094,23 +4550,24 @@ elif page == "Merged Data":
                                         "Midfielder": "Midfielder (CDM)",
                                         "Attacking Midfielder": "Attacking Midfielder",
                                         "Winger": "Winger",
-                                        "Striker": "Striker"
+                                        "Striker": "Striker",
                                     }
                                     default_template = position_group_to_template.get(pos, "Striker")
 
-                                    # 2. Stockage temporaire du template sélectionné
+                                    # 2) Stockage temporaire du template sélectionné
                                     template_label = f"template_select_{player_name}_{season}_{team_name}".replace(" ", "_")
                                     selected_template = st.session_state.get(template_label, default_template)
 
-                                    # 3. Extraction des métriques et labels
+                                    # 3) Extraction des métriques et labels
                                     template = metric_templates_tech[selected_template]
                                     labels = metric_labels_tech[selected_template]
 
-                                    # 3. Peers pour comparaison
+                                    # 4) Peers Top5 (incluant les 2 variantes de Bundesliga) + fallback
+                                    top5 = ["ITA - Serie A", "GER - 1. Bundesliga", "SPA - La Liga", "FRA - Ligue 1", "ENG - Premier League"]
                                     ref_tech = df_tech[
                                         (df_tech["Position Group"] == pos) &
                                         (df_tech["Season Name"] == row["Season Name"]) &
-                                        (df_tech["Competition Name"].isin(["Serie A", "Premier League", "La Liga", "Ligue 1", "1.Bundesliga"])) &
+                                        (df_tech["Competition Name"].isin(top5)) &
                                         (df_tech["Minutes"] >= 600)
                                     ]
                                     if ref_tech.empty:
@@ -4121,73 +4578,104 @@ elif page == "Merged Data":
                                         ]
 
                                     inverse_metrics = ["Turnovers P90", "Dispossessions P90"]
+
                                     def pct_rank(series, value):
-                                        arr = series.dropna().values
-                                        if len(arr) == 0: return 0.0
-                                        lower = (arr < value).sum()
-                                        equal = (arr == value).sum()
-                                        return (lower + 0.5 * equal) / len(arr) * 100
+                                        s = pd.to_numeric(series, errors="coerce").dropna().values
+                                        try:
+                                            v = float(value)
+                                        except Exception:
+                                            v = np.nan if "np" in globals() else float("nan")
+                                        if len(s) == 0 or (pd.isna(v) if "pd" in globals() else (v != v)):
+                                            return 0.0
+                                        lower = (s < v).sum()
+                                        equal = (s == v).sum()
+                                        return (lower + 0.5 * equal) / len(s) * 100
 
-                                    r_tech = [
-                                        100 - pct_rank(ref_tech[m], row.get(m, 0)) if m in inverse_metrics else pct_rank(ref_tech[m], row.get(m, 0))
-                                        for m in template
-                                    ]
-                                    r_avg = [
-                                        100 - pct_rank(ref_tech[m], ref_tech[m].mean()) if m in inverse_metrics else pct_rank(ref_tech[m], ref_tech[m].mean())
-                                        for m in template
-                                    ]
-                                    raw_vals = [row.get(m, "NA") for m in template]
+                                    # --- Helpers de résolution de colonnes / valeurs (utilise resolve_metric_col défini plus haut)
+                                    def _get(obj, name: str):
+                                        cols = obj.index if hasattr(obj, "index") and not hasattr(obj, "columns") else obj.columns
+                                        return obj[resolve_metric_col(cols, name)]
 
-                                    metrics_closed = labels + [labels[0]]
-                                    r_tech_closed = r_tech + [r_tech[0]]
-                                    r_avg_closed = r_avg + [r_avg[0]]
-                                    raw_closed = raw_vals + [raw_vals[0]]
+                                    def _fmt(v):
+                                        try:
+                                            v = float(v)
+                                            if pd.isna(v):
+                                                return "NA"
+                                            return f"{v:.2f}"
+                                        except Exception:
+                                            return "NA"
+
+                                    # 5) Calculs robustes (on saute les métriques absentes)
+                                    r_tech, r_avg, raw_vals, labels_kept = [], [], [], []
+                                    for m, lab in zip(template, labels):
+                                        try:
+                                            ser = _get(ref_tech, m)   # Series des peers sur la vraie colonne
+                                            val = _get(row, m)        # valeur du joueur sur la vraie clé
+                                        except KeyError:
+                                            continue
+
+                                        r = 100 - pct_rank(ser, val) if m in inverse_metrics else pct_rank(ser, val)
+                                        rav = 100 - pct_rank(ser, ser.mean()) if m in inverse_metrics else pct_rank(ser, ser.mean())
+
+                                        r_tech.append(r)
+                                        r_avg.append(rav)
+                                        raw_vals.append(val)
+                                        labels_kept.append(lab)
+
+                                    # 6) Construction du radar (fermé)
+                                    metrics_closed = labels_kept + [labels_kept[0]]
+                                    r_tech_closed = r_tech + [r_tech[0]] if r_tech else []
+                                    r_avg_closed = r_avg + [r_avg[0]] if r_avg else []
+                                    raw_closed = raw_vals + [raw_vals[0]] if raw_vals else []
 
                                     fig_tech = go.Figure()
-                                    fig_tech.add_trace(go.Scatterpolar(
-                                        r=r_tech_closed,
-                                        theta=metrics_closed,
-                                        mode='lines',
-                                        fill='toself',
-                                        line=dict(color='gold', width=2),
-                                        fillcolor='rgba(255,215,0,0.3)',
-                                        hoverinfo='skip',
-                                        name=player_name
-                                    ))
-                                    fig_tech.add_trace(go.Scatterpolar(
-                                        r=r_tech_closed,
-                                        theta=metrics_closed,
-                                        mode='markers',
-                                        hoverinfo='text',
-                                        hovertext=[
-                                            f"<b>{label}</b><br>Value: {v:.2f}<br>Percentile: {r:.1f}%" 
-                                            for label, v, r in zip(metrics_closed, raw_closed, r_tech_closed)
-                                        ],
-                                        marker=dict(size=12, color='rgba(255,215,0,0)'),
-                                        showlegend=False
-                                    ))
-                                    fig_tech.add_trace(go.Scatterpolar(
-                                        r=r_avg_closed,
-                                        theta=metrics_closed,
-                                        mode='lines',
-                                        fill='toself',
-                                        line=dict(color='lightgreen', width=2),
-                                        fillcolor='rgba(144,238,144,0.3)',
-                                        hoverinfo='skip',
-                                        name='Top5 Average'
-                                    ))
-                                    fig_tech.add_trace(go.Scatterpolar(
-                                        r=r_avg_closed,
-                                        theta=metrics_closed,
-                                        mode='markers',
-                                        hoverinfo='text',
-                                        hovertext=[
-                                            f"<b>{label}</b><br>Mean Percentile: {r:.1f}%" 
-                                            for label, r in zip(metrics_closed, r_avg_closed)
-                                        ],
-                                        marker=dict(size=12, color='rgba(144,238,144,0)'),
-                                        showlegend=False
-                                    ))
+                                    if r_tech_closed:
+                                        fig_tech.add_trace(go.Scatterpolar(
+                                            r=r_tech_closed,
+                                            theta=metrics_closed,
+                                            mode='lines',
+                                            fill='toself',
+                                            line=dict(color='gold', width=2),
+                                            fillcolor='rgba(255,215,0,0.3)',
+                                            hoverinfo='skip',
+                                            name=player_name
+                                        ))
+                                        fig_tech.add_trace(go.Scatterpolar(
+                                            r=r_tech_closed,
+                                            theta=metrics_closed,
+                                            mode='markers',
+                                            hoverinfo='text',
+                                            hovertext=[
+                                                f"<b>{label}</b><br>Value: {_fmt(v)}<br>Percentile: {r:.1f}%"
+                                                for label, v, r in zip(metrics_closed, raw_closed, r_tech_closed)
+                                            ],
+                                            marker=dict(size=12, color='rgba(255,215,0,0)'),
+                                            showlegend=False
+                                        ))
+                                    if r_avg_closed:
+                                        fig_tech.add_trace(go.Scatterpolar(
+                                            r=r_avg_closed,
+                                            theta=metrics_closed,
+                                            mode='lines',
+                                            fill='toself',
+                                            line=dict(color='lightgreen', width=2),
+                                            fillcolor='rgba(144,238,144,0.3)',
+                                            hoverinfo='skip',
+                                            name='Top5 Average'
+                                        ))
+                                        fig_tech.add_trace(go.Scatterpolar(
+                                            r=r_avg_closed,
+                                            theta=metrics_closed,
+                                            mode='markers',
+                                            hoverinfo='text',
+                                            hovertext=[
+                                                f"<b>{label}</b><br>Mean Percentile: {r:.1f}%"
+                                                for label, r in zip(metrics_closed, r_avg_closed)
+                                            ],
+                                            marker=dict(size=12, color='rgba(144,238,144,0)'),
+                                            showlegend=False
+                                        ))
+
                                     fig_tech.update_layout(
                                         hovermode='closest',
                                         polar=dict(
@@ -4199,23 +4687,23 @@ elif page == "Merged Data":
                                                 showticklabels=True,
                                                 ticksuffix='%',
                                                 tickfont=dict(color='white'),
-                                                gridcolor='gray'
+                                                gridcolor='gray',
                                             ),
-                                            angularaxis=dict(rotation=90, direction="clockwise")
+                                            angularaxis=dict(rotation=90, direction="clockwise"),
                                         ),
                                         paper_bgcolor='rgba(0,0,0,0)',
                                         font_color='white',
                                         showlegend=False,
-                                        height=500
+                                        height=500,
                                     )
                                     st.plotly_chart(fig_tech, use_container_width=True)
-                                    
-                                    # 5. Selectbox SOUS le radar, avec maj + rerun
+
+                                    # 7) Selectbox SOUS le radar, avec maj + rerun
                                     new_template = st.selectbox(
                                         "Select a radar template",
                                         options=list(metric_templates_tech.keys()),
                                         index=list(metric_templates_tech.keys()).index(selected_template),
-                                        key=template_label + "_under"
+                                        key=template_label + "_under",
                                     )
                                     if new_template != selected_template:
                                         st.session_state[template_label] = new_template
@@ -4223,7 +4711,7 @@ elif page == "Merged Data":
 
                                 except Exception as e:
                                     st.error(f"Erreur radar technique : {e}")
-                                
+
                         # === Onglet 2 : Indexes ===
                         with tab_indexes_ps:
                             try:
@@ -4573,7 +5061,8 @@ elif page == "Merged Data":
             if pd.notna(row.get("Player Known Name")) and row["Player Known Name"].strip() != "" and row["Player Known Name"] != row["Player Name"]
             else row["Player Name"],
             axis=1
-        )
+        )       
+        df_merged.rename(columns=NAME_NORMALIZER, inplace=True)
 
         # --- Selectors: player, season, competition, club [MERGED INDEXES] ---
         display_names_mi = sorted(df_merged["Player Display Name MI"].dropna().unique())
@@ -4639,6 +5128,7 @@ elif page == "Merged Data":
                 df_row = df_player_all_mi
 
         row_mi = df_row.sort_values(by=["Minutes"], ascending=False, na_position="last").iloc[0]
+        row_mi.index = [NAME_NORMALIZER.get(c, c) for c in row_mi.index]
 
         # Variables de confort utilisées ensuite (références radars, titres, etc.)
         season_mi = row_mi["Season Name"]
@@ -4674,7 +5164,7 @@ elif page == "Merged Data":
                     metrics_phys_labels_mi = [
                         "TOP5 PSV-99", "HI Dist", "Tot Dist", "HSR Dist", "Sprint Dist", "Sprint Ct", "High Acc Ct"
                     ]
-                    LIGUES_CIBLE = ["Serie A", "1.Bundesliga", "La Liga", "Ligue 1", "Premier League"]
+                    LIGUES_CIBLE = ["ITA - Serie A", "GER - 1. Bundesliga", "SPA - La Liga", "FRA - Ligue 1", "ENG - Premier League"]
                     ref_phys_mi = df_merged[
                         (df_merged["Competition Name"].isin(LIGUES_CIBLE)) &
                         (df_merged["Position Group"] == pos_mi) &
@@ -4796,7 +5286,7 @@ elif page == "Merged Data":
                     ref_tech_mi = df_merged[
                         (df_merged["Position Group"] == pos_mi) &
                         (df_merged["Season Name"] == row_mi["Season Name"]) &
-                        (df_merged["Competition Name"].isin(["Serie A", "Premier League", "La Liga", "Ligue 1", "1.Bundesliga"])) &
+                        (df_merged["Competition Name"].isin(["ITA - Serie A", "GER - 1. Bundesliga", "SPA - La Liga", "FRA - Ligue 1", "ENG - Premier League"])) &
                         (df_merged["Minutes"] >= 600)
                     ]
                     if ref_tech_mi.empty:
@@ -4805,6 +5295,7 @@ elif page == "Merged Data":
                             (df_merged["Season Name"] == row_mi["Season Name"]) &
                             (df_merged["Minutes"] >= 600)
                         ]
+                    ref_tech_mi.rename(columns=NAME_NORMALIZER, inplace=True)
 
                     inverse_metrics = ["Turnovers P90", "Dispossessions P90"]
 
@@ -4815,15 +5306,35 @@ elif page == "Merged Data":
                         equal = (arr == value).sum()
                         return (lower + 0.5 * equal) / len(arr) * 100
 
-                    r_tech_mi = [
-                        100 - pct_rank_mi(ref_tech_mi[m], row_mi.get(m, 0)) if m in inverse_metrics else pct_rank_mi(ref_tech_mi[m], row_mi.get(m, 0))
-                        for m in template_mi
-                    ]
-                    r_avg_mi = [
-                        100 - pct_rank_mi(ref_tech_mi[m], ref_tech_mi[m].mean()) if m in inverse_metrics else pct_rank_mi(ref_tech_mi[m], ref_tech_mi[m].mean())
-                        for m in template_mi
-                    ]
-                    raw_vals_mi = [row_mi.get(m, "NA") for m in template_mi]
+                    def _col(name): 
+                        return resolve_metric_col(ref_tech_mi.columns, name)
+
+                    def _row(name): 
+                        return resolve_metric_col(row_mi.index, name)
+
+                    r_tech_mi, r_avg_mi, raw_vals_mi, labels_kept = [], [], [], []
+                    for m, lab in zip(template_mi, labels_mi):
+                        try:
+                            mc = _col(m)           # colonne réelle dans ref_tech_mi
+                            mr = _row(m)           # clé réelle dans row_mi
+                            ser = ref_tech_mi[mc]
+                            val = row_mi[mr]
+                        except KeyError:
+                            continue  # saute les métriques introuvables dans le merged
+
+                        r   = 100 - pct_rank_mi(ser, val) if m in inverse_metrics else pct_rank_mi(ser, val)
+                        rav = 100 - pct_rank_mi(ser, ser.mean()) if m in inverse_metrics else pct_rank_mi(ser, ser.mean())
+
+                        r_tech_mi.append(r)
+                        r_avg_mi.append(rav)
+                        raw_vals_mi.append(val)
+                        labels_kept.append(lab)
+
+                    # mets aussi à jour les labels utilisés pour le radar fermé
+                    metrics_closed_mi = labels_kept + [labels_kept[0]]
+                    r_tech_closed_mi  = r_tech_mi + [r_tech_mi[0]]
+                    r_avg_closed_mi   = r_avg_mi + [r_avg_mi[0]]
+                    raw_closed_mi     = raw_vals_mi + [raw_vals_mi[0]]
 
                     metrics_closed_mi = labels_mi + [labels_mi[0]]
                     r_tech_closed_mi = r_tech_mi + [r_tech_mi[0]]
