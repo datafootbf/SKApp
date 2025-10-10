@@ -1305,7 +1305,7 @@ if page == "xPhysical":
             # ==== Tableau ====
             base_cols = [
                 "Player Name", "Team Name", "Competition Name",
-                pos_col, age_col,
+                "Position Group", "Age",
                 "xPhysical"
             ]
             extra_cols = [c for c in extra_cols if c not in base_cols]
