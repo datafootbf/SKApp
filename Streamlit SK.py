@@ -1303,13 +1303,6 @@ if page == "xPhysical":
                             extra_cols.append(col_name)
 
             # ==== Tableau ==== 
-            XPHY_COL = None
-            if "xPhysical" in df_f.columns:
-                XPHY_COL = "xPhysical"
-            elif "xPhysical (/100)" in df_f.columns:
-                XPHY_COL = "xPhysical (/100)"
-            
-            # 2) Colonnes de base toujours visibles
             base_cols = [
                 "Player Name", "Team Name", "Competition Name",
                 "Position Group", "Age"
