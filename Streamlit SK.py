@@ -989,7 +989,7 @@ graph_columns = [
 ]
 
 # Charge le logo (met le chemin exact si besoin)
-logo_path = '/Users/favie/Statsbomb/TEST/AS Roma.png'
+logo_path = 'AS Roma.png'
 logo = Image.open(logo_path)
 st.sidebar.image(logo, use_container_width=True)
 
@@ -1305,7 +1305,7 @@ if page == "xPhysical":
             # ==== Tableau ====
             base_cols = [
                 "Player Name", "Team Name", "Competition Name",
-                pos_col, age_col,
+                "Position Group", "Age",
                 "xPhysical"
             ]
             extra_cols = [c for c in extra_cols if c not in base_cols]
