@@ -1077,6 +1077,13 @@ if page == "xPhysical":
         if "Competition Name" not in df.columns and comp_col in df.columns:
             df["Competition Name"] = df[comp_col]
 
+        # --- xPhysical column resolver (gère "xPhysical" vs "xPhysical (/100)")  # NEW
+        XPHY_COL = None
+        if "xPhysical" in df.columns:
+            XPHY_COL = "xPhysical"
+        elif "xPhysical (/100)" in df.columns:
+            XPHY_COL = "xPhysical (/100)"
+
         # ==== Sélecteurs de chargement ====
         seasons_all = sorted(df[season_col].dropna().astype(str).unique().tolist())
         comps_all   = sorted(df[comp_col].dropna().astype(str).unique().tolist())
@@ -1303,58 +1310,84 @@ if page == "xPhysical":
                             extra_cols.append(col_name)
 
             # ==== Tableau ====
+            # Fallback métriques si aucun filtre percentile n'est sélectionné
+            DEFAULT_PHY_METRICS = [
+                "HI Distance P90", "Sprint Count P90", "HSR Distance P90"
+            ]
+            
+            # Colonnes de base (inclut xPhysical si dispo)
             base_cols = [
                 "Player Name", "Team Name", "Competition Name",
-                "Position Group", "Age",
-                "xPhysical"
+                "Position Group", "Age"
             ]
+            if XPHY_COL and XPHY_COL not in base_cols:
+                base_cols.append(XPHY_COL)  # "xPhysical" ou "xPhysical (/100)"            # CHANGED
+            
+            # extra_cols = colonnes issues des filtres percentiles plus haut
             extra_cols = [c for c in extra_cols if c not in base_cols]
-
+            
+            # Si l'utilisateur n'a encore rien choisi via les popovers → fallback simple    # NEW
+            if not extra_cols:
+                extra_cols = [c for c in DEFAULT_PHY_METRICS if c in df_f.columns]         # NEW
+            
+            # Construire la liste finale
             final_cols = []
             for c in base_cols + extra_cols:
                 if c in df_f.columns and c not in final_cols:
                     final_cols.append(c)
-
-            player_display = df_f[final_cols].copy()
-
-            # Cast & formats
-            if age_col in player_display.columns:
-                player_display[age_col] = pd.to_numeric(player_display[age_col], errors="coerce")
-
-            for m in extra_cols + ["xPhysical"]:
-                if m in player_display.columns:
-                    player_display[m] = pd.to_numeric(player_display[m], errors="coerce").round(2)
-
-            # Lien Transfermarkt
-            import urllib.parse as _parse
-            TM_BASE = "https://www.transfermarkt.fr/schnellsuche/ergebnis/schnellsuche?query="
-            if "Transfermarkt" not in player_display.columns:
-                player_display["Transfermarkt"] = player_display["Player Name"].apply(
-                    lambda name: TM_BASE + _parse.quote(str(name)) if pd.notna(name) else ""
-                )
-
-            # AgGrid
-            from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode, DataReturnMode
-            gob = GridOptionsBuilder.from_dataframe(player_display)
-            gob.configure_default_column(resizable=True, filter=True, sortable=True, flex=1, min_width=120)
-            for col in [age_col] + extra_cols + ["xPhysical"]:
-                if col in player_display.columns:
-                    gob.configure_column(col, type=["numericColumn"], cellStyle={'textAlign': 'right'})
-            gob.configure_column("Transfermarkt", hide=True)
-            gob.configure_selection(selection_mode="single", use_checkbox=True)
-            gob.configure_pagination(enabled=True, paginationAutoPageSize=True)
-            gob.configure_grid_options(domLayout="normal", suppressHorizontalScroll=True)
-
-            grid = AgGrid(
-                player_display,
-                gridOptions=gob.build(),
-                update_mode=GridUpdateMode.SELECTION_CHANGED,
-                data_return_mode=DataReturnMode.FILTERED,
-                fit_columns_on_grid_load=True,
-                theme="streamlit",
-                height=520,
-                key="xphy_ps_grid",
-            )
+            
+            # Si rien d'affichable (peu probable), message clair
+            if not final_cols:
+                st.info("Aucune colonne affichable avec la configuration actuelle.")
+            else:
+                player_display = df_f[final_cols].copy()
+            
+                # Cast & formats
+                if age_col in player_display.columns:
+                    player_display[age_col] = pd.to_numeric(player_display[age_col], errors="coerce")
+            
+                for m in extra_cols + ([XPHY_COL] if XPHY_COL else []):                    # CHANGED
+                    if m in player_display.columns:
+                        player_display[m] = pd.to_numeric(player_display[m], errors="coerce").round(2)
+            
+                # Lien Transfermarkt
+                import urllib.parse as _parse
+                TM_BASE = "https://www.transfermarkt.fr/schnellsuche/ergebnis/schnellsuche?query="
+                if "Transfermarkt" not in player_display.columns:
+                    player_display["Transfermarkt"] = player_display["Player Name"].apply(
+                        lambda name: TM_BASE + _parse.quote(str(name)) if pd.notna(name) else ""
+                    )
+            
+                # Si pas de lignes après filtres → éviter un AgGrid "gris"
+                if player_display.empty:
+                    st.info("Aucune donnée à afficher avec les filtres actuels (xPhysical / Player Search).")
+                else:
+                    # AgGrid
+                    from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode, DataReturnMode
+                    gob = GridOptionsBuilder.from_dataframe(player_display)
+                    gob.configure_default_column(resizable=True, filter=True, sortable=True, flex=1, min_width=120)
+            
+                    # Alignement à droite pour numériques
+                    numeric_cols = [age_col] + extra_cols + ([XPHY_COL] if XPHY_COL else [])   # CHANGED
+                    for col in numeric_cols:
+                        if col in player_display.columns:
+                            gob.configure_column(col, type=["numericColumn"], cellStyle={'textAlign': 'right'})
+            
+                    gob.configure_column("Transfermarkt", hide=True)
+                    gob.configure_selection(selection_mode="single", use_checkbox=True)
+                    gob.configure_pagination(enabled=True, paginationAutoPageSize=True)
+                    gob.configure_grid_options(domLayout="normal", suppressHorizontalScroll=True)
+            
+                    grid = AgGrid(
+                        player_display,
+                        gridOptions=gob.build(),
+                        update_mode=GridUpdateMode.SELECTION_CHANGED,
+                        data_return_mode=DataReturnMode.FILTERED,
+                        fit_columns_on_grid_load=True,
+                        theme="streamlit",
+                        height=520,
+                        key="xphy_ps_grid",
+                    )
 
             # Résumé filtres
             filters_summary = [
