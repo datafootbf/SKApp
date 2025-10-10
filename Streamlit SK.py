@@ -1077,13 +1077,6 @@ if page == "xPhysical":
         if "Competition Name" not in df.columns and comp_col in df.columns:
             df["Competition Name"] = df[comp_col]
 
-        # --- xPhysical column resolver (gère "xPhysical" vs "xPhysical (/100)")  # NEW
-        XPHY_COL = None
-        if "xPhysical" in df.columns:
-            XPHY_COL = "xPhysical"
-        elif "xPhysical (/100)" in df.columns:
-            XPHY_COL = "xPhysical (/100)"
-
         # ==== Sélecteurs de chargement ====
         seasons_all = sorted(df[season_col].dropna().astype(str).unique().tolist())
         comps_all   = sorted(df[comp_col].dropna().astype(str).unique().tolist())
@@ -1309,34 +1302,40 @@ if page == "xPhysical":
                         if col_name not in extra_cols:
                             extra_cols.append(col_name)
 
-            # ==== Tableau ====
-            # Fallback métriques si aucun filtre percentile n'est sélectionné
-            DEFAULT_PHY_METRICS = [
-                "HI Distance P90", "Sprint Count P90", "HSR Distance P90"
-            ]
+            # ==== Tableau ==== 
+            XPHY_COL = None
+            if "xPhysical" in df_f.columns:
+                XPHY_COL = "xPhysical"
+            elif "xPhysical (/100)" in df_f.columns:
+                XPHY_COL = "xPhysical (/100)"
             
-            # Colonnes de base (inclut xPhysical si dispo)
+            # 2) Colonnes de base toujours visibles
             base_cols = [
                 "Player Name", "Team Name", "Competition Name",
                 "Position Group", "Age"
             ]
             if XPHY_COL and XPHY_COL not in base_cols:
-                base_cols.append(XPHY_COL)  # "xPhysical" ou "xPhysical (/100)"            # CHANGED
+                base_cols.append(XPHY_COL)
             
-            # extra_cols = colonnes issues des filtres percentiles plus haut
-            extra_cols = [c for c in extra_cols if c not in base_cols]
+            # 3) Déterminer les métriques à afficher
+            DEFAULT_PHY_METRICS = ["xPhysical"]  
             
-            # Si l'utilisateur n'a encore rien choisi via les popovers → fallback simple    # NEW
-            if not extra_cols:
-                extra_cols = [c for c in DEFAULT_PHY_METRICS if c in df_f.columns]         # NEW
+            active_metric_cols = []
+            for (grp, col_name), p in filter_percentiles.items():
+                if p and (col_name in df_f.columns):
+                    active_metric_cols.append(col_name)
             
-            # Construire la liste finale
+            if active_metric_cols:
+                display_metrics = [c for c in active_metric_cols if c not in base_cols]
+            else:
+                display_metrics = [c for c in DEFAULT_PHY_METRICS if c in df_f.columns and c not in base_cols]
+            
+            # 4) Construire les colonnes finales (existantes, sans doublons)
             final_cols = []
-            for c in base_cols + extra_cols:
+            for c in base_cols + display_metrics:
                 if c in df_f.columns and c not in final_cols:
                     final_cols.append(c)
             
-            # Si rien d'affichable (peu probable), message clair
             if not final_cols:
                 st.info("Aucune colonne affichable avec la configuration actuelle.")
             else:
@@ -1346,9 +1345,10 @@ if page == "xPhysical":
                 if age_col in player_display.columns:
                     player_display[age_col] = pd.to_numeric(player_display[age_col], errors="coerce")
             
-                for m in extra_cols + ([XPHY_COL] if XPHY_COL else []):                    # CHANGED
-                    if m in player_display.columns:
-                        player_display[m] = pd.to_numeric(player_display[m], errors="coerce").round(2)
+                numeric_cols = display_metrics + ([XPHY_COL] if XPHY_COL else [])
+                for col in numeric_cols:
+                    if col in player_display.columns:
+                        player_display[col] = pd.to_numeric(player_display[col], errors="coerce").round(2)
             
                 # Lien Transfermarkt
                 import urllib.parse as _parse
@@ -1358,7 +1358,7 @@ if page == "xPhysical":
                         lambda name: TM_BASE + _parse.quote(str(name)) if pd.notna(name) else ""
                     )
             
-                # Si pas de lignes après filtres → éviter un AgGrid "gris"
+                # Si pas de lignes → éviter l'AgGrid "gris"
                 if player_display.empty:
                     st.info("Aucune donnée à afficher avec les filtres actuels (xPhysical / Player Search).")
                 else:
@@ -1367,8 +1367,7 @@ if page == "xPhysical":
                     gob = GridOptionsBuilder.from_dataframe(player_display)
                     gob.configure_default_column(resizable=True, filter=True, sortable=True, flex=1, min_width=120)
             
-                    # Alignement à droite pour numériques
-                    numeric_cols = [age_col] + extra_cols + ([XPHY_COL] if XPHY_COL else [])   # CHANGED
+                    # Alignement à droite pour colonnes numériques
                     for col in numeric_cols:
                         if col in player_display.columns:
                             gob.configure_column(col, type=["numericColumn"], cellStyle={'textAlign': 'right'})
