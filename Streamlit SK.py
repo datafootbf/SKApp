@@ -1141,6 +1141,7 @@ if page == "xPhysical":
             ].copy()
             st.session_state.xphy_ps_loaded_df = df_loaded
             st.session_state.xphy_ps_pending = False
+            st.session_state.xphy_ps_render_nonce += 1
 
         ps_ready = st.session_state.xphy_ps_loaded_df is not None and not st.session_state.xphy_ps_pending
         if not ps_ready:
@@ -1309,22 +1310,22 @@ if page == "xPhysical":
                 "xPhysical"
             ]
             extra_cols = [c for c in extra_cols if c not in base_cols]
-
+            
             final_cols = []
             for c in base_cols + extra_cols:
                 if c in df_f.columns and c not in final_cols:
                     final_cols.append(c)
-
+            
             player_display = df_f[final_cols].copy()
-
+            
             # Cast & formats
             if age_col in player_display.columns:
                 player_display[age_col] = pd.to_numeric(player_display[age_col], errors="coerce")
-
+            
             for m in extra_cols + ["xPhysical"]:
                 if m in player_display.columns:
                     player_display[m] = pd.to_numeric(player_display[m], errors="coerce").round(2)
-
+            
             # Lien Transfermarkt
             import urllib.parse as _parse
             TM_BASE = "https://www.transfermarkt.fr/schnellsuche/ergebnis/schnellsuche?query="
@@ -1332,28 +1333,40 @@ if page == "xPhysical":
                 player_display["Transfermarkt"] = player_display["Player Name"].apply(
                     lambda name: TM_BASE + _parse.quote(str(name)) if pd.notna(name) else ""
                 )
-
-            # AgGrid
+            
+            # --- Initialisation du compteur de rendu (si absent) -------------------------  # NEW
+            if "xphy_ps_render_nonce" not in st.session_state:
+                st.session_state.xphy_ps_render_nonce = 0
+            
+            # --- AgGrid ------------------------------------------------------------------
             from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode, DataReturnMode
+            
+            player_display = player_display.reset_index(drop=True)
+            
             gob = GridOptionsBuilder.from_dataframe(player_display)
             gob.configure_default_column(resizable=True, filter=True, sortable=True, flex=1, min_width=120)
-            for col in [age_col] + extra_cols + ["xPhysical"]:
+            for col in [age_col] + extra_cols + (["xPhysical"] if "xPhysical" in player_display.columns else []):
                 if col in player_display.columns:
                     gob.configure_column(col, type=["numericColumn"], cellStyle={'textAlign': 'right'})
             gob.configure_column("Transfermarkt", hide=True)
             gob.configure_selection(selection_mode="single", use_checkbox=True)
             gob.configure_pagination(enabled=True, paginationAutoPageSize=True)
             gob.configure_grid_options(domLayout="normal", suppressHorizontalScroll=True)
-
+            
+            # --- Clé unique pour forcer le rerender après Load Data ----------------------  # NEW
+            _grid_version = f"{len(player_display)}_{hash(tuple(player_display.columns))}_{st.session_state.xphy_ps_render_nonce}"
+            grid_key = f"xphy_ps_grid_{_grid_version}"
+            
             grid = AgGrid(
                 player_display,
                 gridOptions=gob.build(),
                 update_mode=GridUpdateMode.SELECTION_CHANGED,
-                data_return_mode=DataReturnMode.FILTERED,
-                fit_columns_on_grid_load=True,
+                data_return_mode=DataReturnMode.FILTERED_AND_SORTED,
+                reload_data=True,                   # force le rechargement
+                fit_columns_on_grid_load=False,     # plus stable dans les tabs
                 theme="streamlit",
                 height=520,
-                key="xphy_ps_grid",
+                key=grid_key,                       # clé dynamique
             )
 
             # Résumé filtres
