@@ -1355,11 +1355,11 @@ if page == "xPhysical":
                 player_display_phy,
                 gridOptions=gob.build(),
                 update_mode=GridUpdateMode.SELECTION_CHANGED,
-                data_return_mode=DataReturnMode.FILTERED,
+                #data_return_mode=DataReturnMode.FILTERED,
                 fit_columns_on_grid_load=True,
                 theme="streamlit",
                 allow_unsafe_jscode=True,
-                height=500,
+                height=520,
                 key="xphy_ps_grid",
             )
             
