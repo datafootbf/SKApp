@@ -1351,20 +1351,25 @@ if page == "xPhysical":
             gob.configure_pagination(enabled=True, paginationAutoPageSize=True)
             gob.configure_grid_options(domLayout="normal", suppressHorizontalScroll=True)
 
-            st.caption(f"table shape: {player_display_phy.shape}")
-
+            _grid_ver = str(hash((
+                tuple(st.session_state.xphy_ps_last_seasons),
+                tuple(st.session_state.xphy_ps_last_comps),
+                player_display_phy.shape  # change si filtres percentiles vides vs non-vides aussi
+            )))
+            
             grid = AgGrid(
                 player_display_phy,
                 gridOptions=gob.build(),
                 update_mode=GridUpdateMode.SELECTION_CHANGED,
                 data_return_mode=DataReturnMode.FILTERED,
                 fit_columns_on_grid_load=True,
-                theme="streamlit",
-                allow_unsafe_jscode=True,    # <— important selon versions st_aggrid
-                height=520,
-                key="xphy_ps_grid",
+                theme="balham",
+                allow_unsafe_jscode=True,
+                height=500,
+                reload_data=True,                 # <— FORCE le refresh de la data
+                key=f"xphy_ps_grid_{_grid_ver}",  # <— remount complet sur nouveau dataset
             )
-
+            
             # Résumé filtres
             filters_summary = [
                 f"Season(s): {', '.join(st.session_state.xphy_ps_last_seasons)}",
