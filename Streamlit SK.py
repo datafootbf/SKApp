@@ -1351,13 +1351,15 @@ if page == "xPhysical":
             gob.configure_pagination(enabled=True, paginationAutoPageSize=True)
             gob.configure_grid_options(domLayout="normal", suppressHorizontalScroll=True)
 
+            st.caption(f"table shape: {player_display_phy.shape}")
+
             grid = AgGrid(
                 player_display_phy,
                 gridOptions=gob.build(),
                 update_mode=GridUpdateMode.SELECTION_CHANGED,
                 data_return_mode=DataReturnMode.FILTERED,
                 fit_columns_on_grid_load=True,
-                theme="balham",
+                theme="streamlit",
                 allow_unsafe_jscode=True,    # <— important selon versions st_aggrid
                 height=520,
                 key="xphy_ps_grid",
