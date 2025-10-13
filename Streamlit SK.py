@@ -1357,10 +1357,9 @@ if page == "xPhysical":
                 update_mode=GridUpdateMode.SELECTION_CHANGED,
                 data_return_mode=DataReturnMode.FILTERED,
                 fit_columns_on_grid_load=True,
-                theme="balham",
+                theme="streamlit",
                 allow_unsafe_jscode=True,
                 height=500,
-                reload_data=True,                 # <— FORCE le refresh de la data
             )
             
             # Résumé filtres
