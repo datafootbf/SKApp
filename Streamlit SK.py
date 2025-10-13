@@ -1352,7 +1352,7 @@ if page == "xPhysical":
                 data_return_mode=DataReturnMode.FILTERED,
                 fit_columns_on_grid_load=True,
                 theme="streamlit",
-                height=520,
+                height=500,
                 key="xphy_ps_grid",
             )
 
