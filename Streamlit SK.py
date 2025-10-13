@@ -1352,51 +1352,67 @@ if page == "xPhysical":
             
             
             # ======== BLOC AGGRID ========
+            # ===== 1) DataFrame propre pour la grille =====
             df_grid = player_display_phy.reset_index(drop=True).copy()
             
-            # mêmes casts "safe" que Merged : seulement les colonnes texte en str
+            # Colonnes texte castées en str (évite les objets/NA bizarres)
             _text_cols = [c for c in ["Player Name","Team Name","Competition Name","Position Group"] if c in df_grid.columns]
             for c in _text_cols:
                 df_grid[c] = df_grid[c].astype(str)
             
-            # ===== 2) AgGrid — copie conforme de Merged (minimaliste) =====
+            # ===== 2) CSS : force la couleur du texte (cells + header) =====
+            st.markdown("""
+            <style>
+            .ag-theme-balham .ag-cell, .ag-theme-balham .ag-header-cell-text,
+            .ag-theme-streamlit .ag-cell, .ag-theme-streamlit .ag-header-cell-text {
+              color: #e6e6e6 !important;     /* lisible en dark; mets #111 si fond clair */
+              opacity: 1 !important;
+            }
+            .ag-theme-balham .ag-cell div, .ag-theme-streamlit .ag-cell div {
+              color: inherit !important;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            
+            # ===== 3) AgGrid (config minimaliste + valueFormatter universel) =====
             from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode
+            from st_aggrid.shared import JsCode
             
             gb = GridOptionsBuilder.from_dataframe(df_grid)
             gb.configure_default_column(
                 editable=False, groupable=True, sortable=True, filter="agTextColumnFilter",
                 resizable=True, flex=1, min_width=120
             )
-            # numériques alignées à droite (comme dans Merged lorsqu'il y en a)
-            for col in ["Age","xPhysical"] + extra_cols:
-                if col in df_grid.columns:
-                    gb.configure_column(col, type=["numericColumn"], cellStyle={'textAlign': 'right'})
             
-            # optionnel mais identique à Merged : épingler le nom à gauche
+            # valueFormatter = "affiche toujours quelque chose" (stringify + NA -> "")
+            _strfmt = JsCode("function(params){ return (params.value == null) ? '' : String(params.value); }")
+            
+            # Appliquer le formatter par défaut à toutes les colonnes (et aligner les numériques)
+            for col in df_grid.columns:
+                is_num = col in (["Age","xPhysical"] + [c for c in df_grid.columns if c in (locals().get('extra_cols', []) or [])])
+                if is_num:
+                    gb.configure_column(col, type=["numericColumn"], cellStyle={'textAlign': 'right'}, valueFormatter=_strfmt)
+                else:
+                    gb.configure_column(col, valueFormatter=_strfmt)
+            
+            # Optionnel : épingler le nom à gauche
             if "Player Name" in df_grid.columns:
                 gb.configure_column("Player Name", pinned="left")
             
-            # pagination OFF (comme Merged)
+            # Même recette que Merged : pas de pagination
             gb.configure_pagination(enabled=False)
             
             grid = AgGrid(
                 df_grid,
                 gridOptions=gb.build(),
                 update_mode=GridUpdateMode.SELECTION_CHANGED,
-                # pas de DataReturnMode
                 fit_columns_on_grid_load=True,
-                theme="streamlit",             
-                allow_unsafe_jscode=True,   # idem Merged
+                theme="balham",            # ou "streamlit" si tu préfères
+                allow_unsafe_jscode=True,
                 height=500,
-                key="xphy_ps_grid",         # clé FIXE
+                key="xphy_ps_grid",
             )
-            
-            # ===== 3) (temp debug) Vérifier ce que voit AgGrid =====
-            try:
-                _seen = grid.get("data", [])
-                st.caption(f"AgGrid rows seen: {len(_seen)}")   # devrait afficher 93 dans ton cas
-            except Exception:
-                pass
+
                         
             # Résumé filtres
             filters_summary = [
