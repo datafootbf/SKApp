@@ -1315,30 +1315,30 @@ if page == "xPhysical":
                 if c in df_f.columns and c not in final_cols:
                     final_cols.append(c)
 
-            player_display = df_f[final_cols].copy()
+            player_display_phy = df_f[final_cols].copy()
 
             # Cast & formats
-            if age_col in player_display.columns:
-                player_display[age_col] = pd.to_numeric(player_display[age_col], errors="coerce")
+            if age_col in player_display_phy.columns:
+                player_display_phy[age_col] = pd.to_numeric(player_display_phy[age_col], errors="coerce")
 
             for m in extra_cols + ["xPhysical"]:
-                if m in player_display.columns:
-                    player_display[m] = pd.to_numeric(player_display[m], errors="coerce").round(2)
+                if m in player_display_phy.columns:
+                    player_display_phy[m] = pd.to_numeric(player_display_phy[m], errors="coerce").round(2)
 
             # Lien Transfermarkt
             import urllib.parse as _parse
             TM_BASE = "https://www.transfermarkt.fr/schnellsuche/ergebnis/schnellsuche?query="
-            if "Transfermarkt" not in player_display.columns:
-                player_display["Transfermarkt"] = player_display["Player Name"].apply(
+            if "Transfermarkt" not in player_display_phy.columns:
+                player_display_phy["Transfermarkt"] = player_display_phy["Player Name"].apply(
                     lambda name: TM_BASE + _parse.quote(str(name)) if pd.notna(name) else ""
                 )
 
             # AgGrid
             from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode, DataReturnMode
-            gob = GridOptionsBuilder.from_dataframe(player_display)
+            gob = GridOptionsBuilder.from_dataframe(player_display_phy)
             gob.configure_default_column(resizable=True, filter=True, sortable=True, flex=1, min_width=120)
             for col in [age_col] + extra_cols + ["xPhysical"]:
-                if col in player_display.columns:
+                if col in player_display_phy.columns:
                     gob.configure_column(col, type=["numericColumn"], cellStyle={'textAlign': 'right'})
             gob.configure_column("Transfermarkt", hide=True)
             gob.configure_selection(selection_mode="single", use_checkbox=True)
@@ -1346,7 +1346,7 @@ if page == "xPhysical":
             gob.configure_grid_options(domLayout="normal", suppressHorizontalScroll=True)
 
             grid = AgGrid(
-                player_display,
+                player_display_phy,
                 gridOptions=gob.build(),
                 update_mode=GridUpdateMode.SELECTION_CHANGED,
                 data_return_mode=DataReturnMode.FILTERED,
@@ -1372,9 +1372,9 @@ if page == "xPhysical":
             try:
                 export_df = pd.DataFrame(grid.get("data", []))
                 if export_df.empty:
-                    export_df = player_display.copy()
+                    export_df = player_display_phy.copy()
             except Exception:
-                export_df = player_display.copy()
+                export_df = player_display_phy.copy()
 
             if "Transfermarkt" in export_df.columns:
                 export_df = export_df.drop(columns=["Transfermarkt"])
