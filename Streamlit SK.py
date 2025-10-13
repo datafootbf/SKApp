@@ -1340,13 +1340,32 @@ if page == "xPhysical":
                 )
 
             # AgGrid
+            if "xphy_ps_frozen_cols" not in st.session_state:
+                st.session_state.xphy_ps_frozen_cols = list(player_display_phy.columns)
+            else:
+                # Ajoute les colonnes manquantes (nées d’un popover) avec NaN
+                for c in st.session_state.xphy_ps_frozen_cols:
+                    if c not in player_display_phy.columns:
+                        player_display_phy[c] = np.nan
+                # Garde l’ordre stable
+                player_display_phy = player_display_phy[st.session_state.xphy_ps_frozen_cols]
+            
+            
+            # ======== BLOC AGGRID ========
             from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode
-            from st_aggrid.shared import JsCode
             
             gob = GridOptionsBuilder.from_dataframe(player_display_phy)
-            gob.configure_default_column(resizable=True, filter=True, sortable=True, flex=1, min_width=120)
+            gob.configure_default_column(
+                editable=False,
+                groupable=True,
+                sortable=True,
+                filter="agTextColumnFilter",
+                resizable=True,
+                flex=1,
+                min_width=120,
+            )
             
-            # Numériques alignés à droite
+            # Colonnes numériques alignées à droite
             for col in [age_col] + extra_cols + ["xPhysical"]:
                 if col in player_display_phy.columns:
                     gob.configure_column(col, type=["numericColumn"], cellStyle={'textAlign': 'right'})
@@ -1354,20 +1373,12 @@ if page == "xPhysical":
             # Colonne masquée
             gob.configure_column("Transfermarkt", hide=True)
             
-            # Sélection & options
+            # Configuration de la sélection et du layout
             gob.configure_selection(selection_mode="single", use_checkbox=True)
-            gob.configure_pagination(enabled=True, paginationAutoPageSize=True)
+            gob.configure_pagination(enabled=False)  # ✅ comme Merged Data
             gob.configure_grid_options(domLayout="normal", suppressHorizontalScroll=True)
             
-            # 👉 Triggers de resize au premier rendu
-            gob.configure_grid_options(
-                onFirstDataRendered=JsCode("function(p){ p.api.sizeColumnsToFit(); }"),
-                onGridReady=JsCode("function(p){ setTimeout(function(){ p.api.sizeColumnsToFit(); }, 80); }"),
-            )
-            
-            # Remount seulement si les colonnes changent (colonnes dynamiques via popovers)
-            _cols_ver = str(hash(tuple(player_display_phy.columns)))
-            
+            # Construction de la grille
             grid = AgGrid(
                 player_display_phy,
                 gridOptions=gob.build(),
@@ -1376,15 +1387,15 @@ if page == "xPhysical":
                 theme="streamlit",          # ou "balham" si tu préfères
                 allow_unsafe_jscode=True,
                 height=500,
-                key=f"xphy_ps_grid_{_cols_ver}",
+                key="xphy_ps_grid",         # clé fixe (plus de clé dynamique)
             )
             
-            # Petit "nudge" de resize côté navigateur après le paint
-            import streamlit.components.v1 as components
-            components.html(
-                "<script>setTimeout(function(){ window.dispatchEvent(new Event('resize')); }, 120);</script>",
-                height=0,
+            # Correction du reflow initial (comme Merged, mais sans JS superflu)
+            st.markdown(
+                "<style>.ag-theme-streamlit, .ag-theme-balham { min-height: 480px !important; }</style>",
+                unsafe_allow_html=True
             )
+
             
             # Résumé filtres
             filters_summary = [
