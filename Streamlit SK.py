@@ -2668,7 +2668,7 @@ elif page == "xTech/xDef":
     # Création des sous-onglets pour xTechnical
     tab_ps, tab1, tab2, tab3, tab4, tab5 = st.tabs(["Player Search", "Scatter Plot ", "Radar", "Index", "Top 50", "Rookie"])
     
-   with tab_ps:
+    with tab_ps:
         
         xtech_help_expander()
 
