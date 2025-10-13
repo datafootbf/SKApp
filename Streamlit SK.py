@@ -1385,7 +1385,7 @@ if page == "xPhysical":
                 update_mode=GridUpdateMode.SELECTION_CHANGED,
                 # pas de DataReturnMode
                 fit_columns_on_grid_load=True,
-                theme="balham",             # c'est ce qui marche chez toi dans Merged; si tu préfères "streamlit", teste ensuite
+                theme="streamlit",             
                 allow_unsafe_jscode=True,   # idem Merged
                 height=500,
                 key="xphy_ps_grid",         # clé FIXE
