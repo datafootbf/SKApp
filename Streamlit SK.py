@@ -1283,133 +1283,210 @@ if page == "xPhysical":
                     cnt = active_filters_count.get(name, 0)
                     st.caption(f"{cnt} active filter{'s' if cnt != 1 else ''}")
 
-            # --- Clear + TM + Send to Radar
+            # --- Clear + TM + Send to Radar (inchangé)
             col_btn1, col_btn2, col_btn3 = st.columns([1.0, 1.6, 1.6], gap="small")
-
+            
             with col_btn1:
                 if st.button("Clear filters", key="xphy_ps_clear_filters"):
                     st.session_state.xphy_ps_reset_counter += 1
                     st.rerun()
-
+            
             with col_btn2:
                 tm_btn_slot = st.empty()
-
+            
             with col_btn3:
                 send_radar_slot = st.empty()
-
-            # Appliquer les seuils percentiles
-            extra_cols = []
+            
+            # =========================
+            # 1) Appliquer les seuils percentiles (filtrage SEULEMENT)
+            # =========================
+            df_f = df_f.copy()  # part de ta base déjà filtrée pos/âge
             for (grp, col_name), p in filter_percentiles.items():
                 if p and (col_name in df_f.columns):
                     s_ref = pd.to_numeric(df_for_pct[col_name], errors="coerce").dropna()
                     if not s_ref.empty:
                         thr = float(np.nanpercentile(s_ref, p))
                         df_f = df_f[pd.to_numeric(df_f[col_name], errors="coerce") >= thr]
-                        if col_name not in extra_cols:
-                            extra_cols.append(col_name)
-
-            # ==== Tableau ====
-            base_cols = [
-                "Player Name", "Team Name", "Competition Name",
-                "Position Group", "Age",
-                "xPhysical"
-            ]
-            extra_cols = [c for c in extra_cols if c not in base_cols]
-
+            
+            # =========================
+            # 2) Définir les groupes de colonnes (affichage)
+            # =========================
+            PSV_COLS = [c for c,_ in PSV_METRICS]
+            ALL_COLS = [c for c,_ in ALL_METRICS]
+            TIP_COLS = [c for c,_ in TIP_METRICS]
+            OTIP_COLS = [c for c,_ in OTIP_METRICS]
+            
+            # Toujours afficher ces colonnes “de base”
+            BASE_COLS = ["Player Name", "Team Name", "Competition Name", "Position Group", "Age"]
+            # xPhysical reste à part (on l’affiche toujours si présent)
+            XPHY_COL = ["xPhysical"]
+            
+            # =========================
+            # 3) UI “pills” = 4 toggles (toutes ON par défaut)
+            # =========================
+            pill_cols = st.columns(4)
+            defaults = {
+                "xphy_show_psv": True,
+                "xphy_show_all": True,
+                "xphy_show_tip": True,
+                "xphy_show_otip": True,
+            }
+            for k, v in defaults.items():
+                if k not in st.session_state:
+                    st.session_state[k] = v
+            
+            with pill_cols[0]:
+                st.session_state.xphy_show_psv = st.toggle("PSV", value=st.session_state.xphy_show_psv, key="xphy_pill_psv")
+            with pill_cols[1]:
+                st.session_state.xphy_show_all = st.toggle("ALL (P90)", value=st.session_state.xphy_show_all, key="xphy_pill_all")
+            with pill_cols[2]:
+                st.session_state.xphy_show_tip = st.toggle("TIP (P30)", value=st.session_state.xphy_show_tip, key="xphy_pill_tip")
+            with pill_cols[3]:
+                st.session_state.xphy_show_otip = st.toggle("OTIP (P30)", value=st.session_state.xphy_show_otip, key="xphy_pill_otip")
+            
+            # Colonnes demandées par les “pills”
+            group_cols = []
+            if st.session_state.xphy_show_psv:
+                group_cols += PSV_COLS
+            if st.session_state.xphy_show_all:
+                group_cols += ALL_COLS
+            if st.session_state.xphy_show_tip:
+                group_cols += TIP_COLS
+            if st.session_state.xphy_show_otip:
+                group_cols += OTIP_COLS
+            
+            # Ordre final = BASE + xPhysical (si dispo) + groupes cochés, SANS doublons, et seulement celles présentes dans df_f
             final_cols = []
-            for c in base_cols + extra_cols:
+            for c in BASE_COLS + XPHY_COL + group_cols:
                 if c in df_f.columns and c not in final_cols:
                     final_cols.append(c)
-
+            
+            # Si aucune “pill” n’est cochée, on affiche quand même BASE + xPhysical si dispo
+            if not group_cols:
+                for c in BASE_COLS + XPHY_COL:
+                    if c in df_f.columns and c not in final_cols:
+                        final_cols.append(c)
+            
+            # =========================
+            # 4) DataFrame d’affichage : TOUTES les colonnes des groupes sélectionnés
+            # =========================
             player_display_phy = df_f[final_cols].copy()
-
-            # Cast & formats
+            
+            # Cast & formats “safe” (on n’affecte pas la structure)
             if age_col in player_display_phy.columns:
                 player_display_phy[age_col] = pd.to_numeric(player_display_phy[age_col], errors="coerce")
-
-            for m in extra_cols + ["xPhysical"]:
+            if "xPhysical" in player_display_phy.columns:
+                player_display_phy["xPhysical"] = pd.to_numeric(player_display_phy["xPhysical"], errors="coerce").round(2)
+            
+            # Numériques des groupes : arrondis légers
+            for m in set(group_cols):
                 if m in player_display_phy.columns:
                     player_display_phy[m] = pd.to_numeric(player_display_phy[m], errors="coerce").round(2)
-
-            # Lien Transfermarkt
+            
+            # Lien Transfermarkt (masqué dans la grille)
             import urllib.parse as _parse
             TM_BASE = "https://www.transfermarkt.fr/schnellsuche/ergebnis/schnellsuche?query="
-            if "Transfermarkt" not in player_display_phy.columns:
+            if "Transfermarkt" not in player_display_phy.columns and "Player Name" in player_display_phy.columns:
                 player_display_phy["Transfermarkt"] = player_display_phy["Player Name"].apply(
                     lambda name: TM_BASE + _parse.quote(str(name)) if pd.notna(name) else ""
                 )
-
-            # AgGrid
-            from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode, DataReturnMode
-            gob = GridOptionsBuilder.from_dataframe(player_display_phy)
-            gob.configure_default_column(resizable=True, filter=True, sortable=True, flex=1, min_width=120)
-            for col in [age_col] + extra_cols + ["xPhysical"]:
-                if col in player_display_phy.columns:
-                    gob.configure_column(col, type=["numericColumn"], cellStyle={'textAlign': 'right'})
-            gob.configure_column("Transfermarkt", hide=True)
-            gob.configure_selection(selection_mode="single", use_checkbox=True)
-            gob.configure_pagination(enabled=True, paginationAutoPageSize=True)
-            gob.configure_grid_options(domLayout="normal", suppressHorizontalScroll=True)
             
+            # =========================
+            # 5) AgGrid – config stable (comme Merged), colonnes scrolables
+            # =========================
+            from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode
+            
+            gob = GridOptionsBuilder.from_dataframe(player_display_phy)
+            gob.configure_default_column(
+                editable=False, groupable=True, sortable=True, filter="agTextColumnFilter",
+                resizable=True, flex=1, min_width=120
+            )
+            
+            # Aligner numériques à droite
+            num_candidates = [age_col, "xPhysical"] + PSV_COLS + ALL_COLS + TIP_COLS + OTIP_COLS
+            for col in final_cols:
+                if col in num_candidates and col in player_display_phy.columns:
+                    gob.configure_column(col, type=["numericColumn"], cellStyle={'textAlign': 'right'})
+            
+            # Colonne masquée
+            if "Transfermarkt" in player_display_phy.columns:
+                gob.configure_column("Transfermarkt", hide=True)
+            
+            # Épingler Player Name à gauche
+            if "Player Name" in player_display_phy.columns:
+                gob.configure_column("Player Name", pinned="left")
+            
+            # Pas de pagination (comme Merged)
+            gob.configure_pagination(enabled=False)
+            
+            # Layout normal, scroll horizontal autorisé (⚠ pas de domLayout/suppressHorizontalScroll pour rester “safe”)
             grid = AgGrid(
                 player_display_phy,
                 gridOptions=gob.build(),
                 update_mode=GridUpdateMode.SELECTION_CHANGED,
-                #data_return_mode=DataReturnMode.FILTERED,
-                fit_columns_on_grid_load=True,
-                theme="streamlit",
+                fit_columns_on_grid_load=True,       # laisse ag-Grid packer, tout en gardant le scroll si trop de colonnes
+                theme="streamlit",                   # ou "balham" selon ton thème global
                 allow_unsafe_jscode=True,
                 height=520,
                 key="xphy_ps_grid",
             )
             
-            # Résumé filtres
+            # =========================
+            # 6) Résumé filtres (inchangé)
+            # =========================
             filters_summary = [
                 f"Season(s): {', '.join(st.session_state.xphy_ps_last_seasons)}",
                 f"Competition(s): {', '.join(st.session_state.xphy_ps_last_comps)}",
                 f"Positions: {', '.join(selected_positions) if selected_positions else 'All'}",
                 f"Age: {selected_age[0]}–{selected_age[1]}" if selected_age else "Age: All",
             ]
+            # Ajout de l’état des pills
+            pill_state = []
+            if st.session_state.xphy_show_psv: pill_state.append("PSV")
+            if st.session_state.xphy_show_all: pill_state.append("ALL (P90)")
+            if st.session_state.xphy_show_tip: pill_state.append("TIP (P30)")
+            if st.session_state.xphy_show_otip: pill_state.append("OTIP (P30)")
+            filters_summary.append("Groups: " + (", ".join(pill_state) if pill_state else "None"))
+            
             st.markdown(
                 "<div style='font-size:0.85em; margin-top:-15px;'>Filters applied: " + " | ".join(filters_summary) + "</div>",
                 unsafe_allow_html=True
             )
-
-            # Export CSV (données visibles)
+            
+            # =========================
+            # 7) Export CSV (visible)
+            # =========================
             try:
                 export_df = pd.DataFrame(grid.get("data", []))
                 if export_df.empty:
                     export_df = player_display_phy.copy()
             except Exception:
                 export_df = player_display_phy.copy()
-
+            
             if "Transfermarkt" in export_df.columns:
                 export_df = export_df.drop(columns=["Transfermarkt"])
-
-            export_cols_order = [c for c in ["Player Name", "Team Name", "Competition Name", pos_col,
-                                             age_col, "xPhysical"] if c in export_df.columns]
-            if export_cols_order:
-                export_df = export_df[export_cols_order]
-
+            
             csv_bytes = export_df.to_csv(index=False).encode("utf-8-sig")
             file_name = f"xphysical_player_search_{len(export_df)}.csv"
-
+            
             st.download_button(
                 label="Download selection as CSV",
                 data=csv_bytes,
                 file_name=file_name,
                 mime="text/csv",
-                key="xphy_ps_download_csv",  # <— NEW: clé unique
+                key="xphy_ps_download_csv",
             )
             
-            # --- Actions selon la sélection (TM + Send to Radar)
+            # =========================
+            # 8) Sélection + TM / Send to Radar (inchangé, mais basé sur grid)
+            # =========================
             sel = grid.get("selected_rows", [])
             has_sel, sel_row = False, None
             if isinstance(sel, list) and len(sel) > 0:
                 has_sel, sel_row = True, sel[0]
             elif isinstance(sel, pd.DataFrame) and not sel.empty:
                 has_sel, sel_row = True, sel.iloc[0].to_dict()
-
+            
             # Bouton TM
             if 'tm_btn_slot' in locals():
                 if has_sel and sel_row:
@@ -1420,27 +1497,24 @@ if page == "xPhysical":
                         tm_btn_slot.empty()
                 else:
                     tm_btn_slot.empty()
-
+            
             # Bouton Send to Radar
             if 'send_radar_slot' in locals():
                 if has_sel and sel_row:
                     if send_radar_slot.button("Send to Radar", use_container_width=True):
                         try:
-                            # 1) Reconstituer la Display Name attendue par le Radar
                             _df_dn = df[["Player", "Short Name"]].dropna().drop_duplicates()
                             _df_dn["Display Name"] = _df_dn["Short Name"].astype(str) + " (" + _df_dn["Player"].astype(str) + ")"
                             player_to_display_map = dict(zip(_df_dn["Player"], _df_dn["Display Name"]))
-
+            
                             player_name_sel = sel_row.get("Player Name") or sel_row.get("Player")
                             display_val = player_to_display_map.get(player_name_sel)
                             if display_val is None:
                                 short_name_fallback = sel_row.get("Short Name")
                                 display_val = f"{short_name_fallback} ({player_name_sel})" if short_name_fallback and player_name_sel else player_name_sel
-
-                            # 2) Pousser uniquement le joueur vers l’onglet Radar
+            
                             st.session_state["radar_p1"] = display_val
-
-                            # 3) Auto-switch vers l’onglet "Radar"
+            
                             import streamlit.components.v1 as components
                             components.html(
                                 """
@@ -1459,15 +1533,16 @@ if page == "xPhysical":
                                 """,
                                 height=0,
                             )
-
+            
                         except Exception:
-                            pass  # pas d'affichage d'erreur ni de succès
+                            pass
                 else:
                     send_radar_slot.empty()
-                    
-                    st.write("")
-                    st.write("")
-                    xphysical_glossary_expander()
+            
+            st.write("")
+            st.write("")
+            xphysical_glossary_expander()
+
     
 ###################### --- Onglet Scatter Plot ---
     with tab1:
