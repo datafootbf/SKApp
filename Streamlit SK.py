@@ -1352,51 +1352,52 @@ if page == "xPhysical":
             
             
             # ======== BLOC AGGRID ========
+            df_grid = player_display_phy.reset_index(drop=True).copy()
+            
+            # mêmes casts "safe" que Merged : seulement les colonnes texte en str
+            _text_cols = [c for c in ["Player Name","Team Name","Competition Name","Position Group"] if c in df_grid.columns]
+            for c in _text_cols:
+                df_grid[c] = df_grid[c].astype(str)
+            
+            # ===== 2) AgGrid — copie conforme de Merged (minimaliste) =====
             from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode
             
-            gob = GridOptionsBuilder.from_dataframe(player_display_phy)
-            gob.configure_default_column(
-                editable=False,
-                groupable=True,
-                sortable=True,
-                filter="agTextColumnFilter",
-                resizable=True,
-                flex=1,
-                min_width=120,
+            gb = GridOptionsBuilder.from_dataframe(df_grid)
+            gb.configure_default_column(
+                editable=False, groupable=True, sortable=True, filter="agTextColumnFilter",
+                resizable=True, flex=1, min_width=120
             )
+            # numériques alignées à droite (comme dans Merged lorsqu'il y en a)
+            for col in ["Age","xPhysical"] + extra_cols:
+                if col in df_grid.columns:
+                    gb.configure_column(col, type=["numericColumn"], cellStyle={'textAlign': 'right'})
             
-            # Colonnes numériques alignées à droite
-            for col in [age_col] + extra_cols + ["xPhysical"]:
-                if col in player_display_phy.columns:
-                    gob.configure_column(col, type=["numericColumn"], cellStyle={'textAlign': 'right'})
+            # optionnel mais identique à Merged : épingler le nom à gauche
+            if "Player Name" in df_grid.columns:
+                gb.configure_column("Player Name", pinned="left")
             
-            # Colonne masquée
-            gob.configure_column("Transfermarkt", hide=True)
+            # pagination OFF (comme Merged)
+            gb.configure_pagination(enabled=False)
             
-            # Configuration de la sélection et du layout
-            gob.configure_selection(selection_mode="single", use_checkbox=True)
-            gob.configure_pagination(enabled=False)  # ✅ comme Merged Data
-            gob.configure_grid_options(domLayout="normal", suppressHorizontalScroll=True)
-            
-            # Construction de la grille
             grid = AgGrid(
-                player_display_phy,
-                gridOptions=gob.build(),
+                df_grid,
+                gridOptions=gb.build(),
                 update_mode=GridUpdateMode.SELECTION_CHANGED,
+                # pas de DataReturnMode
                 fit_columns_on_grid_load=True,
-                theme="streamlit",          # ou "balham" si tu préfères
-                allow_unsafe_jscode=True,
+                theme="balham",             # c'est ce qui marche chez toi dans Merged; si tu préfères "streamlit", teste ensuite
+                allow_unsafe_jscode=True,   # idem Merged
                 height=500,
-                key="xphy_ps_grid",         # clé fixe (plus de clé dynamique)
+                key="xphy_ps_grid",         # clé FIXE
             )
             
-            # Correction du reflow initial (comme Merged, mais sans JS superflu)
-            st.markdown(
-                "<style>.ag-theme-streamlit, .ag-theme-balham { min-height: 480px !important; }</style>",
-                unsafe_allow_html=True
-            )
-
-            
+            # ===== 3) (temp debug) Vérifier ce que voit AgGrid =====
+            try:
+                _seen = grid.get("data", [])
+                st.caption(f"AgGrid rows seen: {len(_seen)}")   # devrait afficher 93 dans ton cas
+            except Exception:
+                pass
+                        
             # Résumé filtres
             filters_summary = [
                 f"Season(s): {', '.join(st.session_state.xphy_ps_last_seasons)}",
