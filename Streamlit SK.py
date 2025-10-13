@@ -2668,104 +2668,97 @@ elif page == "xTech/xDef":
     # Création des sous-onglets pour xTechnical
     tab_ps, tab1, tab2, tab3, tab4, tab5 = st.tabs(["Player Search", "Scatter Plot ", "Radar", "Index", "Top 50", "Rookie"])
     
-    with tabs_ps:
-        xphysical_help_expander()
+   with tab_ps:
         
-        # ==== Colonnes xPhysical ====
-        season_col   = "Season"
-        comp_col     = "Competition"
-        pos_col      = "Position Group"
-        age_col      = "Age"
-        player_col   = "Player"
-        team_col     = "Team"
+        xtech_help_expander()
 
-        # Alias (pour affichage/exports + TM)
-        if "Player Name" not in df.columns and player_col in df.columns:
-            df["Player Name"] = df[player_col]
-        if "Team Name" not in df.columns and team_col in df.columns:
-            df["Team Name"] = df[team_col]
-        if "Competition Name" not in df.columns and comp_col in df.columns:
-            df["Competition Name"] = df[comp_col]
+        season_col = "Season Name"
+        comp_col   = "Competition Name"
+        pos_col    = "Position Group"
+        foot_col   = "Prefered Foot"
+        minutes_col= "Minutes"
+        age_col    = "Age"
 
-        # ==== Sélecteurs de chargement ====
-        seasons_all = sorted(df[season_col].dropna().astype(str).unique().tolist())
-        comps_all   = sorted(df[comp_col].dropna().astype(str).unique().tolist())
+        # --- Sélecteurs "loader"
+        seasons_all = sorted(df_tech[season_col].dropna().astype(str).unique().tolist())
+        comps_all   = sorted(df_tech[comp_col].dropna().astype(str).unique().tolist())
 
-        c1, c2 = st.columns(2)
-        with c1:
+        col1, col2 = st.columns(2)
+        with col1:
             st.multiselect(
                 "Season(s) to load",
                 options=seasons_all,
-                key="xphy_ps_ui_seasons",
-                default=(['2025/2026'] if '2025/2026' in seasons_all else (seasons_all[-1:] or [])),
+                key="xtech_ps_ui_seasons",
+                default=['2025/2026'],
             )
 
-        _seasons_sel = st.session_state.get("xphy_ps_ui_seasons", [])
+        _seasons_sel = st.session_state.get("xtech_ps_ui_seasons", [])
         if _seasons_sel:
             comps_pool = sorted(
-                df.loc[df[season_col].isin(_seasons_sel), comp_col]
-                  .dropna().astype(str).unique().tolist()
+                df_tech.loc[df_tech[season_col].isin(_seasons_sel), comp_col]
+                .dropna().astype(str).unique().tolist()
             )
         else:
-            comps_pool = comps_all
+            comps_pool = sorted(df_tech[comp_col].dropna().astype(str).unique().tolist())
 
-        with c2:
+        with col2:
             st.multiselect(
                 "Competition(s) to load",
                 options=comps_pool,
-                key="xphy_ps_ui_comps",
-                default=[],  # vide au démarrage
+                key="xtech_ps_ui_comps",
+                default=[],
             )
 
-        # ---- Etat
-        if "xphy_ps_loaded_df" not in st.session_state:
-            st.session_state.xphy_ps_loaded_df = None
-        if "xphy_ps_last_seasons" not in st.session_state:
-            st.session_state.xphy_ps_last_seasons = []
-        if "xphy_ps_last_comps" not in st.session_state:
-            st.session_state.xphy_ps_last_comps = []
-        if "xphy_ps_pending" not in st.session_state:
-            st.session_state.xphy_ps_pending = True
+        # --- Etat
+        if "xtech_ps_loaded_df" not in st.session_state:
+            st.session_state.xtech_ps_loaded_df = None
+        if "xtech_ps_last_seasons" not in st.session_state:
+            st.session_state.xtech_ps_last_seasons = []
+        if "xtech_ps_last_comps" not in st.session_state:
+            st.session_state.xtech_ps_last_comps = []
+        if "xtech_ps_pending" not in st.session_state:
+            st.session_state.xtech_ps_pending = True
 
-        _now  = (tuple(st.session_state.get("xphy_ps_ui_seasons", [])),
-                 tuple(st.session_state.get("xphy_ps_ui_comps", [])))
-        _last = (tuple(st.session_state.get("xphy_ps_last_seasons", [])),
-                 tuple(st.session_state.get("xphy_ps_last_comps", [])))
-        if st.session_state.xphy_ps_loaded_df is not None and _now != _last:
-            st.session_state.xphy_ps_pending = True
-            st.session_state.xphy_ps_loaded_df = None
-            
-        comp_sel = st.session_state.get("xphy_ps_ui_comps", [])
-        load_disabled = not bool(comp_sel)
-        if st.button("Load Data", key="xphy_ps_load_btn", type="primary", disabled=load_disabled, help="Select at least one competition"):
-            if st.session_state.xphy_ps_ui_seasons and st.session_state.xphy_ps_ui_comps:
-                st.session_state.xphy_ps_last_seasons = list(st.session_state.xphy_ps_ui_seasons)
-                st.session_state.xphy_ps_last_comps   = list(st.session_state.xphy_ps_ui_comps)
-            else:
-                st.session_state.xphy_ps_last_seasons = seasons_all
-                st.session_state.xphy_ps_last_comps   = comps_all
+        _now = (tuple(st.session_state.xtech_ps_ui_seasons), tuple(st.session_state.xtech_ps_ui_comps))
+        _last= (tuple(st.session_state.xtech_ps_last_seasons), tuple(st.session_state.xtech_ps_last_comps))
+        if st.session_state.xtech_ps_loaded_df is not None and _now != _last:
+            st.session_state.xtech_ps_pending = True
+            st.session_state.xtech_ps_loaded_df = None
 
-            df_loaded = df[
-                df[season_col].isin(st.session_state.xphy_ps_last_seasons)
-                & df[comp_col].isin(st.session_state.xphy_ps_last_comps)
+        seasons_sel = st.session_state.get("xtech_ps_ui_seasons", [])
+        comps_sel   = st.session_state.get("xtech_ps_ui_comps", [])
+        load_disabled = not (seasons_sel and comps_sel)
+
+        if st.button(
+            "Load Data",
+            key="xtech_ps_load_btn",
+            type="primary",
+            use_container_width=False,
+            disabled=load_disabled,
+            help="Select at least one season and competition before loading data"
+        ):
+            st.session_state.xtech_ps_last_seasons = list(seasons_sel)
+            st.session_state.xtech_ps_last_comps   = list(comps_sel)
+
+            df_loaded = df_tech[
+                df_tech[season_col].isin(st.session_state.xtech_ps_last_seasons)
+                & df_tech[comp_col].isin(st.session_state.xtech_ps_last_comps)
             ].copy()
-            st.session_state.xphy_ps_loaded_df = df_loaded
-            st.session_state.xphy_ps_pending = False
 
-        ps_ready = st.session_state.xphy_ps_loaded_df is not None and not st.session_state.xphy_ps_pending
-        if not ps_ready:
+            st.session_state.xtech_ps_loaded_df = df_loaded
+            st.session_state.xtech_ps_pending = False
+
+        if st.session_state.xtech_ps_loaded_df is None or st.session_state.xtech_ps_pending:
             st.info("Please load data to continue.")
         else:
             st.markdown("---")
-            df_loaded = st.session_state.xphy_ps_loaded_df.copy()
 
-           # ==== Filtres dynamiques ====
-            DESIRED_ORDER = ["Goalkeeper", "Central Defender", "Full Back", "Midfield", "Wide Attacker", "Center Forward"]
+            # ============== Filtres dynamiques ==============
+            df_loaded = st.session_state.xtech_ps_loaded_df.copy()
 
-            c3, c4 = st.columns([1.2, 1.2])
-
-            # -- Position Group (à gauche)
-            with c3:
+            c1, c2 = st.columns([1.2, 1.2])
+            with c1:
+                DESIRED_ORDER = ["Goalkeeper", "Full Back", "Central Defender", "Midfielder", "Attacking Midfielder", "Winger", "Striker"]
                 if pos_col in df_loaded.columns:
                     raw_pos = df_loaded[pos_col].dropna().astype(str).unique().tolist()
                     order_idx = {v: i for i, v in enumerate(DESIRED_ORDER)}
@@ -2776,104 +2769,143 @@ elif page == "xTech/xDef":
                     "Position Group(s)",
                     options=pos_options,
                     default=[],
-                    key="xphy_ps_positions",
+                    key="xtech_ps_positions",
                 )
 
-            # -- Age (à droite)  ✅ (à côté du Position Group)
+            with c2:
+                standard_pf = ["Right Footed", "Left Footed", "Ambidextrous"]
+                if foot_col in df_loaded.columns:
+                    pf_seen = df_loaded[foot_col].dropna().astype(str).str.strip().unique().tolist()
+                    pf_options = [p for p in standard_pf if p in pf_seen] or standard_pf
+                else:
+                    pf_options = standard_pf
+                selected_feet = st.multiselect(
+                    "Preferred Foot",
+                    options=pf_options,
+                    default=pf_options,
+                    key="xtech_ps_foot",
+                )
+
             def _bounds(series, default=(0, 0)):
                 s = pd.to_numeric(series, errors="coerce")
                 return (int(s.min()), int(s.max())) if s.notna().any() else default
 
-            _ps_ver = str(hash((tuple(st.session_state.xphy_ps_last_seasons),
-                                tuple(st.session_state.xphy_ps_last_comps))))
+            _ps_ver = str(hash((tuple(st.session_state.xtech_ps_last_seasons), tuple(st.session_state.xtech_ps_last_comps))))
 
-            with c4:
+            c3, c4 = st.columns([1.2, 1.2])
+            with c3:
                 if age_col in df_loaded.columns and not df_loaded[age_col].isnull().all():
                     a_min, a_max = _bounds(df_loaded[age_col], default=(16, 45))
                     selected_age = st.slider(
                         "Age",
-                        min_value=a_min, max_value=a_max,
-                        value=(a_min, a_max), step=1,
-                        key=f"xphy_ps_age_{_ps_ver}",
+                        min_value=a_min,
+                        max_value=a_max,
+                        value=(a_min, a_max),
+                        step=1,
+                        key=f"xtech_ps_age_{_ps_ver}",
                     )
                 else:
                     selected_age = None
 
-            # Appliquer les filtres (⚠️ pas de filtre sur Team)
+            with c4:
+                if minutes_col in df_loaded.columns and not df_loaded[minutes_col].isnull().all():
+                    m_min, m_max = _bounds(df_loaded[minutes_col], default=(0, 4000))
+                    selected_minutes = st.slider(
+                        "Minutes",
+                        min_value=m_min,
+                        max_value=m_max,
+                        value=(m_min, m_max),
+                        step=50,
+                        key=f"xtech_ps_minutes_{_ps_ver}",
+                    )
+                else:
+                    selected_minutes = None
+
+            # ============== Application filtres ==============
             df_f = df_loaded.copy()
             if selected_positions:
                 df_f = df_f[df_f[pos_col].isin(selected_positions)]
+            if selected_feet:
+                df_f = df_f[df_f[foot_col].astype(str).str.strip().isin(selected_feet)]
             if selected_age:
                 df_f = df_f[(df_f[age_col] >= selected_age[0]) & (df_f[age_col] <= selected_age[1])]
+            if selected_minutes:
+                df_f = df_f[(df_f[minutes_col] >= selected_minutes[0]) & (df_f[minutes_col] <= selected_minutes[1])]
 
-            # ==== Groupes de métriques : PSV / ALL (P90) / TIP (P30) / OTIP (P30) ====
-            PSV_METRICS = [
-                ("PSV-99", "PSV-99"),
-                ("TOP 5 PSV-99", "TOP 5 PSV-99"),
-            ]
-            ALL_METRICS = [
-                ("xPhysical", "xPhysical (/100)"),
-                ("Total Distance P90", "Total Distance"),
-                ("M/min P90", "M/min"),
-                ("Running Distance P90", "Running Distance"),
-                ("HI Distance P90", "HI Distance"),
-                ("HSR Distance P90", "HSR Distance"),
-                ("Sprinting Distance P90", "Sprinting Distance"),
-                ("Sprint Count P90", "Sprint Count"),
-                ("High Acceleration Count P90", "High Accel. Count"),
-                ("Explosive Acceleration to HSR Count P90", "Expl. Accel → HSR"),
-                ("Explosive Acceleration to Sprint Count P90", "Expl. Accel → Sprint"),
-            ]
-            TIP_METRICS = [
-                ("Total Distance TIP P30", "Total Distance TIP"),
-                ("M/min TIP P30", "M/min TIP"),
-                ("Running Distance TIP P30", "Running Distance TIP"),
-                ("HI Distance TIP P30", "HI Distance TIP"),
-                ("HSR Distance TIP P30", "HSR Distance TIP"),
-                ("Sprinting Distance TIP P30", "Sprinting Distance TIP"),
-                ("Sprint Count TIP P30", "Sprint Count TIP"),
-                ("High Acceleration Count TIP P30", "High Accel. Count TIP"),
-                ("Explosive Acceleration to HSR Count TIP P30", "Expl. Accel → HSR TIP"),
-                ("Explosive Acceleration to Sprint Count TIP P30", "Expl. Accel → Sprint TIP"),
-            ]
-            OTIP_METRICS = [
-                ("Total Distance OTIP P30", "Total Distance OTIP"),
-                ("M/min OTIP P30", "M/min OTIP"),
-                ("Running Distance OTIP P30", "Running Distance OTIP"),
-                ("HI Distance OTIP P30", "HI Distance OTIP"),
-                ("HSR Distance OTIP P30", "HSR Distance OTIP"),
-                ("Sprinting Distance OTIP P30", "Sprinting Distance OTIP"),
-                ("Sprint Count OTIP P30", "Sprint Count OTIP"),
-                ("High Acceleration Count OTIP P30", "High Accel. Count OTIP"),
-                ("Explosive Acceleration to HSR Count OTIP P30", "Expl. Accel → HSR OTIP"),
-                ("Explosive Acceleration to Sprint Count OTIP P30", "Expl. Accel → Sprint OTIP"),
-            ]
+            # --- Colonne URL Transfermarkt
+            import urllib.parse as _parse
+            TM_BASE = "https://www.transfermarkt.fr/schnellsuche/ergebnis/schnellsuche?query="
+            if "Transfermarkt" not in df_f.columns:
+                df_f["Transfermarkt"] = df_f["Player Name"].apply(
+                    lambda name: TM_BASE + _parse.quote(str(name)) if pd.notna(name) else ""
+                )
 
-            metric_popovers = [
-                ("PSV", PSV_METRICS),
-                ("ALL (P90)", ALL_METRICS),
-                ("TIP (P30)", TIP_METRICS),
-                ("OTIP (P30)", OTIP_METRICS),
-            ]
+            # =========================
+            # POP-OVERS (mêmes groupes)
+            # =========================
 
-            # État reset percentiles
-            if "xphy_ps_reset_counter" not in st.session_state:
-                st.session_state.xphy_ps_reset_counter = 0
+            if "xtech_ps_reset_counter" not in st.session_state:
+                st.session_state.xtech_ps_reset_counter = 0
 
             df_for_pct = df_f.copy()
 
-            st.markdown("<hr style='margin:6px 0 0 0; border-color:#555;'>", unsafe_allow_html=True)
-            row = st.columns(4, gap="small")  # ✅ une seule ligne (4 colonnes)
+            INDEX_METRICS = [("xTECH","xTECH"), ("xDEF","xDEF")]
+            SCORING_SHOOTING_METRICS = [
+                ("Npg P90", "NP Goals"), ("Op Assists P90", "OP Assists"),
+                ("Conversion Ratio", "Conversion %"), ("Scoring Contribution", "Contribution G+A"),
+                ("Shots P90", "Shots"), ("Np Shots P90", "Shots"),
+                ("Shot On Target Ratio", "Shooting %"), ("Np Xg P90", "NP xG"),
+                ("Np Xg Per Shot", "xG/Shot"),
+            ]
+            CREATIVITY_METRICS = [
+                ("Npxgxa P90","NPxG + xA"),("OP xGAssisted","OP xA"),("Op Key Passes P90","OP Key Passes"),
+                ("Shots Key Passes P90","Shots + Key Passes"),("Op Passes Into And Touches Inside Box P90","OP Passes + Touches Into Box"),
+                ("Through Balls P90","Throughballs"),("Crosses P90","Crosses"),("Crossing Ratio","Crossing %"),
+                ("Sp Key Passes P90","Set Pieces Key Passes"),("Sp Xa P90","Set Pieces xA"),
+                ("Dribbles P90","Dribbles Succ."),("Dribble Ratio","Dribble %"),("Penalty Wins P90","Penalty Won"),
+            ]
+            OBV_METRICS = [("Obv P90","OBV"),("Obv Pass P90","OBV Pass"),("Obv Shot P90","OBV Shot"),("Obv Defensive Action P90","OBV Def. Act."),("Obv Dribble Carry P90","OBV Dribble & Carry")]
+            POSSESSION_METRICS = [("Op Passes P90","OP Passes"),("Passing Ratio","Passing %"),("Pressured Passing Ratio","Pressured Passing %"),("Deep Progressions P90","Deep Progressions"),("Deep Completions P90","Deep Completions"),
+                ("Op Xgbuildup P90","OP xG Buildup"),("Long Balls P90","Long Ball"),("Long Ball Ratio","Long Ball %"),("Carries P90","Carries"), ("Turnovers P90","Turnovers"),("Dispossessions P90","Dispossessions")]
+            DEFENSIVE_METRICS = [
+                ("Padj Pressures P90","PAdj Pressures"),("Counterpressures P90","Counterpressures"),
+                ("Fhalf Pressures P90","Pressures in Opp. Half"),("Pressure Regains P90","Pressure Regains"),
+                ("Average X Pressure","Average Pressure Distance"),("Ball Recoveries P90","Ball Recoveries"),
+                ("Fhalf Ball Recoveries P90","Ball Recoveries in Opp. Half"),("Padj Interceptions P90","PAdj Interceptions"),
+                ("Padj Tackles P90","PAdj Tackles"),("Padj Tackles And Interceptions P90","PAdj Tackles And Interceptions"),
+                ("Tackles And Interceptions P90","Tackles And Interceptions"),("Challenge Ratio","Tack./Dribbled Past %"),
+                ("Hops","HOPS"),("Aerial Wins P90","Aerial Wins"),("Aerial Ratio","Aerial Win %"),
+                ("Blocks Per Shot","Blocks/Shot"),("Padj Clearances P90","PAdj Clearances"),("Errors P90","Errors"),
+            ]
+            GK_METRICS = [("xTech GK Save (/100)","xSave GK"),("xTech GK Usage (/100)","xUsage GK"),("Save Ratio","Save % (GK)"),
+                          ("Xs Ratio","Expected Save % (GK)"),("Gsaa P90","Goals Saved Above Average (GK)"),
+                          ("Clcaa","Claims % (GK)"),("Pass Into Danger Ratio","Pass Into Danger % (GK)"),("OBV Gk P90","OBV GK")]
 
+            metric_popovers = [
+                ("Index", INDEX_METRICS),
+                ("Scoring / Shooting", SCORING_SHOOTING_METRICS),
+                ("Creativity / Dangerousness", CREATIVITY_METRICS),
+                ("OBV", OBV_METRICS),
+                ("Possession / Ball use", POSSESSION_METRICS),
+                ("Defensive", DEFENSIVE_METRICS),
+                ("GK", GK_METRICS),
+            ]
+            
             filter_percentiles = {}
             active_filters_count = {name: 0 for name, _ in metric_popovers}
 
+            st.markdown("<hr style='margin:6px 0 0 0; border-color:#555;'>", unsafe_allow_html=True)
+            row1 = st.columns(4, gap="small")
+            row2 = st.columns(4, gap="small")
+
             for i, (name, metric_list) in enumerate(metric_popovers):
-                with row[i]:
+                target_col = row1[i] if i < 4 else row2[i - 4]
+                with target_col:
+                    st.markdown('<div class="custom-popover-wrap">', unsafe_allow_html=True)
                     with st.popover(name, use_container_width=True):
                         for col_name, label in metric_list:
                             if col_name in df_for_pct.columns:
-                                slider_key = f"xphy_pop_{name}_{col_name}_{st.session_state.xphy_ps_reset_counter}"
+                                slider_key = f"xtech_pop_{name}_{col_name}_{st.session_state.xtech_ps_reset_counter}"
                                 s = pd.to_numeric(df_for_pct[col_name], errors="coerce").dropna()
                                 if s.empty:
                                     st.slider(f"{label} – Percentile", 0, 100, 0, 5, key=slider_key, disabled=True)
@@ -2885,23 +2917,34 @@ elif page == "xTech/xDef":
                                     st.caption(f"≥ **{thr:,.2f}** (min {s.min():,.2f} / max {s.max():,.2f})")
                                     active_filters_count[name] = active_filters_count.get(name, 0) + 1
                     cnt = active_filters_count.get(name, 0)
-                    st.caption(f"{cnt} active filter{'s' if cnt != 1 else ''}")
+                    st.markdown(
+                        f'<div class="custom-active-filters">{cnt} – active filter{"s" if cnt != 1 else ""}</div>',
+                        unsafe_allow_html=True
+                    )
+                    st.markdown('</div>', unsafe_allow_html=True)
 
-            # --- Clear + TM + Send to Radar
-            col_btn1, col_btn2, col_btn3 = st.columns([1.0, 1.6, 1.6], gap="small")
+            with row2[3]:
+                st.markdown("""
+                <style>
+                div[data-testid="column"]:nth-of-type(4) button {
+                    font-size: 0.85rem !important;
+                    padding: 0.35rem 0.6rem !important;
+                    margin-bottom: 6px !important;
+                    min-height: 32px !important;
+                }
+                </style>
+                """, unsafe_allow_html=True)
 
-            with col_btn1:
-                if st.button("Clear filters", key="xphy_ps_clear_filters"):
-                    st.session_state.xphy_ps_reset_counter += 1
-                    st.rerun()
+                col_btn1, col_btn2 = st.columns([1.2, 2.2], gap="small")
 
-            with col_btn2:
-                tm_btn_slot = st.empty()
+                with col_btn1:
+                    if st.button("Clear filters", key="xtech_ps_clear_filters_sm"):
+                        st.session_state.xtech_ps_reset_counter += 1
+                        st.rerun()
 
-            with col_btn3:
-                send_radar_slot = st.empty()
+                with col_btn2:
+                    tm_btn_slot = st.empty()
 
-            # Appliquer les seuils percentiles
             extra_cols = []
             for (grp, col_name), p in filter_percentiles.items():
                 if p and (col_name in df_f.columns):
@@ -2912,45 +2955,43 @@ elif page == "xTech/xDef":
                         if col_name not in extra_cols:
                             extra_cols.append(col_name)
 
-            # ==== Tableau ====
-            base_cols = [
-                "Player Name", "Team Name", "Competition Name",
-                "Position Group", "Age",
-                "xPhysical"
+            _base_cols = [
+                "Player Name","Team Name","Competition Name",
+                pos_col, minutes_col, age_col, "xTECH","xDEF","Transfermarkt"
             ]
-            extra_cols = [c for c in extra_cols if c not in base_cols]
+            extra_cols = [c for c in extra_cols if c not in _base_cols]
 
             final_cols = []
-            for c in base_cols + extra_cols:
+            for c in _base_cols + extra_cols:
                 if c in df_f.columns and c not in final_cols:
                     final_cols.append(c)
 
             player_display = df_f[final_cols].copy()
 
-            # Cast & formats
+            if minutes_col in player_display.columns:
+                player_display[minutes_col] = pd.to_numeric(player_display[minutes_col], errors="coerce")
+                player_display[minutes_col] = np.ceil(player_display[minutes_col]).astype("Int64")
+
+            for k in ["xTECH","xDEF"]:
+                if k in player_display.columns:
+                    player_display[k] = pd.to_numeric(player_display[k], errors="coerce")
+                    player_display[k] = np.ceil(player_display[k]).astype("Int64")
+
             if age_col in player_display.columns:
                 player_display[age_col] = pd.to_numeric(player_display[age_col], errors="coerce")
 
-            for m in extra_cols + ["xPhysical"]:
+            for m in extra_cols:
                 if m in player_display.columns:
                     player_display[m] = pd.to_numeric(player_display[m], errors="coerce").round(2)
 
-            # Lien Transfermarkt
-            import urllib.parse as _parse
-            TM_BASE = "https://www.transfermarkt.fr/schnellsuche/ergebnis/schnellsuche?query="
-            if "Transfermarkt" not in player_display.columns:
-                player_display["Transfermarkt"] = player_display["Player Name"].apply(
-                    lambda name: TM_BASE + _parse.quote(str(name)) if pd.notna(name) else ""
-                )
-
-            # AgGrid
             from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode, DataReturnMode
             gob = GridOptionsBuilder.from_dataframe(player_display)
             gob.configure_default_column(resizable=True, filter=True, sortable=True, flex=1, min_width=120)
-            for col in [age_col] + extra_cols + ["xPhysical"]:
+            for col in [minutes_col, age_col, "xTECH", "xDEF"] + extra_cols:
                 if col in player_display.columns:
                     gob.configure_column(col, type=["numericColumn"], cellStyle={'textAlign': 'right'})
-            gob.configure_column("Transfermarkt", hide=True)
+            if "Transfermarkt" in player_display.columns:
+                gob.configure_column("Transfermarkt", hide=True)
             gob.configure_selection(selection_mode="single", use_checkbox=True)
             gob.configure_pagination(enabled=True, paginationAutoPageSize=True)
             gob.configure_grid_options(domLayout="normal", suppressHorizontalScroll=True)
@@ -2963,22 +3004,25 @@ elif page == "xTech/xDef":
                 fit_columns_on_grid_load=True,
                 theme="streamlit",
                 height=520,
-                key="xphy_ps_grid",
+                key="xtech_ps_grid",
             )
 
-            # Résumé filtres
             filters_summary = [
-                f"Season(s): {', '.join(st.session_state.xphy_ps_last_seasons)}",
-                f"Competition(s): {', '.join(st.session_state.xphy_ps_last_comps)}",
+                f"Season(s): {', '.join(st.session_state.xtech_ps_last_seasons)}",
+                f"Competition(s): {', '.join(st.session_state.xtech_ps_last_comps)}",
                 f"Positions: {', '.join(selected_positions) if selected_positions else 'All'}",
-                f"Age: {selected_age[0]}–{selected_age[1]}" if selected_age else "Age: All",
+                f"Preferred Foot: {', '.join(selected_feet) if selected_feet else 'All'}",
             ]
+            if selected_age:
+                filters_summary.append(f"Age: {selected_age[0]}–{selected_age[1]}")
+            if selected_minutes:
+                filters_summary.append(f"Minutes: {selected_minutes[0]}–{selected_minutes[1]}")
+
             st.markdown(
                 "<div style='font-size:0.85em; margin-top:-15px;'>Filters applied: " + " | ".join(filters_summary) + "</div>",
                 unsafe_allow_html=True
             )
 
-            # Export CSV (données visibles)
             try:
                 export_df = pd.DataFrame(grid.get("data", []))
                 if export_df.empty:
@@ -2990,87 +3034,47 @@ elif page == "xTech/xDef":
                 export_df = export_df.drop(columns=["Transfermarkt"])
 
             export_cols_order = [c for c in ["Player Name", "Team Name", "Competition Name", pos_col,
-                                             age_col, "xPhysical"] if c in export_df.columns]
+                                             minutes_col, age_col, "xTECH", "xDEF"] if c in export_df.columns]
             if export_cols_order:
                 export_df = export_df[export_cols_order]
 
             csv_bytes = export_df.to_csv(index=False).encode("utf-8-sig")
-            file_name = f"xphysical_player_search_{len(export_df)}.csv"
+            file_name = f"player_search_{len(export_df)}.csv"
 
             st.download_button(
                 label="Download selection as CSV",
                 data=csv_bytes,
                 file_name=file_name,
                 mime="text/csv",
-                key="xphy_ps_download_csv",
+                key="xtech_ps_download_csv",
+                use_container_width=False
             )
 
-            # --- Actions selon la sélection (TM + Send to Radar)
             sel = grid.get("selected_rows", [])
+
             has_sel, sel_row = False, None
             if isinstance(sel, list) and len(sel) > 0:
                 has_sel, sel_row = True, sel[0]
             elif isinstance(sel, pd.DataFrame) and not sel.empty:
                 has_sel, sel_row = True, sel.iloc[0].to_dict()
 
-            # Bouton TM
             if 'tm_btn_slot' in locals():
                 if has_sel and sel_row:
                     tm_url = sel_row.get("Transfermarkt")
                     if isinstance(tm_url, str) and tm_url.strip():
-                        tm_btn_slot.link_button("TM Player Page", tm_url, use_container_width=True)
+                        tm_btn_slot.link_button(
+                            f"TM Player Page",
+                            tm_url,
+                            use_container_width=True,
+                        )
                     else:
                         tm_btn_slot.empty()
                 else:
                     tm_btn_slot.empty()
-
-            # Bouton Send to Radar
-            if 'send_radar_slot' in locals():
-                if has_sel and sel_row:
-                    if send_radar_slot.button("Send to Radar", use_container_width=True):
-                        try:
-                            # 1) Reconstituer la Display Name attendue par le Radar
-                            _df_dn = df[["Player", "Short Name"]].dropna().drop_duplicates()
-                            _df_dn["Display Name"] = _df_dn["Short Name"].astype(str) + " (" + _df_dn["Player"].astype(str) + ")"
-                            player_to_display_map = dict(zip(_df_dn["Player"], _df_dn["Display Name"]))
-
-                            player_name_sel = sel_row.get("Player Name") or sel_row.get("Player")
-                            display_val = player_to_display_map.get(player_name_sel)
-                            if display_val is None:
-                                short_name_fallback = sel_row.get("Short Name")
-                                display_val = f"{short_name_fallback} ({player_name_sel})" if short_name_fallback and player_name_sel else player_name_sel
-
-                            # 2) Pousser uniquement le joueur vers l’onglet Radar
-                            st.session_state["radar_p1"] = display_val
-
-                            # 3) Auto-switch vers l’onglet "Radar"
-                            import streamlit.components.v1 as components
-                            components.html(
-                                """
-                                <script>
-                                setTimeout(function(){
-                                  const root = window.parent.document;
-                                  const tabs = root.querySelectorAll('button[role="tab"]');
-                                  for (const t of tabs) {
-                                    if ((t.innerText || "").trim().toLowerCase().startsWith("radar")) {
-                                      t.click();
-                                      break;
-                                    }
-                                  }
-                                }, 80);
-                                </script>
-                                """,
-                                height=0,
-                            )
-
-                        except Exception:
-                            pass  # pas d'affichage d'erreur ni de succès
-                else:
-                    send_radar_slot.empty()
                     
                     st.write("")
                     st.write("")
-                    xphysical_glossary_expander()
+                    xtech_glossary_expander()
         
 
 #######################=== Onglet Scatter Plot ===
