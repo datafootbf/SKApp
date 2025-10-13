@@ -1357,9 +1357,9 @@ if page == "xPhysical":
                 update_mode=GridUpdateMode.SELECTION_CHANGED,
                 data_return_mode=DataReturnMode.FILTERED,
                 fit_columns_on_grid_load=True,
-                theme="streamlit",              # <— aligné sur Merged (optionnel mais sûr)
+                theme="balham",
                 allow_unsafe_jscode=True,    # <— important selon versions st_aggrid
-                height=500,
+                height=520,
                 key="xphy_ps_grid",
             )
 
