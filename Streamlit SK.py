@@ -1340,29 +1340,52 @@ if page == "xPhysical":
                 )
 
             # AgGrid
-            from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode, DataReturnMode
+            from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode
+            from st_aggrid.shared import JsCode
+            
             gob = GridOptionsBuilder.from_dataframe(player_display_phy)
             gob.configure_default_column(resizable=True, filter=True, sortable=True, flex=1, min_width=120)
+            
+            # Numériques alignés à droite
             for col in [age_col] + extra_cols + ["xPhysical"]:
                 if col in player_display_phy.columns:
                     gob.configure_column(col, type=["numericColumn"], cellStyle={'textAlign': 'right'})
+            
+            # Colonne masquée
             gob.configure_column("Transfermarkt", hide=True)
+            
+            # Sélection & options
             gob.configure_selection(selection_mode="single", use_checkbox=True)
             gob.configure_pagination(enabled=True, paginationAutoPageSize=True)
             gob.configure_grid_options(domLayout="normal", suppressHorizontalScroll=True)
+            
+            # 👉 Triggers de resize au premier rendu
+            gob.configure_grid_options(
+                onFirstDataRendered=JsCode("function(p){ p.api.sizeColumnsToFit(); }"),
+                onGridReady=JsCode("function(p){ setTimeout(function(){ p.api.sizeColumnsToFit(); }, 80); }"),
+            )
+            
+            # Remount seulement si les colonnes changent (colonnes dynamiques via popovers)
+            _cols_ver = str(hash(tuple(player_display_phy.columns)))
             
             grid = AgGrid(
                 player_display_phy,
                 gridOptions=gob.build(),
                 update_mode=GridUpdateMode.SELECTION_CHANGED,
-                data_return_mode=DataReturnMode.FILTERED,
                 fit_columns_on_grid_load=True,
-                theme="streamlit",
+                theme="streamlit",          # ou "balham" si tu préfères
                 allow_unsafe_jscode=True,
-                height=520,
-                key="xphy_ps_grid",
+                height=500,
+                key=f"xphy_ps_grid_{_cols_ver}",
             )
-
+            
+            # Petit "nudge" de resize côté navigateur après le paint
+            import streamlit.components.v1 as components
+            components.html(
+                "<script>setTimeout(function(){ window.dispatchEvent(new Event('resize')); }, 120);</script>",
+                height=0,
+            )
+            
             # Résumé filtres
             filters_summary = [
                 f"Season(s): {', '.join(st.session_state.xphy_ps_last_seasons)}",
