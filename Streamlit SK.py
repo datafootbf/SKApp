@@ -1360,6 +1360,7 @@ if page == "xPhysical":
                 theme="streamlit",
                 allow_unsafe_jscode=True,
                 height=500,
+                key="xphy_ps_grid",
             )
             
             # Résumé filtres
