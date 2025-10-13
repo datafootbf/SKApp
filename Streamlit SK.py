@@ -1350,12 +1350,6 @@ if page == "xPhysical":
             gob.configure_selection(selection_mode="single", use_checkbox=True)
             gob.configure_pagination(enabled=True, paginationAutoPageSize=True)
             gob.configure_grid_options(domLayout="normal", suppressHorizontalScroll=True)
-
-            _grid_ver = str(hash((
-                tuple(st.session_state.xphy_ps_last_seasons),
-                tuple(st.session_state.xphy_ps_last_comps),
-                player_display_phy.shape  # change si filtres percentiles vides vs non-vides aussi
-            )))
             
             grid = AgGrid(
                 player_display_phy,
