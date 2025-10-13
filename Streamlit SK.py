@@ -1127,7 +1127,13 @@ if page == "xPhysical":
             
         comp_sel = st.session_state.get("xphy_ps_ui_comps", [])
         load_disabled = not bool(comp_sel)
-        if st.button("Load Data", type="primary", disabled=load_disabled, help="Select at least one competition"):
+        if st.button(
+            "Load Data",
+            key="xphy_ps_load_btn",     # <— NEW: clé unique
+            type="primary",
+            disabled=load_disabled,
+            help="Select at least one competition"
+        ):
             if st.session_state.xphy_ps_ui_seasons and st.session_state.xphy_ps_ui_comps:
                 st.session_state.xphy_ps_last_seasons = list(st.session_state.xphy_ps_ui_seasons)
                 st.session_state.xphy_ps_last_comps   = list(st.session_state.xphy_ps_ui_comps)
@@ -1351,7 +1357,8 @@ if page == "xPhysical":
                 update_mode=GridUpdateMode.SELECTION_CHANGED,
                 data_return_mode=DataReturnMode.FILTERED,
                 fit_columns_on_grid_load=True,
-                theme="streamlit",
+                theme="streamlit",              # <— aligné sur Merged (optionnel mais sûr)
+                allow_unsafe_jscode=True,    # <— important selon versions st_aggrid
                 height=500,
                 key="xphy_ps_grid",
             )
@@ -1392,8 +1399,9 @@ if page == "xPhysical":
                 data=csv_bytes,
                 file_name=file_name,
                 mime="text/csv",
+                key="xphy_ps_download_csv",  # <— NEW: clé unique
             )
-
+            
             # --- Actions selon la sélection (TM + Send to Radar)
             sel = grid.get("selected_rows", [])
             has_sel, sel_row = False, None
