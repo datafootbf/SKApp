@@ -1340,29 +1340,41 @@ if page == "xPhysical":
                 )
 
             # AgGrid
-            from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode, DataReturnMode
+            _text_cols = [c for c in ["Player Name","Team Name","Competition Name","Position Group"] if c in player_display_phy.columns]
+            for c in _text_cols:
+                player_display_phy[c] = player_display_phy[c].astype(str)
+            
+            from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode  # <-- pas DataReturnMode
             gob = GridOptionsBuilder.from_dataframe(player_display_phy)
-            gob.configure_default_column(resizable=True, filter=True, sortable=True, flex=1, min_width=120)
+            
+            # ≈ Merged
+            gob.configure_default_column(
+                editable=False, groupable=True, sortable=True, filter="agTextColumnFilter",
+                resizable=True, flex=1, min_width=120
+            )
             for col in [age_col] + extra_cols + ["xPhysical"]:
                 if col in player_display_phy.columns:
-                    gob.configure_column(col, type=["numericColumn"], cellStyle={'textAlign': 'right'})
-            gob.configure_column("Transfermarkt", hide=True)
-            gob.configure_selection(selection_mode="single", use_checkbox=True)
-            gob.configure_pagination(enabled=True, paginationAutoPageSize=True)
-            gob.configure_grid_options(domLayout="normal", suppressHorizontalScroll=True)
+                    gob.configure_column(col, type=["numericColumn"], cellStyle={"textAlign": "right"})
+            
+            # même choix que Merged : pas de pagination
+            gob.configure_pagination(enabled=False)
+            
+            # (optionnel) col "Player Name" à gauche (comme Merged)
+            if "Player Name" in player_display_phy.columns:
+                gob.configure_column("Player Name", pinned="left")
             
             grid = AgGrid(
                 player_display_phy,
                 gridOptions=gob.build(),
                 update_mode=GridUpdateMode.SELECTION_CHANGED,
-                #data_return_mode=DataReturnMode.FILTERED,
+                #data_return_mode=DataReturnMode.FILTERED
                 fit_columns_on_grid_load=True,
-                theme="streamlit",
+                theme="balham",
                 allow_unsafe_jscode=True,
-                height=520,
-                key="xphy_ps_grid",
+                height=500,
+                key="xphy_ps_grid",  # clé fixe, OK
             )
-            
+
             # Résumé filtres
             filters_summary = [
                 f"Season(s): {', '.join(st.session_state.xphy_ps_last_seasons)}",
