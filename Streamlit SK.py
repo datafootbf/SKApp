@@ -1351,7 +1351,7 @@ if page == "xPhysical":
                 update_mode=GridUpdateMode.SELECTION_CHANGED,
                 data_return_mode=DataReturnMode.FILTERED,
                 fit_columns_on_grid_load=True,
-                theme="streamlit",
+                theme="balham",
                 height=500,
                 key="xphy_ps_grid",
             )
