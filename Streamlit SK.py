@@ -1361,7 +1361,6 @@ if page == "xPhysical":
                 allow_unsafe_jscode=True,
                 height=500,
                 reload_data=True,                 # <— FORCE le refresh de la data
-                key=f"xphy_ps_grid_{_grid_ver}",  # <— remount complet sur nouveau dataset
             )
             
             # Résumé filtres
