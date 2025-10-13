@@ -2059,8 +2059,8 @@ if page == "xPhysical":
 
         with col1:
             default_display = next((name for name in display_options if "Artem Dovbyk" in name), display_options[0])
-            player_display = st.selectbox("Select a player", display_options, index=display_options.index(default_display), key="idx_p1")
-            player = display_to_player[player_display]
+            player_display1 = st.selectbox("Select a player", display_options, index=display_options.index(default_display), key="idx_p1")
+            player = display_to_player[player_display1]
 
         with col2:
             seasons = sorted(df[df["Player"] == player]["Season"].dropna().unique())
