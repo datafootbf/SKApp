@@ -1340,80 +1340,29 @@ if page == "xPhysical":
                 )
 
             # AgGrid
-            if "xphy_ps_frozen_cols" not in st.session_state:
-                st.session_state.xphy_ps_frozen_cols = list(player_display_phy.columns)
-            else:
-                # Ajoute les colonnes manquantes (nées d’un popover) avec NaN
-                for c in st.session_state.xphy_ps_frozen_cols:
-                    if c not in player_display_phy.columns:
-                        player_display_phy[c] = np.nan
-                # Garde l’ordre stable
-                player_display_phy = player_display_phy[st.session_state.xphy_ps_frozen_cols]
-            
-            
-            # ======== BLOC AGGRID ========
-            # ===== 1) DataFrame propre pour la grille =====
-            df_grid = player_display_phy.reset_index(drop=True).copy()
-            
-            # Colonnes texte castées en str (évite les objets/NA bizarres)
-            _text_cols = [c for c in ["Player Name","Team Name","Competition Name","Position Group"] if c in df_grid.columns]
-            for c in _text_cols:
-                df_grid[c] = df_grid[c].astype(str)
-            
-            # ===== 2) CSS : force la couleur du texte (cells + header) =====
-            st.markdown("""
-            <style>
-            .ag-theme-balham .ag-cell, .ag-theme-balham .ag-header-cell-text,
-            .ag-theme-streamlit .ag-cell, .ag-theme-streamlit .ag-header-cell-text {
-              color: #e6e6e6 !important;     /* lisible en dark; mets #111 si fond clair */
-              opacity: 1 !important;
-            }
-            .ag-theme-balham .ag-cell div, .ag-theme-streamlit .ag-cell div {
-              color: inherit !important;
-            }
-            </style>
-            """, unsafe_allow_html=True)
-            
-            # ===== 3) AgGrid (config minimaliste + valueFormatter universel) =====
-            from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode
-            from st_aggrid.shared import JsCode
-            
-            gb = GridOptionsBuilder.from_dataframe(df_grid)
-            gb.configure_default_column(
-                editable=False, groupable=True, sortable=True, filter="agTextColumnFilter",
-                resizable=True, flex=1, min_width=120
-            )
-            
-            # valueFormatter = "affiche toujours quelque chose" (stringify + NA -> "")
-            _strfmt = JsCode("function(params){ return (params.value == null) ? '' : String(params.value); }")
-            
-            # Appliquer le formatter par défaut à toutes les colonnes (et aligner les numériques)
-            for col in df_grid.columns:
-                is_num = col in (["Age","xPhysical"] + [c for c in df_grid.columns if c in (locals().get('extra_cols', []) or [])])
-                if is_num:
-                    gb.configure_column(col, type=["numericColumn"], cellStyle={'textAlign': 'right'}, valueFormatter=_strfmt)
-                else:
-                    gb.configure_column(col, valueFormatter=_strfmt)
-            
-            # Optionnel : épingler le nom à gauche
-            if "Player Name" in df_grid.columns:
-                gb.configure_column("Player Name", pinned="left")
-            
-            # Même recette que Merged : pas de pagination
-            gb.configure_pagination(enabled=False)
+            from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode, DataReturnMode
+            gob = GridOptionsBuilder.from_dataframe(player_display_phy)
+            gob.configure_default_column(resizable=True, filter=True, sortable=True, flex=1, min_width=120)
+            for col in [age_col] + extra_cols + ["xPhysical"]:
+                if col in player_display_phy.columns:
+                    gob.configure_column(col, type=["numericColumn"], cellStyle={'textAlign': 'right'})
+            gob.configure_column("Transfermarkt", hide=True)
+            gob.configure_selection(selection_mode="single", use_checkbox=True)
+            gob.configure_pagination(enabled=True, paginationAutoPageSize=True)
+            gob.configure_grid_options(domLayout="normal", suppressHorizontalScroll=True)
             
             grid = AgGrid(
-                df_grid,
-                gridOptions=gb.build(),
+                player_display_phy,
+                gridOptions=gob.build(),
                 update_mode=GridUpdateMode.SELECTION_CHANGED,
+                #data_return_mode=DataReturnMode.FILTERED,
                 fit_columns_on_grid_load=True,
-                theme="balham",            # ou "streamlit" si tu préfères
+                theme="streamlit",
                 allow_unsafe_jscode=True,
-                height=500,
+                height=520,
                 key="xphy_ps_grid",
             )
-
-                        
+            
             # Résumé filtres
             filters_summary = [
                 f"Season(s): {', '.join(st.session_state.xphy_ps_last_seasons)}",
