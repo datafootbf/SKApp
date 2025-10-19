@@ -2756,6 +2756,7 @@ elif page == "xTech/xDef":
 
             st.session_state.xtech_ps_loaded_df = df_loaded
             st.session_state.xtech_ps_pending = False
+            st.rerun()  # ← AJOUT CRITIQUE
 
         if st.session_state.xtech_ps_loaded_df is None or st.session_state.xtech_ps_pending:
             st.info("Please load data to continue.")
@@ -2977,33 +2978,40 @@ elif page == "xTech/xDef":
 
             player_display = df_f[final_cols].copy()
 
+            # Typage robuste avec gestion des NaN
             if minutes_col in player_display.columns:
-                player_display[minutes_col] = pd.to_numeric(player_display[minutes_col], errors="coerce")
-                player_display[minutes_col] = np.ceil(player_display[minutes_col]).astype("Int64")
+                player_display[minutes_col] = pd.to_numeric(player_display[minutes_col], errors="coerce").fillna(0)
+                player_display[minutes_col] = np.ceil(player_display[minutes_col]).astype(int)
+
+            if age_col in player_display.columns:
+                player_display[age_col] = pd.to_numeric(player_display[age_col], errors="coerce").fillna(0).astype(int)
 
             for k in ["xTECH","xDEF"]:
                 if k in player_display.columns:
-                    player_display[k] = pd.to_numeric(player_display[k], errors="coerce")
-                    player_display[k] = np.ceil(player_display[k]).astype("Int64")
-
-            if age_col in player_display.columns:
-                player_display[age_col] = pd.to_numeric(player_display[age_col], errors="coerce")
+                    player_display[k] = pd.to_numeric(player_display[k], errors="coerce").fillna(0)
+                    player_display[k] = np.ceil(player_display[k]).astype(int)
 
             for m in extra_cols:
                 if m in player_display.columns:
-                    player_display[m] = pd.to_numeric(player_display[m], errors="coerce").round(2)
-
+                    player_display[m] = pd.to_numeric(player_display[m], errors="coerce").fillna(0).round(2)
+        
             from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode, DataReturnMode
+            # Configuration AgGrid avec filtres numériques explicites
             gob = GridOptionsBuilder.from_dataframe(player_display)
             gob.configure_default_column(resizable=True, filter=True, sortable=True, flex=1, min_width=120)
+
             for col in [minutes_col, age_col, "xTECH", "xDEF"] + extra_cols:
                 if col in player_display.columns:
-                    gob.configure_column(col, type=["numericColumn"], cellStyle={'textAlign': 'right'})
+                    gob.configure_column(
+                        col, 
+                        type=["numericColumn", "numberColumnFilter"],  # ← AJOUT
+                        cellStyle={'textAlign': 'right'}
+                    )                    
             if "Transfermarkt" in player_display.columns:
                 gob.configure_column("Transfermarkt", hide=True)
             gob.configure_selection(selection_mode="single", use_checkbox=True)
             gob.configure_pagination(enabled=True, paginationAutoPageSize=True)
-            gob.configure_grid_options(domLayout="normal", suppressHorizontalScroll=True)
+            gob.configure_grid_options(domLayout="autoHeight")
 
             grid = AgGrid(
                 player_display,
@@ -3013,6 +3021,8 @@ elif page == "xTech/xDef":
                 fit_columns_on_grid_load=True,
                 theme="streamlit",
                 height=520,
+                reload_data=True,           # ← AJOUTER
+                enable_enterprise_modules=False,  # ← AJOUTER
                 key="xtech_ps_grid",
             )
 
@@ -3084,7 +3094,6 @@ elif page == "xTech/xDef":
                     st.write("")
                     st.write("")
                     xtech_glossary_expander()
-        
 
 #######################=== Onglet Scatter Plot ===
     with tab1:
