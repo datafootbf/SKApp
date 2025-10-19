@@ -1372,7 +1372,7 @@ if page == "xPhysical":
 
                 # Configuration AgGrid (style Merged Data)
                 gb = GridOptionsBuilder.from_dataframe(df_display_phy)
-                gb.configure_selection(selection_mode="single", use_checkbox=False)  # ← PAS de checkbox
+                gb.configure_selection(selection_mode="single", use_checkbox=True)  # ← PAS de checkbox
                 gb.configure_default_column(
                     editable=False, 
                     groupable=True, 
