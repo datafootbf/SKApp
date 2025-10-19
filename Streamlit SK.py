@@ -1372,7 +1372,7 @@ if page == "xPhysical":
 
                 # Configuration AgGrid (style Merged Data)
                 gb = GridOptionsBuilder.from_dataframe(df_display_phy)
-                gb.configure_selection(selection_mode="single", use_checkbox=False)  # ← PAS de checkbox
+                gb.configure_selection(selection_mode="single", use_checkbox=True)  # ← PAS de checkbox
                 gb.configure_default_column(
                     editable=False, 
                     groupable=True, 
@@ -1408,7 +1408,7 @@ if page == "xPhysical":
                     df_display_phy,
                     gridOptions=gb.build(),
                     height=500,
-                    theme='balham',  # ← Theme Merged Data
+                    theme='streamlit',  # ← Theme Merged Data
                     update_mode=GridUpdateMode.SELECTION_CHANGED,
                     allow_unsafe_jscode=True,
                     key="xphy_ps_grid_merged_style"
@@ -3063,55 +3063,56 @@ elif page == "xTech/xDef":
 
                 df_display_ps = player_display.reset_index(drop=True)
 
-                # Typage des colonnes texte (utiliser les variables)
+                # Typage des colonnes texte
                 for col in [season_col, comp_col, pos_col]:
                     if col in df_display_ps.columns:
                         df_display_ps[col] = df_display_ps[col].astype(str)
 
-                # Formatage différencié : entiers pour colonnes de base
+                # Formatage : entiers pour colonnes de base
                 for col in [minutes_col, age_col, "xTECH", "xDEF"]:
                     if col in df_display_ps.columns:
                         df_display_ps[col] = df_display_ps[col].apply(
-                            lambda x: int(round(x)) if pd.notna(x) and x != "" else 0
+                            lambda x: int(round(x)) if pd.notna(x) else ""
                         )
 
-                # Garder 2 décimales pour les colonnes ajoutées via filtres
+                # 2 décimales pour colonnes de filtres
                 for col in extra_cols:
                     if col in df_display_ps.columns:
                         df_display_ps[col] = df_display_ps[col].apply(
-                            lambda x: round(x, 2) if pd.notna(x) and x != "" else 0.0
+                            lambda x: round(x, 2) if pd.notna(x) and x != "" else ""
                         )
 
-                # Configuration AgGrid (fusionnée)
+                # Configuration AgGrid (style Merged Data)
                 gb = GridOptionsBuilder.from_dataframe(df_display_ps)
-                gb.configure_selection(selection_mode="single", use_checkbox=True)
+                gb.configure_selection(selection_mode="single", use_checkbox=True)  # ← PAS de checkbox
                 gb.configure_default_column(
                     editable=False, 
                     groupable=True, 
                     sortable=True, 
-                    filter="agTextColumnFilter",
-                    flex=1,
-                    headerStyle={'textAlign': 'center'}
+                    filter="agTextColumnFilter"
                 )
 
-                # Configuration spécifique des colonnes numériques
+                # Colonnes numériques
                 for col in [minutes_col, age_col, "xTECH", "xDEF"] + extra_cols:
                     if col in df_display_ps.columns:
                         gb.configure_column(
                             col, 
                             type=["numericColumn", "numberColumnFilter"],
-                            flex=1
+                            cellStyle={'textAlign': 'center'}
                         )
 
-                # Player Name : épinglée à gauche et plus large
+                # Configuration de toutes les colonnes (centrage)
+                for col in df_display_ps.columns:
+                    if col != "Transfermarkt":
+                        gb.configure_column(
+                            col, 
+                            headerClass='header-style', 
+                            cellStyle={'textAlign': 'center'}
+                        )
+
+                # Player Name épinglée
                 if "Player Name" in df_display_ps.columns:
-                    gb.configure_column(
-                        "Player Name", 
-                        pinned="left",
-                        flex=2,
-                        minWidth=200,
-                        cellStyle={'textAlign': 'left'}
-                    )
+                    gb.configure_column("Player Name", pinned="left")
 
                 # Masquer Transfermarkt
                 if "Transfermarkt" in df_display_ps.columns:
@@ -3124,32 +3125,27 @@ elif page == "xTech/xDef":
                     df_display_ps,
                     gridOptions=gb.build(),
                     height=500,
-                    theme='streamlit',
+                    theme='streamlit',  # ← Theme Merged Data
                     update_mode=GridUpdateMode.SELECTION_CHANGED,
                     allow_unsafe_jscode=True,
-                    fit_columns_on_grid_load=True,
                     key="xtech_ps_grid_merged_style"
                 )
 
-                # Récupération sécurisée de la sélection
+                # Récupération sélection (même logique Merged Data)
                 selected_rows = grid_response.get("selected_rows", [])
                 if isinstance(selected_rows, pd.DataFrame):
                     selected_rows = selected_rows.to_dict(orient='records')
 
-                has_sel = False
-                sel_row = None
-
+                # Gestion boutons TM
                 if isinstance(selected_rows, list) and len(selected_rows) > 0 and isinstance(selected_rows[0], dict):
-                    has_sel = True
-                    sel_row = selected_rows[0]
-                    player_name_sel = sel_row.get("Player Name")
+                    display_row = selected_rows[0]
+                    player_name_sel = display_row.get("Player Name")
 
                     full_row = player_display[player_display["Player Name"] == player_name_sel]
 
                     if not full_row.empty:
                         tm_url = full_row.iloc[0].get("Transfermarkt")
 
-                        # Vérifier existence du slot avant utilisation
                         if 'tm_btn_slot' in locals() and tm_url and isinstance(tm_url, str) and tm_url.strip():
                             with tm_btn_slot:
                                 st.link_button(
@@ -4824,80 +4820,75 @@ elif page == "xTech/xDef":
 
             df_display_rookie = rookies_display.reset_index(drop=True)
 
-            # Typage des colonnes texte
-            for col in ["Competition Name", "Position Group"]:
+            # Typage
+            for col in [comp_col, pos_col]:
                 if col in df_display_rookie.columns:
                     df_display_rookie[col] = df_display_rookie[col].astype(str)
 
-            # Configuration AgGrid (même style que Player Search)
+            for col in ["Minutes", "Age", "xTECH", "xDEF"]:
+                if col in df_display_rookie.columns:
+                    df_display_rookie[col] = df_display_rookie[col].apply(
+                        lambda x: int(round(x)) if pd.notna(x) else ""
+                    )
+
+            # Configuration AgGrid (style Merged Data)
             gb = GridOptionsBuilder.from_dataframe(df_display_rookie)
-            gb.configure_selection(selection_mode="single", use_checkbox=True)
+            gb.configure_selection(selection_mode="single", use_checkbox=True)  # ← PAS de checkbox
             gb.configure_default_column(
                 editable=False, 
                 groupable=True, 
                 sortable=True, 
-                filter="agTextColumnFilter",
-                flex=1,
-                headerStyle={'textAlign': 'center'}
+                filter="agTextColumnFilter"
             )
 
-            # Configuration des colonnes numériques
             for col in ["Minutes", "Age", "xTECH", "xDEF"]:
                 if col in df_display_rookie.columns:
                     gb.configure_column(
                         col, 
                         type=["numericColumn", "numberColumnFilter"],
-                        flex=1
+                        cellStyle={'textAlign': 'center'}
                     )
 
-            # Player Name : épinglée à gauche et plus large
-            if "Player Name" in df_display_rookie.columns:
-                gb.configure_column(
-                    "Player Name", 
-                    pinned="left",
-                    flex=2,
-                    minWidth=200,
-                    cellStyle={'textAlign': 'left'},
-                    headerStyle={'textAlign': 'center'}
-                )
+            for col in df_display_rookie.columns:
+                if col != "Transfermarkt":
+                    gb.configure_column(
+                        col, 
+                        headerClass='header-style', 
+                        cellStyle={'textAlign': 'center'}
+                    )
 
-            # Masquer Transfermarkt
+            if "Player Name" in df_display_rookie.columns:
+                gb.configure_column("Player Name", pinned="left")
+
             if "Transfermarkt" in df_display_rookie.columns:
                 gb.configure_column("Transfermarkt", hide=True)
 
-            # Pas de pagination (scroll infini)
             gb.configure_pagination(enabled=False)
 
             grid_response_rookie = AgGrid(
                 df_display_rookie,
                 gridOptions=gb.build(),
                 height=500,
-                theme='streamlit',
+                theme='streamlit',  # ← Theme Merged Data
                 update_mode=GridUpdateMode.SELECTION_CHANGED,
                 allow_unsafe_jscode=True,
-                fit_columns_on_grid_load=True,
                 key="rookies_grid_merged_style"
             )
 
-            # Récupération sécurisée de la sélection
+            # Gestion sélection (même logique)
             selected_rows = grid_response_rookie.get("selected_rows", [])
             if isinstance(selected_rows, pd.DataFrame):
                 selected_rows = selected_rows.to_dict(orient='records')
 
-            has_sel = False
-            sel_row = None
-
             if isinstance(selected_rows, list) and len(selected_rows) > 0 and isinstance(selected_rows[0], dict):
-                has_sel = True
-                sel_row = selected_rows[0]
-                player_name_sel = sel_row.get("Player Name")
+                display_row = selected_rows[0]
+                player_name_sel = display_row.get("Player Name")
 
                 full_row = rookies_display[rookies_display["Player Name"] == player_name_sel]
 
                 if not full_row.empty:
                     tm_url = full_row.iloc[0].get("Transfermarkt")
 
-                    # Vérifier existence du slot avant utilisation
                     if 'btn_slot' in locals() and tm_url and isinstance(tm_url, str) and tm_url.strip():
                         with btn_slot:
                             st.link_button(
