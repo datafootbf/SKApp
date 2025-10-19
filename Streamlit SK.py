@@ -1357,18 +1357,16 @@ if page == "xPhysical":
                 for col in [comp_col, pos_col]:
                     if col in df_display_phy.columns:
                         df_display_phy[col] = df_display_phy[col].astype(str)
-
-                for col in [age_col, "xPhysical"]:
-                    if col in df_display_phy.columns:
-                        df_display_phy[col] = df_display_phy[col].apply(
-                            lambda x: int(round(x)) if pd.notna(x) else ""
-                        )
-
+                
+                # Colonnes numériques : rester en numeric + NaN (pas de "")
+                if age_col in df_display_phy.columns:
+                    df_display_phy[age_col] = pd.to_numeric(df_display_phy[age_col], errors="coerce").round().astype("Int64")
+                if "xPhysical" in df_display_phy.columns:
+                    df_display_phy["xPhysical"] = pd.to_numeric(df_display_phy["xPhysical"], errors="coerce").round().astype("Int64")
+                
                 for col in extra_cols:
                     if col in df_display_phy.columns:
-                        df_display_phy[col] = df_display_phy[col].apply(
-                            lambda x: round(x, 2) if pd.notna(x) and x != "" else ""
-                        )
+                        df_display_phy[col] = pd.to_numeric(df_display_phy[col], errors="coerce")  # float avec NaN
 
                 # Configuration AgGrid (style Merged Data)
                 gb = GridOptionsBuilder.from_dataframe(df_display_phy)
@@ -1380,13 +1378,34 @@ if page == "xPhysical":
                     filter="agTextColumnFilter"
                 )
 
-                for col in [age_col, "xPhysical"] + extra_cols:
+                # Age
+                if age_col in df_display_phy.columns:
+                    gb.configure_column(
+                        age_col,
+                        type=["numericColumn", "numberColumnFilter"],
+                        cellStyle={'textAlign': 'center'},
+                        valueFormatter="value == null ? '' : Math.round(value)"
+                    )
+                
+                # xPhysical
+                if "xPhysical" in df_display_phy.columns:
+                    gb.configure_column(
+                        "xPhysical",
+                        type=["numericColumn", "numberColumnFilter"],
+                        cellStyle={'textAlign': 'center'},
+                        valueFormatter="value == null ? '' : Math.round(value)"
+                    )
+                
+                # extra_cols : affichage 2 décimales si présent
+                for col in extra_cols:
                     if col in df_display_phy.columns:
                         gb.configure_column(
-                            col, 
+                            col,
                             type=["numericColumn", "numberColumnFilter"],
-                            cellStyle={'textAlign': 'center'}
+                            cellStyle={'textAlign': 'center'},
+                            valueFormatter="value == null ? '' : Number(value).toFixed(2)"
                         )
+
 
                 for col in df_display_phy.columns:
                     if col != "Transfermarkt":
