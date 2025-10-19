@@ -1408,7 +1408,7 @@ if page == "xPhysical":
                     df_display_phy,
                     gridOptions=gb.build(),
                     height=500,
-                    theme='balham',  # ← Theme Merged Data
+                    theme='streamlit',  # ← Theme Merged Data
                     update_mode=GridUpdateMode.SELECTION_CHANGED,
                     allow_unsafe_jscode=True,
                     key="xphy_ps_grid_merged_style"
