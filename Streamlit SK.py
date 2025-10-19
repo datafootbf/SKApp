@@ -1127,7 +1127,13 @@ if page == "xPhysical":
             
         comp_sel = st.session_state.get("xphy_ps_ui_comps", [])
         load_disabled = not bool(comp_sel)
-        if st.button("Load Data", type="primary", disabled=load_disabled, help="Select at least one competition"):
+        if st.button(
+            "Load Data",
+            key="xphy_ps_load_btn",     # <— NEW: clé unique
+            type="primary",
+            disabled=load_disabled,
+            help="Select at least one competition"
+        ):
             if st.session_state.xphy_ps_ui_seasons and st.session_state.xphy_ps_ui_comps:
                 st.session_state.xphy_ps_last_seasons = list(st.session_state.xphy_ps_ui_seasons)
                 st.session_state.xphy_ps_last_comps   = list(st.session_state.xphy_ps_ui_comps)
@@ -1315,47 +1321,48 @@ if page == "xPhysical":
                 if c in df_f.columns and c not in final_cols:
                     final_cols.append(c)
 
-            player_display = df_f[final_cols].copy()
+            player_display_phy = df_f[final_cols].copy()
 
             # Cast & formats
-            if age_col in player_display.columns:
-                player_display[age_col] = pd.to_numeric(player_display[age_col], errors="coerce")
+            if age_col in player_display_phy.columns:
+                player_display_phy[age_col] = pd.to_numeric(player_display_phy[age_col], errors="coerce")
 
             for m in extra_cols + ["xPhysical"]:
-                if m in player_display.columns:
-                    player_display[m] = pd.to_numeric(player_display[m], errors="coerce").round(2)
+                if m in player_display_phy.columns:
+                    player_display_phy[m] = pd.to_numeric(player_display_phy[m], errors="coerce").round(2)
 
             # Lien Transfermarkt
             import urllib.parse as _parse
             TM_BASE = "https://www.transfermarkt.fr/schnellsuche/ergebnis/schnellsuche?query="
-            if "Transfermarkt" not in player_display.columns:
-                player_display["Transfermarkt"] = player_display["Player Name"].apply(
+            if "Transfermarkt" not in player_display_phy.columns:
+                player_display_phy["Transfermarkt"] = player_display_phy["Player Name"].apply(
                     lambda name: TM_BASE + _parse.quote(str(name)) if pd.notna(name) else ""
                 )
 
             # AgGrid
             from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode, DataReturnMode
-            gob = GridOptionsBuilder.from_dataframe(player_display)
+            gob = GridOptionsBuilder.from_dataframe(player_display_phy)
             gob.configure_default_column(resizable=True, filter=True, sortable=True, flex=1, min_width=120)
             for col in [age_col] + extra_cols + ["xPhysical"]:
-                if col in player_display.columns:
+                if col in player_display_phy.columns:
                     gob.configure_column(col, type=["numericColumn"], cellStyle={'textAlign': 'right'})
             gob.configure_column("Transfermarkt", hide=True)
             gob.configure_selection(selection_mode="single", use_checkbox=True)
             gob.configure_pagination(enabled=True, paginationAutoPageSize=True)
             gob.configure_grid_options(domLayout="normal", suppressHorizontalScroll=True)
-
+            
             grid = AgGrid(
-                player_display,
+                player_display_phy,
                 gridOptions=gob.build(),
                 update_mode=GridUpdateMode.SELECTION_CHANGED,
-                data_return_mode=DataReturnMode.FILTERED,
+                #data_return_mode=DataReturnMode.FILTERED,
                 fit_columns_on_grid_load=True,
                 theme="streamlit",
+                allow_unsafe_jscode=True,
                 height=520,
                 key="xphy_ps_grid",
             )
-
+            
             # Résumé filtres
             filters_summary = [
                 f"Season(s): {', '.join(st.session_state.xphy_ps_last_seasons)}",
@@ -1372,9 +1379,9 @@ if page == "xPhysical":
             try:
                 export_df = pd.DataFrame(grid.get("data", []))
                 if export_df.empty:
-                    export_df = player_display.copy()
+                    export_df = player_display_phy.copy()
             except Exception:
-                export_df = player_display.copy()
+                export_df = player_display_phy.copy()
 
             if "Transfermarkt" in export_df.columns:
                 export_df = export_df.drop(columns=["Transfermarkt"])
@@ -1392,8 +1399,9 @@ if page == "xPhysical":
                 data=csv_bytes,
                 file_name=file_name,
                 mime="text/csv",
+                key="xphy_ps_download_csv",  # <— NEW: clé unique
             )
-
+            
             # --- Actions selon la sélection (TM + Send to Radar)
             sel = grid.get("selected_rows", [])
             has_sel, sel_row = False, None
@@ -2060,8 +2068,8 @@ if page == "xPhysical":
 
         with col1:
             default_display = next((name for name in display_options if "Artem Dovbyk" in name), display_options[0])
-            player_display = st.selectbox("Select a player", display_options, index=display_options.index(default_display), key="idx_p1")
-            player = display_to_player[player_display]
+            player_display1 = st.selectbox("Select a player", display_options, index=display_options.index(default_display), key="idx_p1")
+            player = display_to_player[player_display1]
 
         with col2:
             seasons = sorted(df[df["Player"] == player]["Season"].dropna().unique())
@@ -2680,7 +2688,7 @@ elif page == "xTech/xDef":
         minutes_col= "Minutes"
         age_col    = "Age"
 
-        # --- Sélecteurs "loader" (rien d'autre ne s'affiche tant que ce n'est pas chargé)
+        # --- Sélecteurs "loader"
         seasons_all = sorted(df_tech[season_col].dropna().astype(str).unique().tolist())
         comps_all   = sorted(df_tech[comp_col].dropna().astype(str).unique().tolist())
 
@@ -2689,12 +2697,11 @@ elif page == "xTech/xDef":
             st.multiselect(
                 "Season(s) to load",
                 options=seasons_all,
-                key="ps_ui_seasons",
+                key="xtech_ps_ui_seasons",
                 default=['2025/2026'],
             )
 
-        # --> options de compétitions filtrées PAR les saisons sélectionnées
-        _seasons_sel = st.session_state.get("ps_ui_seasons", [])
+        _seasons_sel = st.session_state.get("xtech_ps_ui_seasons", [])
         if _seasons_sel:
             comps_pool = sorted(
                 df_tech.loc[df_tech[season_col].isin(_seasons_sel), comp_col]
@@ -2706,65 +2713,60 @@ elif page == "xTech/xDef":
         with col2:
             st.multiselect(
                 "Competition(s) to load",
-                options=comps_pool,                 # <-- dynamique
-                key="ps_ui_comps",
-                default=[],                         # vide par défaut
+                options=comps_pool,
+                key="xtech_ps_ui_comps",
+                default=[],
             )
 
-        # Gestion d'état (pattern déjà utilisé dans Merged Data) :contentReference[oaicite:2]{index=2}
-        if "ps_loaded_df" not in st.session_state:
-            st.session_state.ps_loaded_df = None
-        if "ps_last_seasons" not in st.session_state:
-            st.session_state.ps_last_seasons = []
-        if "ps_last_comps" not in st.session_state:
-            st.session_state.ps_last_comps = []
-        if "ps_pending" not in st.session_state:
-            st.session_state.ps_pending = True
+        # --- Etat
+        if "xtech_ps_loaded_df" not in st.session_state:
+            st.session_state.xtech_ps_loaded_df = None
+        if "xtech_ps_last_seasons" not in st.session_state:
+            st.session_state.xtech_ps_last_seasons = []
+        if "xtech_ps_last_comps" not in st.session_state:
+            st.session_state.xtech_ps_last_comps = []
+        if "xtech_ps_pending" not in st.session_state:
+            st.session_state.xtech_ps_pending = True
 
-        # Si l’utilisateur change la sélection → on invalide le chargement précédent
-        _now = (tuple(st.session_state.ps_ui_seasons), tuple(st.session_state.ps_ui_comps))
-        _last= (tuple(st.session_state.ps_last_seasons), tuple(st.session_state.ps_last_comps))
-        if st.session_state.ps_loaded_df is not None and _now != _last:
-            st.session_state.ps_pending = True
-            st.session_state.ps_loaded_df = None
+        _now = (tuple(st.session_state.xtech_ps_ui_seasons), tuple(st.session_state.xtech_ps_ui_comps))
+        _last= (tuple(st.session_state.xtech_ps_last_seasons), tuple(st.session_state.xtech_ps_last_comps))
+        if st.session_state.xtech_ps_loaded_df is not None and _now != _last:
+            st.session_state.xtech_ps_pending = True
+            st.session_state.xtech_ps_loaded_df = None
 
-        # --- Vérifie si au moins une saison ET une compétition sont sélectionnées
-        seasons_sel = st.session_state.get("ps_ui_seasons", [])
-        comps_sel   = st.session_state.get("ps_ui_comps", [])
+        seasons_sel = st.session_state.get("xtech_ps_ui_seasons", [])
+        comps_sel   = st.session_state.get("xtech_ps_ui_comps", [])
         load_disabled = not (seasons_sel and comps_sel)
 
-        # --- Bouton Load Data (désactivé tant qu'aucune sélection)
         if st.button(
             "Load Data",
+            key="xtech_ps_load_btn",
             type="primary",
             use_container_width=False,
             disabled=load_disabled,
             help="Select at least one season and competition before loading data"
         ):
-            st.session_state.ps_last_seasons = list(seasons_sel)
-            st.session_state.ps_last_comps   = list(comps_sel)
+            st.session_state.xtech_ps_last_seasons = list(seasons_sel)
+            st.session_state.xtech_ps_last_comps   = list(comps_sel)
 
             df_loaded = df_tech[
-                df_tech[season_col].isin(st.session_state.ps_last_seasons)
-                & df_tech[comp_col].isin(st.session_state.ps_last_comps)
+                df_tech[season_col].isin(st.session_state.xtech_ps_last_seasons)
+                & df_tech[comp_col].isin(st.session_state.xtech_ps_last_comps)
             ].copy()
 
-            st.session_state.ps_loaded_df = df_loaded
-            st.session_state.ps_pending = False
+            st.session_state.xtech_ps_loaded_df = df_loaded
+            st.session_state.xtech_ps_pending = False
 
-        # Message si non chargé
-        if st.session_state.ps_loaded_df is None or st.session_state.ps_pending:
+        if st.session_state.xtech_ps_loaded_df is None or st.session_state.xtech_ps_pending:
             st.info("Please load data to continue.")
         else:
             st.markdown("---")
 
             # ============== Filtres dynamiques ==============
-            df_loaded = st.session_state.ps_loaded_df.copy()
+            df_loaded = st.session_state.xtech_ps_loaded_df.copy()
 
-            # --- Ligne 1 : Position Group + Preferred Foot
             c1, c2 = st.columns([1.2, 1.2])
             with c1:
-                # Position Group trié selon ton ordre habituel
                 DESIRED_ORDER = ["Goalkeeper", "Full Back", "Central Defender", "Midfielder", "Attacking Midfielder", "Winger", "Striker"]
                 if pos_col in df_loaded.columns:
                     raw_pos = df_loaded[pos_col].dropna().astype(str).unique().tolist()
@@ -2776,11 +2778,10 @@ elif page == "xTech/xDef":
                     "Position Group(s)",
                     options=pos_options,
                     default=[],
-                    key="ps_positions",
+                    key="xtech_ps_positions",
                 )
 
             with c2:
-                # Preferred Foot — coche tout par défaut (pattern Rookie)
                 standard_pf = ["Right Footed", "Left Footed", "Ambidextrous"]
                 if foot_col in df_loaded.columns:
                     pf_seen = df_loaded[foot_col].dropna().astype(str).str.strip().unique().tolist()
@@ -2791,15 +2792,14 @@ elif page == "xTech/xDef":
                     "Preferred Foot",
                     options=pf_options,
                     default=pf_options,
-                    key="ps_foot",
+                    key="xtech_ps_foot",
                 )
 
-            # --- Ligne 2 : Age + Minutes + slot bouton Transfermarkt
             def _bounds(series, default=(0, 0)):
                 s = pd.to_numeric(series, errors="coerce")
                 return (int(s.min()), int(s.max())) if s.notna().any() else default
 
-            _ps_ver = str(hash((tuple(st.session_state.ps_last_seasons), tuple(st.session_state.ps_last_comps))))
+            _ps_ver = str(hash((tuple(st.session_state.xtech_ps_last_seasons), tuple(st.session_state.xtech_ps_last_comps))))
 
             c3, c4 = st.columns([1.2, 1.2])
             with c3:
@@ -2811,7 +2811,7 @@ elif page == "xTech/xDef":
                         max_value=a_max,
                         value=(a_min, a_max),
                         step=1,
-                        key=f"ps_age_{_ps_ver}",
+                        key=f"xtech_ps_age_{_ps_ver}",
                     )
                 else:
                     selected_age = None
@@ -2825,7 +2825,7 @@ elif page == "xTech/xDef":
                         max_value=m_max,
                         value=(m_min, m_max),
                         step=50,
-                        key=f"ps_minutes_{_ps_ver}",
+                        key=f"xtech_ps_minutes_{_ps_ver}",
                     )
                 else:
                     selected_minutes = None
@@ -2841,49 +2841,37 @@ elif page == "xTech/xDef":
             if selected_minutes:
                 df_f = df_f[(df_f[minutes_col] >= selected_minutes[0]) & (df_f[minutes_col] <= selected_minutes[1])]
 
-            # --- Tableau AgGrid (aucun affichage natif ailleurs)
-            from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode, DataReturnMode
-
-            # --- Colonne URL Transfermarkt (même logique que Rookie)
+            # --- Colonne URL Transfermarkt
             import urllib.parse as _parse
             TM_BASE = "https://www.transfermarkt.fr/schnellsuche/ergebnis/schnellsuche?query="
-
             if "Transfermarkt" not in df_f.columns:
                 df_f["Transfermarkt"] = df_f["Player Name"].apply(
                     lambda name: TM_BASE + _parse.quote(str(name)) if pd.notna(name) else ""
                 )
-            
+
             # =========================
-            # POP-OVERS : Index, Scoring, Shooting, Passing/Creativity, OBV, Possession/Ball use, Defensive, GK
+            # POP-OVERS (mêmes groupes)
             # =========================
 
-            # État global pour reset (comme dans Merged Data)
-            if "reset_counter" not in st.session_state:
-                st.session_state.reset_counter = 0
+            if "xtech_ps_reset_counter" not in st.session_state:
+                st.session_state.xtech_ps_reset_counter = 0
 
-            # Base pour percentiles = échantillon déjà filtré (pos/foot/âge/minutes)
             df_for_pct = df_f.copy()
 
-            # --- Groupes
             INDEX_METRICS = [("xTECH","xTECH"), ("xDEF","xDEF")]
             SCORING_SHOOTING_METRICS = [
-                # --- Scoring ---
-                ("Npg P90", "NP Goals"),
-                ("Op Assists P90", "OP Assists"),
-                ("Conversion Ratio", "Conversion %"),
-                ("Scoring Contribution", "Contribution G+A"),
-                # --- Shooting ---
-                ("Shots P90", "Shots"),
-                ("Np Shots P90", "Shots"),
-                ("Shot On Target Ratio", "Shooting %"),
-                ("Np Xg P90", "NP xG"),
+                ("Npg P90", "NP Goals"), ("Op Assists P90", "OP Assists"),
+                ("Conversion Ratio", "Conversion %"), ("Scoring Contribution", "Contribution G+A"),
+                ("Shots P90", "Shots"), ("Np Shots P90", "Shots"),
+                ("Shot On Target Ratio", "Shooting %"), ("Np Xg P90", "NP xG"),
                 ("Np Xg Per Shot", "xG/Shot"),
             ]
             CREATIVITY_METRICS = [
                 ("Npxgxa P90","NPxG + xA"),("OP xGAssisted","OP xA"),("Op Key Passes P90","OP Key Passes"),
                 ("Shots Key Passes P90","Shots + Key Passes"),("Op Passes Into And Touches Inside Box P90","OP Passes + Touches Into Box"),
                 ("Through Balls P90","Throughballs"),("Crosses P90","Crosses"),("Crossing Ratio","Crossing %"),
-                ("Sp Key Passes P90","Set Pieces Key Passes"),("Sp Xa P90","Set Pieces xA"),("Dribbles P90","Dribbles Succ."),("Dribble Ratio","Dribble %"),("Penalty Wins P90","Penalty Won"),
+                ("Sp Key Passes P90","Set Pieces Key Passes"),("Sp Xa P90","Set Pieces xA"),
+                ("Dribbles P90","Dribbles Succ."),("Dribble Ratio","Dribble %"),("Penalty Wins P90","Penalty Won"),
             ]
             OBV_METRICS = [("Obv P90","OBV"),("Obv Pass P90","OBV Pass"),("Obv Shot P90","OBV Shot"),("Obv Defensive Action P90","OBV Def. Act."),("Obv Dribble Carry P90","OBV Dribble & Carry")]
             POSSESSION_METRICS = [("Op Passes P90","OP Passes"),("Passing Ratio","Passing %"),("Pressured Passing Ratio","Pressured Passing %"),("Deep Progressions P90","Deep Progressions"),("Deep Completions P90","Deep Completions"),
@@ -2912,17 +2900,13 @@ elif page == "xTech/xDef":
                 ("GK", GK_METRICS),
             ]
             
-            # Choix utilisateur (percentiles) & compteurs
             filter_percentiles = {}
             active_filters_count = {name: 0 for name, _ in metric_popovers}
 
             st.markdown("<hr style='margin:6px 0 0 0; border-color:#555;'>", unsafe_allow_html=True)
-            # 1ère rangée : 4 popovers
             row1 = st.columns(4, gap="small")
-            # 2ème rangée : 3 popovers + 1 colonne pour le bouton Clear
             row2 = st.columns(4, gap="small")
 
-            # placement : 0..3 en row1, 4..6 en row2 (col 0..2)
             for i, (name, metric_list) in enumerate(metric_popovers):
                 target_col = row1[i] if i < 4 else row2[i - 4]
                 with target_col:
@@ -2930,7 +2914,7 @@ elif page == "xTech/xDef":
                     with st.popover(name, use_container_width=True):
                         for col_name, label in metric_list:
                             if col_name in df_for_pct.columns:
-                                slider_key = f"pop_{name}_{col_name}_{st.session_state.reset_counter}"
+                                slider_key = f"xtech_pop_{name}_{col_name}_{st.session_state.xtech_ps_reset_counter}"
                                 s = pd.to_numeric(df_for_pct[col_name], errors="coerce").dropna()
                                 if s.empty:
                                     st.slider(f"{label} – Percentile", 0, 100, 0, 5, key=slider_key, disabled=True)
@@ -2940,7 +2924,6 @@ elif page == "xTech/xDef":
                                 if p > 0:
                                     thr = float(np.nanpercentile(s, p))
                                     st.caption(f"≥ **{thr:,.2f}** (min {s.min():,.2f} / max {s.max():,.2f})")
-                                    # compteur actif pour ce groupe
                                     active_filters_count[name] = active_filters_count.get(name, 0) + 1
                     cnt = active_filters_count.get(name, 0)
                     st.markdown(
@@ -2949,11 +2932,9 @@ elif page == "xTech/xDef":
                     )
                     st.markdown('</div>', unsafe_allow_html=True)
 
-            # --- Colonne 4 : bouton Clear + slot pour TM
             with row2[3]:
                 st.markdown("""
                 <style>
-                /* Style compact pour la colonne Clear/TM */
                 div[data-testid="column"]:nth-of-type(4) button {
                     font-size: 0.85rem !important;
                     padding: 0.35rem 0.6rem !important;
@@ -2963,18 +2944,16 @@ elif page == "xTech/xDef":
                 </style>
                 """, unsafe_allow_html=True)
 
-                # Deux sous-colonnes : Clear (étroit) + TM (large)
                 col_btn1, col_btn2 = st.columns([1.2, 2.2], gap="small")
 
                 with col_btn1:
-                    if st.button("Clear filters", key="ps_clear_filters_sm"):
-                        st.session_state.reset_counter += 1
+                    if st.button("Clear filters", key="xtech_ps_clear_filters_sm"):
+                        st.session_state.xtech_ps_reset_counter += 1
                         st.rerun()
 
                 with col_btn2:
-                    tm_btn_slot = st.empty()  # slot pour TM (sera rempli après AgGrid)
+                    tm_btn_slot = st.empty()
 
-            # ========= Appliquer les filtres (>= percentile choisi) & préparer les colonnes à ajouter =========
             extra_cols = []
             for (grp, col_name), p in filter_percentiles.items():
                 if p and (col_name in df_f.columns):
@@ -2985,16 +2964,12 @@ elif page == "xTech/xDef":
                         if col_name not in extra_cols:
                             extra_cols.append(col_name)
 
-            # ========== Construction du tableau ==========
             _base_cols = [
                 "Player Name","Team Name","Competition Name",
                 pos_col, minutes_col, age_col, "xTECH","xDEF","Transfermarkt"
             ]
-
-            # 1) éviter d'ajouter xTECH/xDEF (ou toute autre base) deux fois
             extra_cols = [c for c in extra_cols if c not in _base_cols]
 
-            # 2) liste finale de colonnes SANS doublons, ordre préservé
             final_cols = []
             for c in _base_cols + extra_cols:
                 if c in df_f.columns and c not in final_cols:
@@ -3002,7 +2977,6 @@ elif page == "xTech/xDef":
 
             player_display = df_f[final_cols].copy()
 
-            # --- Cast & arrondis (maintenant chaque sélection est 1D -> Series)
             if minutes_col in player_display.columns:
                 player_display[minutes_col] = pd.to_numeric(player_display[minutes_col], errors="coerce")
                 player_display[minutes_col] = np.ceil(player_display[minutes_col]).astype("Int64")
@@ -3019,7 +2993,6 @@ elif page == "xTech/xDef":
                 if m in player_display.columns:
                     player_display[m] = pd.to_numeric(player_display[m], errors="coerce").round(2)
 
-            # GridOptionsBuilder APRES player_display
             from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode, DataReturnMode
             gob = GridOptionsBuilder.from_dataframe(player_display)
             gob.configure_default_column(resizable=True, filter=True, sortable=True, flex=1, min_width=120)
@@ -3032,22 +3005,20 @@ elif page == "xTech/xDef":
             gob.configure_pagination(enabled=True, paginationAutoPageSize=True)
             gob.configure_grid_options(domLayout="normal", suppressHorizontalScroll=True)
 
-            # --- Affichage du tableau
             grid = AgGrid(
                 player_display,
                 gridOptions=gob.build(),
                 update_mode=GridUpdateMode.SELECTION_CHANGED,
-                data_return_mode=DataReturnMode.FILTERED,   # récupère ce qui est visible
+                data_return_mode=DataReturnMode.FILTERED,
                 fit_columns_on_grid_load=True,
                 theme="streamlit",
                 height=520,
-                key="ps_grid",
+                key="xtech_ps_grid",
             )
 
-            # --- Résumé des filtres appliqués (sans xTECH/xDEF min comme demandé)
             filters_summary = [
-                f"Season(s): {', '.join(st.session_state.ps_last_seasons)}",
-                f"Competition(s): {', '.join(st.session_state.ps_last_comps)}",
+                f"Season(s): {', '.join(st.session_state.xtech_ps_last_seasons)}",
+                f"Competition(s): {', '.join(st.session_state.xtech_ps_last_comps)}",
                 f"Positions: {', '.join(selected_positions) if selected_positions else 'All'}",
                 f"Preferred Foot: {', '.join(selected_feet) if selected_feet else 'All'}",
             ]
@@ -3061,7 +3032,6 @@ elif page == "xTech/xDef":
                 unsafe_allow_html=True
             )
 
-            # --- Export CSV : récupère ce qui est affiché dans la grille (post-filtres/tri AgGrid)
             try:
                 export_df = pd.DataFrame(grid.get("data", []))
                 if export_df.empty:
@@ -3069,17 +3039,14 @@ elif page == "xTech/xDef":
             except Exception:
                 export_df = player_display.copy()
 
-            # On enlève la colonne masquée si présente
             if "Transfermarkt" in export_df.columns:
                 export_df = export_df.drop(columns=["Transfermarkt"])
 
-            # Optionnel : garantir l'ordre des colonnes comme l'affichage
             export_cols_order = [c for c in ["Player Name", "Team Name", "Competition Name", pos_col,
                                              minutes_col, age_col, "xTECH", "xDEF"] if c in export_df.columns]
             if export_cols_order:
                 export_df = export_df[export_cols_order]
 
-            # Encodage CSV (UTF-8 avec BOM pour Excel) + nom de fichier
             csv_bytes = export_df.to_csv(index=False).encode("utf-8-sig")
             file_name = f"player_search_{len(export_df)}.csv"
 
@@ -3088,10 +3055,10 @@ elif page == "xTech/xDef":
                 data=csv_bytes,
                 file_name=file_name,
                 mime="text/csv",
+                key="xtech_ps_download_csv",
                 use_container_width=False
             )
 
-            # --- Gestion de la sélection (robuste) + bouton TM (dans la colonne Clear/TM)
             sel = grid.get("selected_rows", [])
 
             has_sel, sel_row = False, None
@@ -3100,7 +3067,6 @@ elif page == "xTech/xDef":
             elif isinstance(sel, pd.DataFrame) and not sel.empty:
                 has_sel, sel_row = True, sel.iloc[0].to_dict()
 
-            # Remplit le slot créé dans row2[3]
             if 'tm_btn_slot' in locals():
                 if has_sel and sel_row:
                     tm_url = sel_row.get("Transfermarkt")
@@ -3111,9 +3077,9 @@ elif page == "xTech/xDef":
                             use_container_width=True,
                         )
                     else:
-                        tm_btn_slot.empty()  # pas d'URL valide -> on n'affiche rien
+                        tm_btn_slot.empty()
                 else:
-                    tm_btn_slot.empty()  # aucune sélection -> on n'affiche rien
+                    tm_btn_slot.empty()
                     
                     st.write("")
                     st.write("")
