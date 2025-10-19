@@ -1400,7 +1400,7 @@ if page == "xPhysical":
                     gb.configure_column("Player Name", pinned="left")
 
                 if "Transfermarkt" in df_display_phy.columns:
-                    gb.configure_column("Transfermarkt", hide=True)
+                    gb.configure_column("Transfermarkt", hide=False)
 
                 gb.configure_pagination(enabled=False)
 
@@ -1408,7 +1408,7 @@ if page == "xPhysical":
                     df_display_phy,
                     gridOptions=gb.build(),
                     height=500,
-                    theme='streamlit',  # ← Theme Merged Data
+                    theme='balham',  # ← Theme Merged Data
                     update_mode=GridUpdateMode.SELECTION_CHANGED,
                     allow_unsafe_jscode=True,
                     key="xphy_ps_grid_merged_style"
