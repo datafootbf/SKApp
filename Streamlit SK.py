@@ -2995,12 +2995,57 @@ elif page == "xTech/xDef":
                 if m in player_display.columns:
                     player_display[m] = pd.to_numeric(player_display[m], errors="coerce").fillna(0).round(2)
         
-            st.dataframe(
+            # === AgGrid Player Search (isolé avec clé unique) ===
+            from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode, DataReturnMode
+
+            gob = GridOptionsBuilder.from_dataframe(player_display)
+            gob.configure_default_column(resizable=True, filter=True, sortable=True, flex=1, min_width=120)
+
+            for col in [minutes_col, age_col, "xTECH", "xDEF"] + extra_cols:
+                if col in player_display.columns:
+                    gob.configure_column(
+                        col, 
+                        type=["numericColumn", "numberColumnFilter"],
+                        cellStyle={'textAlign': 'right'}
+                    )
+
+            if "Transfermarkt" in player_display.columns:
+                gob.configure_column("Transfermarkt", hide=True)
+
+            gob.configure_selection(selection_mode="single", use_checkbox=True)
+            gob.configure_pagination(enabled=True, paginationAutoPageSize=True)
+            gob.configure_grid_options(domLayout="autoHeight")
+
+            # Clé unique basée sur le hash des filtres pour forcer le rafraîchissement
+            grid_key = f"xtech_ps_grid_{hash(tuple(st.session_state.xtech_ps_last_seasons + st.session_state.xtech_ps_last_comps))}"
+
+            grid_response = AgGrid(
                 player_display,
-                use_container_width=True,
+                gridOptions=gob.build(),
+                update_mode=GridUpdateMode.SELECTION_CHANGED,
+                data_return_mode=DataReturnMode.FILTERED,
+                fit_columns_on_grid_load=True,
+                theme="streamlit",
                 height=520,
-                hide_index=True
+                reload_data=True,
+                enable_enterprise_modules=False,
+                allow_unsafe_jscode=True,
+                key=grid_key,  # ← CLÉ DYNAMIQUE
             )
+
+            # Récupération sécurisée de la sélection
+            try:
+                sel = grid_response.get("selected_rows", [])
+                if isinstance(sel, pd.DataFrame):
+                    sel = sel.to_dict(orient='records') if not sel.empty else []
+                elif not isinstance(sel, list):
+                    sel = []
+            except Exception:
+                sel = []
+
+            has_sel, sel_row = False, None
+            if isinstance(sel, list) and len(sel) > 0:
+                has_sel, sel_row = True, sel[0]
 
             filters_summary = [
                 f"Season(s): {', '.join(st.session_state.xtech_ps_last_seasons)}",
@@ -3044,15 +3089,7 @@ elif page == "xTech/xDef":
                 key="xtech_ps_download_csv",
                 use_container_width=False
             )
-
-            sel = grid.get("selected_rows", [])
-
-            has_sel, sel_row = False, None
-            if isinstance(sel, list) and len(sel) > 0:
-                has_sel, sel_row = True, sel[0]
-            elif isinstance(sel, pd.DataFrame) and not sel.empty:
-                has_sel, sel_row = True, sel.iloc[0].to_dict()
-
+            
             if 'tm_btn_slot' in locals():
                 if has_sel and sel_row:
                     tm_url = sel_row.get("Transfermarkt")
@@ -4746,47 +4783,42 @@ elif page == "xTech/xDef":
         )
 
        # --- Tableau AgGrid (aucun affichage natif ailleurs)
+        # === AgGrid Rookie (isolé avec clé unique) ===
         from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode, DataReturnMode
 
-        # Arrondi à l'entier supérieur
-        rookies_display["Minutes"] = np.ceil(pd.to_numeric(rookies_display["Minutes"], errors="coerce")).astype("Int64")
-        rookies_display["xTECH"]   = np.ceil(pd.to_numeric(rookies_display["xTECH"], errors="coerce")).astype("Int64")
-        rookies_display["xDEF"]    = np.ceil(pd.to_numeric(rookies_display["xDEF"], errors="coerce")).astype("Int64")
+        # S'assurer que rookies_display existe et n'est pas vide
+        if 'rookies_display' not in locals() or rookies_display.empty:
+            st.info("🔍 No players match your current filters.")
+            st.stop()
 
         gob = GridOptionsBuilder.from_dataframe(rookies_display)
-
-        # Même largeur pour toutes les colonnes
         gob.configure_default_column(
             resizable=True,
             filter=True,
             sortable=True,
-            flex=1,           # chaque colonne prend la même largeur
-            min_width=120     # largeur de base
+            flex=1,
+            min_width=120
         )
 
-        # Colonnes numériques : alignement à droite
         for col in ["Minutes", "Age", "xTECH", "xDEF"]:
             if col in rookies_display.columns:
                 gob.configure_column(
                     col,
-                    type=["numericColumn"],
+                    type=["numericColumn", "numberColumnFilter"],
                     cellStyle={'textAlign': 'right'}
                 )
 
-        # Masquer la colonne URL
         if "Transfermarkt" in rookies_display.columns:
             gob.configure_column("Transfermarkt", hide=True)
 
-        # Sélection & pagination
         gob.configure_selection(selection_mode="single", use_checkbox=True)
         gob.configure_pagination(enabled=True, paginationAutoPageSize=True)
+        gob.configure_grid_options(domLayout="autoHeight")
 
-        # Options globales
-        gob.configure_grid_options(domLayout="normal")
-        gob.configure_grid_options(suppressHorizontalScroll=True)
+        # Clé unique basée sur les filtres pour éviter les conflits
+        rookie_key = f"rookies_grid_{hash((tuple(selected_comps or []), tuple(selected_positions or []), selected_age_max))}"
 
-        # --- Affichage du tableau
-        grid = AgGrid(
+        grid_response_rookie = AgGrid(
             rookies_display,
             gridOptions=gob.build(),
             update_mode=GridUpdateMode.SELECTION_CHANGED,
@@ -4794,8 +4826,28 @@ elif page == "xTech/xDef":
             fit_columns_on_grid_load=True,
             theme="streamlit",
             height=520,
-            key="rookies_grid",
+            reload_data=True,
+            enable_enterprise_modules=False,
+            allow_unsafe_jscode=True,
+            key=rookie_key,  # ← CLÉ DYNAMIQUE
         )
+
+        # Récupération sécurisée de la sélection
+        try:
+            sel = grid_response_rookie.get("selected_rows", [])
+            if isinstance(sel, pd.DataFrame):
+                sel = sel.to_dict(orient='records') if not sel.empty else []
+            elif not isinstance(sel, list):
+                sel = []
+        except Exception:
+            sel = []
+
+        has_sel = False
+        sel_row = None
+
+        if isinstance(sel, list) and len(sel) > 0:
+            has_sel = True
+            sel_row = sel[0]
         
         # --- Résumé des filtres appliqués
         filters_summary = [
@@ -4844,25 +4896,22 @@ elif page == "xTech/xDef":
             use_container_width=False
         )
 
+        # Utiliser grid_response_rookie au lieu de grid
+        try:
+            sel = grid_response_rookie.get("selected_rows", [])
+            if isinstance(sel, pd.DataFrame):
+                sel = sel.to_dict(orient='records') if not sel.empty else []
+            elif not isinstance(sel, list):
+                sel = []
+        except Exception:
+            sel = []
 
-
-        # --- Gestion de la sélection (robuste liste/DataFrame)
-        sel = grid.get("selected_rows", [])
-
-        # Normalise en dict unique si sélection présente
         has_sel = False
         sel_row = None
 
-        if isinstance(sel, list):
-            has_sel = len(sel) > 0
-            if has_sel:
-                sel_row = sel[0]  # déjà un dict
-        elif isinstance(sel, pd.DataFrame):
-            has_sel = not sel.empty
-            if has_sel:
-                sel_row = sel.iloc[0].to_dict()
-        else:
-            has_sel = False
+        if isinstance(sel, list) and len(sel) > 0:
+            has_sel = True
+            sel_row = sel[0]
 
         if has_sel and sel_row:
             pname = (str(sel_row.get("Player Name", "")).strip())
