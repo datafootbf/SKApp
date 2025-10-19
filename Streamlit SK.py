@@ -104,13 +104,13 @@ def shorten_season(s):
 
 @st.cache_data
 def load_xphysical():
-    df = pd.read_csv('SK_All.csv', sep=",")
+    df = pd.read_csv('/Users/favie/Desktop/SKApp/SK_All.csv', sep=",")
     df.columns = df.columns.str.strip()
     return df
 
 @st.cache_data
 def load_xtechnical():
-    df_tech = pd.read_csv('SB_All.csv', sep=",")
+    df_tech = pd.read_csv('/Users/favie/Desktop/SKApp/SB_All.csv', sep=",")
     df_tech.columns = df_tech.columns.str.strip()
     df_tech["season_short"] = df_tech["Season Name"].apply(shorten_season)
     df_tech["Display Name"] = df_tech.apply(
@@ -123,7 +123,7 @@ def load_xtechnical():
 
 @st.cache_data
 def load_merged():
-    df_merged = pd.read_csv('SB_SK_MERGED.csv')
+    df_merged = pd.read_csv('/Users/favie/Desktop/SKApp/SB_SK_MERGED.csv')
     df_merged.columns = df_merged.columns.str.strip()
     return df_merged
 
@@ -989,7 +989,7 @@ graph_columns = [
 ]
 
 # Charge le logo (met le chemin exact si besoin)
-logo_path = 'AS Roma.png'
+logo_path = '/Users/favie/Statsbomb/TEST/AS Roma.png'
 logo = Image.open(logo_path)
 st.sidebar.image(logo, use_container_width=True)
 
@@ -1060,7 +1060,7 @@ if page == "xPhysical":
     
     with tabs_ps:
         xphysical_help_expander()
-        
+
         # ==== Colonnes xPhysical ====
         season_col   = "Season"
         comp_col     = "Competition"
@@ -1104,10 +1104,10 @@ if page == "xPhysical":
                 "Competition(s) to load",
                 options=comps_pool,
                 key="xphy_ps_ui_comps",
-                default=[],  # vide au démarrage
+                default=[],
             )
 
-        # ---- Etat
+        # ---- État
         if "xphy_ps_loaded_df" not in st.session_state:
             st.session_state.xphy_ps_loaded_df = None
         if "xphy_ps_last_seasons" not in st.session_state:
@@ -1124,12 +1124,13 @@ if page == "xPhysical":
         if st.session_state.xphy_ps_loaded_df is not None and _now != _last:
             st.session_state.xphy_ps_pending = True
             st.session_state.xphy_ps_loaded_df = None
-            
+
         comp_sel = st.session_state.get("xphy_ps_ui_comps", [])
         load_disabled = not bool(comp_sel)
+
         if st.button(
             "Load Data",
-            key="xphy_ps_load_btn",     # <— NEW: clé unique
+            key="xphy_ps_load_btn",
             type="primary",
             disabled=load_disabled,
             help="Select at least one competition"
@@ -1147,20 +1148,25 @@ if page == "xPhysical":
             ].copy()
             st.session_state.xphy_ps_loaded_df = df_loaded
             st.session_state.xphy_ps_pending = False
+            st.rerun()
 
-        ps_ready = st.session_state.xphy_ps_loaded_df is not None and not st.session_state.xphy_ps_pending
+        ps_ready = (
+            st.session_state.xphy_ps_loaded_df is not None 
+            and not st.session_state.xphy_ps_pending
+            and not st.session_state.xphy_ps_loaded_df.empty
+        )
+
         if not ps_ready:
             st.info("Please load data to continue.")
         else:
             st.markdown("---")
             df_loaded = st.session_state.xphy_ps_loaded_df.copy()
 
-           # ==== Filtres dynamiques ====
+            # ==== Filtres dynamiques ====
             DESIRED_ORDER = ["Goalkeeper", "Central Defender", "Full Back", "Midfield", "Wide Attacker", "Center Forward"]
 
             c3, c4 = st.columns([1.2, 1.2])
 
-            # -- Position Group (à gauche)
             with c3:
                 if pos_col in df_loaded.columns:
                     raw_pos = df_loaded[pos_col].dropna().astype(str).unique().tolist()
@@ -1175,7 +1181,6 @@ if page == "xPhysical":
                     key="xphy_ps_positions",
                 )
 
-            # -- Age (à droite)  ✅ (à côté du Position Group)
             def _bounds(series, default=(0, 0)):
                 s = pd.to_numeric(series, errors="coerce")
                 return (int(s.min()), int(s.max())) if s.notna().any() else default
@@ -1195,14 +1200,14 @@ if page == "xPhysical":
                 else:
                     selected_age = None
 
-            # Appliquer les filtres (⚠️ pas de filtre sur Team)
+            # Appliquer les filtres
             df_f = df_loaded.copy()
             if selected_positions:
                 df_f = df_f[df_f[pos_col].isin(selected_positions)]
             if selected_age:
                 df_f = df_f[(df_f[age_col] >= selected_age[0]) & (df_f[age_col] <= selected_age[1])]
 
-            # ==== Groupes de métriques : PSV / ALL (P90) / TIP (P30) / OTIP (P30) ====
+            # ==== Groupes de métriques ====
             PSV_METRICS = [
                 ("PSV-99", "PSV-99"),
                 ("TOP 5 PSV-99", "TOP 5 PSV-99"),
@@ -1252,14 +1257,13 @@ if page == "xPhysical":
                 ("OTIP (P30)", OTIP_METRICS),
             ]
 
-            # État reset percentiles
             if "xphy_ps_reset_counter" not in st.session_state:
                 st.session_state.xphy_ps_reset_counter = 0
 
             df_for_pct = df_f.copy()
 
             st.markdown("<hr style='margin:6px 0 0 0; border-color:#555;'>", unsafe_allow_html=True)
-            row = st.columns(4, gap="small")  # ✅ une seule ligne (4 colonnes)
+            row = st.columns(4, gap="small")
 
             filter_percentiles = {}
             active_filters_count = {name: 0 for name, _ in metric_popovers}
@@ -1283,8 +1287,8 @@ if page == "xPhysical":
                     cnt = active_filters_count.get(name, 0)
                     st.caption(f"{cnt} active filter{'s' if cnt != 1 else ''}")
 
-            # --- Clear + TM + Send to Radar
-            col_btn1, col_btn2, col_btn3 = st.columns([1.0, 1.6, 1.6], gap="small")
+            # --- Clear Filters + TM + Send to Radar (3 boutons côte à côte)
+            col_btn1, col_btn2, col_btn3 = st.columns([1.0, 1.4, 1.4], gap="small")
 
             with col_btn1:
                 if st.button("Clear filters", key="xphy_ps_clear_filters"):
@@ -1308,11 +1312,10 @@ if page == "xPhysical":
                         if col_name not in extra_cols:
                             extra_cols.append(col_name)
 
-            # ==== Tableau ====
+            # ==== Préparation du tableau ====
             base_cols = [
-                "Player Name", "Team Name", "Competition Name",
-                "Position Group", "Age",
-                "xPhysical"
+                "Player Name", "Team Name", comp_col,
+                pos_col, age_col, "xPhysical", "Transfermarkt"
             ]
             extra_cols = [c for c in extra_cols if c not in base_cols]
 
@@ -1323,13 +1326,18 @@ if page == "xPhysical":
 
             player_display_phy = df_f[final_cols].copy()
 
-            # Cast & formats
+            # Typage robuste
             if age_col in player_display_phy.columns:
-                player_display_phy[age_col] = pd.to_numeric(player_display_phy[age_col], errors="coerce")
+                player_display_phy[age_col] = pd.to_numeric(player_display_phy[age_col], errors="coerce").fillna(0).astype(int)
 
-            for m in extra_cols + ["xPhysical"]:
+            # xPhysical en entier
+            if "xPhysical" in player_display_phy.columns:
+                player_display_phy["xPhysical"] = pd.to_numeric(player_display_phy["xPhysical"], errors="coerce").fillna(0).astype(int)
+
+            # Extra_cols avec 2 décimales
+            for m in extra_cols:
                 if m in player_display_phy.columns:
-                    player_display_phy[m] = pd.to_numeric(player_display_phy[m], errors="coerce").round(2)
+                    player_display_phy[m] = pd.to_numeric(player_display_phy[m], errors="coerce").fillna(0).round(2)
 
             # Lien Transfermarkt
             import urllib.parse as _parse
@@ -1339,30 +1347,172 @@ if page == "xPhysical":
                     lambda name: TM_BASE + _parse.quote(str(name)) if pd.notna(name) else ""
                 )
 
-            # AgGrid
-            from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode, DataReturnMode
-            gob = GridOptionsBuilder.from_dataframe(player_display_phy)
-            gob.configure_default_column(resizable=True, filter=True, sortable=True, flex=1, min_width=120)
-            for col in [age_col] + extra_cols + ["xPhysical"]:
-                if col in player_display_phy.columns:
-                    gob.configure_column(col, type=["numericColumn"], cellStyle={'textAlign': 'right'})
-            gob.configure_column("Transfermarkt", hide=True)
-            gob.configure_selection(selection_mode="single", use_checkbox=True)
-            gob.configure_pagination(enabled=True, paginationAutoPageSize=True)
-            gob.configure_grid_options(domLayout="normal", suppressHorizontalScroll=True)
-            
-            grid = AgGrid(
-                player_display_phy,
-                gridOptions=gob.build(),
-                update_mode=GridUpdateMode.SELECTION_CHANGED,
-                #data_return_mode=DataReturnMode.FILTERED,
-                fit_columns_on_grid_load=True,
-                theme="streamlit",
-                allow_unsafe_jscode=True,
-                height=520,
-                key="xphy_ps_grid",
-            )
-            
+            # ========== AgGrid Player Search (style xTechnical) ==========
+            if not player_display_phy.empty:
+                from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode
+
+                df_display_phy = player_display_phy.reset_index(drop=True)
+
+                # Typage des colonnes texte
+                for col in [comp_col, pos_col]:
+                    if col in df_display_phy.columns:
+                        df_display_phy[col] = df_display_phy[col].astype(str)
+
+                # Formatage différencié : entiers pour colonnes de base
+                for col in [age_col, "xPhysical"]:
+                    if col in df_display_phy.columns:
+                        df_display_phy[col] = df_display_phy[col].apply(
+                            lambda x: int(round(x)) if pd.notna(x) and x != "" else 0
+                        )
+
+                # Garder 2 décimales pour les colonnes ajoutées via filtres
+                for col in extra_cols:
+                    if col in df_display_phy.columns:
+                        df_display_phy[col] = df_display_phy[col].apply(
+                            lambda x: round(x, 2) if pd.notna(x) and x != "" else 0.0
+                        )
+
+                # Configuration AgGrid
+                gb = GridOptionsBuilder.from_dataframe(df_display_phy)
+                gb.configure_selection(selection_mode="single", use_checkbox=True)
+                gb.configure_default_column(
+                    editable=False, 
+                    groupable=True, 
+                    sortable=True, 
+                    filter="agTextColumnFilter",
+                    flex=1,
+                    headerStyle={'textAlign': 'center'}
+                )
+
+                # Configuration des colonnes numériques
+                for col in [age_col, "xPhysical"] + extra_cols:
+                    if col in df_display_phy.columns:
+                        gb.configure_column(
+                            col, 
+                            type=["numericColumn", "numberColumnFilter"],
+                            flex=1
+                        )
+
+                # Player Name : épinglée à gauche et plus large
+                if "Player Name" in df_display_phy.columns:
+                    gb.configure_column(
+                        "Player Name", 
+                        pinned="left",
+                        flex=2,
+                        minWidth=200,
+                        cellStyle={'textAlign': 'left'},
+                        headerStyle={'textAlign': 'center'}
+                    )
+
+                # Masquer Transfermarkt
+                if "Transfermarkt" in df_display_phy.columns:
+                    gb.configure_column("Transfermarkt", hide=True)
+
+                # Pas de pagination
+                gb.configure_pagination(enabled=False)
+
+                grid_response = AgGrid(
+                    df_display_phy,
+                    gridOptions=gb.build(),
+                    height=500,
+                    theme='streamlit',
+                    update_mode=GridUpdateMode.SELECTION_CHANGED,
+                    allow_unsafe_jscode=True,
+                    fit_columns_on_grid_load=True,
+                    key="xphy_ps_grid_merged_style"
+                )
+
+                # Récupération sécurisée de la sélection
+                selected_rows = grid_response.get("selected_rows", [])
+                if isinstance(selected_rows, pd.DataFrame):
+                    selected_rows = selected_rows.to_dict(orient='records')
+
+                has_sel = False
+                sel_row = None
+
+                if isinstance(selected_rows, list) and len(selected_rows) > 0 and isinstance(selected_rows[0], dict):
+                    has_sel = True
+                    sel_row = selected_rows[0]
+                    player_name_sel = sel_row.get("Player Name")
+
+                    full_row = player_display_phy[player_display_phy["Player Name"] == player_name_sel]
+
+                    if not full_row.empty:
+                        tm_url = full_row.iloc[0].get("Transfermarkt")
+
+                        # ═══════════════════════════════════════
+                        # BOUTON 1 : TM Player Page
+                        # ═══════════════════════════════════════
+                        if 'tm_btn_slot' in locals() and tm_url and isinstance(tm_url, str) and tm_url.strip():
+                            with tm_btn_slot:
+                                st.link_button(
+                                    "🔗 TM Player Page",
+                                    tm_url,
+                                    use_container_width=True
+                                )
+                        elif 'tm_btn_slot' in locals():
+                            tm_btn_slot.empty()
+
+                        # ═══════════════════════════════════════
+                        # BOUTON 2 : Send to Radar (TOUJOURS AFFICHÉ)
+                        # ═══════════════════════════════════════
+                        if 'send_radar_slot' in locals():
+                            with send_radar_slot:
+                                # Le bouton s'affiche systématiquement si une ligne est sélectionnée
+                                if st.button("📊 Send to Radar", use_container_width=True, key="xphy_send_radar_btn"):
+                                    try:
+                                        # 1) Reconstituer la Display Name
+                                        _df_dn = df[[player_col, "Short Name"]].dropna().drop_duplicates()
+                                        _df_dn["Display Name"] = _df_dn["Short Name"].astype(str) + " (" + _df_dn[player_col].astype(str) + ")"
+                                        player_to_display_map = dict(zip(_df_dn[player_col], _df_dn["Display Name"]))
+
+                                        # player_name_sel peut être "Player Name" ou "Player"
+                                        player_key = sel_row.get("Player Name") or sel_row.get(player_col)
+                                        display_val = player_to_display_map.get(player_key)
+
+                                        if display_val is None:
+                                            short_name_fallback = sel_row.get("Short Name")
+                                            display_val = f"{short_name_fallback} ({player_key})" if short_name_fallback and player_key else player_key
+
+                                        # 2) Pousser vers l'onglet Radar
+                                        st.session_state["radar_p1"] = display_val
+
+                                        # 3) Auto-switch vers l'onglet "Radar"
+                                        import streamlit.components.v1 as components
+                                        components.html(
+                                            """
+                                            <script>
+                                            setTimeout(function(){
+                                              const root = window.parent.document;
+                                              const tabs = root.querySelectorAll('button[role="tab"]');
+                                              for (const t of tabs) {
+                                                if ((t.innerText || "").trim().toLowerCase().startsWith("radar")) {
+                                                  t.click();
+                                                  break;
+                                                }
+                                              }
+                                            }, 80);
+                                            </script>
+                                            """,
+                                            height=0,
+                                        )
+                                    except Exception:
+                                        pass  # Pas d'affichage d'erreur
+                    else:
+                        # Ligne sélectionnée mais pas trouvée dans le DataFrame
+                        if 'tm_btn_slot' in locals():
+                            tm_btn_slot.empty()
+                        if 'send_radar_slot' in locals():
+                            send_radar_slot.empty()
+                else:
+                    # Aucune ligne sélectionnée
+                    if 'tm_btn_slot' in locals():
+                        tm_btn_slot.empty()
+                    if 'send_radar_slot' in locals():
+                        send_radar_slot.empty()
+            else:
+                st.info("No data to display.")
+
             # Résumé filtres
             filters_summary = [
                 f"Season(s): {', '.join(st.session_state.xphy_ps_last_seasons)}",
@@ -1375,9 +1525,9 @@ if page == "xPhysical":
                 unsafe_allow_html=True
             )
 
-            # Export CSV (données visibles)
+            # Export CSV
             try:
-                export_df = pd.DataFrame(grid.get("data", []))
+                export_df = pd.DataFrame(grid_response.get("data", []))
                 if export_df.empty:
                     export_df = player_display_phy.copy()
             except Exception:
@@ -1386,8 +1536,8 @@ if page == "xPhysical":
             if "Transfermarkt" in export_df.columns:
                 export_df = export_df.drop(columns=["Transfermarkt"])
 
-            export_cols_order = [c for c in ["Player Name", "Team Name", "Competition Name", pos_col,
-                                             age_col, "xPhysical"] if c in export_df.columns]
+            export_cols_order = [c for c in ["Player Name", "Team Name", comp_col,
+                                             pos_col, age_col, "xPhysical"] if c in export_df.columns]
             if export_cols_order:
                 export_df = export_df[export_cols_order]
 
@@ -1399,76 +1549,12 @@ if page == "xPhysical":
                 data=csv_bytes,
                 file_name=file_name,
                 mime="text/csv",
-                key="xphy_ps_download_csv",  # <— NEW: clé unique
+                use_container_width=False
             )
-            
-            # --- Actions selon la sélection (TM + Send to Radar)
-            sel = grid.get("selected_rows", [])
-            has_sel, sel_row = False, None
-            if isinstance(sel, list) and len(sel) > 0:
-                has_sel, sel_row = True, sel[0]
-            elif isinstance(sel, pd.DataFrame) and not sel.empty:
-                has_sel, sel_row = True, sel.iloc[0].to_dict()
 
-            # Bouton TM
-            if 'tm_btn_slot' in locals():
-                if has_sel and sel_row:
-                    tm_url = sel_row.get("Transfermarkt")
-                    if isinstance(tm_url, str) and tm_url.strip():
-                        tm_btn_slot.link_button("TM Player Page", tm_url, use_container_width=True)
-                    else:
-                        tm_btn_slot.empty()
-                else:
-                    tm_btn_slot.empty()
-
-            # Bouton Send to Radar
-            if 'send_radar_slot' in locals():
-                if has_sel and sel_row:
-                    if send_radar_slot.button("Send to Radar", use_container_width=True):
-                        try:
-                            # 1) Reconstituer la Display Name attendue par le Radar
-                            _df_dn = df[["Player", "Short Name"]].dropna().drop_duplicates()
-                            _df_dn["Display Name"] = _df_dn["Short Name"].astype(str) + " (" + _df_dn["Player"].astype(str) + ")"
-                            player_to_display_map = dict(zip(_df_dn["Player"], _df_dn["Display Name"]))
-
-                            player_name_sel = sel_row.get("Player Name") or sel_row.get("Player")
-                            display_val = player_to_display_map.get(player_name_sel)
-                            if display_val is None:
-                                short_name_fallback = sel_row.get("Short Name")
-                                display_val = f"{short_name_fallback} ({player_name_sel})" if short_name_fallback and player_name_sel else player_name_sel
-
-                            # 2) Pousser uniquement le joueur vers l’onglet Radar
-                            st.session_state["radar_p1"] = display_val
-
-                            # 3) Auto-switch vers l’onglet "Radar"
-                            import streamlit.components.v1 as components
-                            components.html(
-                                """
-                                <script>
-                                setTimeout(function(){
-                                  const root = window.parent.document;
-                                  const tabs = root.querySelectorAll('button[role="tab"]');
-                                  for (const t of tabs) {
-                                    if ((t.innerText || "").trim().toLowerCase().startsWith("radar")) {
-                                      t.click();
-                                      break;
-                                    }
-                                  }
-                                }, 80);
-                                </script>
-                                """,
-                                height=0,
-                            )
-
-                        except Exception:
-                            pass  # pas d'affichage d'erreur ni de succès
-                else:
-                    send_radar_slot.empty()
-                    
-                    st.write("")
-                    st.write("")
-                    xphysical_glossary_expander()
-
+            st.write("")
+            st.write("")
+            xphysical_glossary_expander()
     
 ###################### --- Onglet Scatter Plot ---
     with tab1:
@@ -2678,7 +2764,7 @@ elif page == "xTech/xDef":
     tab_ps, tab1, tab2, tab3, tab4, tab5 = st.tabs(["Player Search", "Scatter Plot ", "Radar", "Index", "Top 50", "Rookie"])
     
     with tab_ps:
-        
+    
         xtech_help_expander()
 
         season_col = "Season Name"
@@ -2756,7 +2842,7 @@ elif page == "xTech/xDef":
 
             st.session_state.xtech_ps_loaded_df = df_loaded
             st.session_state.xtech_ps_pending = False
-            st.rerun()  # ← AJOUT CRITIQUE
+            st.rerun()
 
         if st.session_state.xtech_ps_loaded_df is None or st.session_state.xtech_ps_pending:
             st.info("Please load data to continue.")
@@ -2900,7 +2986,7 @@ elif page == "xTech/xDef":
                 ("Defensive", DEFENSIVE_METRICS),
                 ("GK", GK_METRICS),
             ]
-            
+
             filter_percentiles = {}
             active_filters_count = {name: 0 for name, _ in metric_popovers}
 
@@ -2945,7 +3031,7 @@ elif page == "xTech/xDef":
                 </style>
                 """, unsafe_allow_html=True)
 
-                col_btn1, col_btn2 = st.columns([1.2, 2.2], gap="small")
+                col_btn1, col_btn2 = st.columns([1.0, 1.4], gap="small")
 
                 with col_btn1:
                     if st.button("Clear filters", key="xtech_ps_clear_filters_sm"):
@@ -2966,8 +3052,8 @@ elif page == "xTech/xDef":
                             extra_cols.append(col_name)
 
             _base_cols = [
-                "Player Name","Team Name","Competition Name",
-                pos_col, minutes_col, age_col, "xTECH","xDEF","Transfermarkt"
+                "Player Name", "Team Name", comp_col,
+                pos_col, minutes_col, age_col, "xTECH", "xDEF", "Transfermarkt"
             ]
             extra_cols = [c for c in extra_cols if c not in _base_cols]
 
@@ -2994,119 +3080,120 @@ elif page == "xTech/xDef":
             for m in extra_cols:
                 if m in player_display.columns:
                     player_display[m] = pd.to_numeric(player_display[m], errors="coerce").fillna(0).round(2)
-        
-            # === AgGrid Player Search (isolé avec clé unique) ===
-            from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode, DataReturnMode
 
-            gob = GridOptionsBuilder.from_dataframe(player_display)
-            gob.configure_default_column(resizable=True, filter=True, sortable=True, flex=1, min_width=120)
+            # ========== AgGrid Player Search (style Merged Data) ==========
+            if not player_display.empty:
+                from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode
 
-            for col in [minutes_col, age_col, "xTECH", "xDEF"] + extra_cols:
-                if col in player_display.columns:
-                    gob.configure_column(
-                        col, 
-                        type=["numericColumn", "numberColumnFilter"],
-                        cellStyle={'textAlign': 'right'}
+                df_display_ps = player_display.reset_index(drop=True)
+
+                # Typage des colonnes texte (utiliser les variables)
+                for col in [season_col, comp_col, pos_col]:
+                    if col in df_display_ps.columns:
+                        df_display_ps[col] = df_display_ps[col].astype(str)
+
+                # Formatage différencié : entiers pour colonnes de base
+                for col in [minutes_col, age_col, "xTECH", "xDEF"]:
+                    if col in df_display_ps.columns:
+                        df_display_ps[col] = df_display_ps[col].apply(
+                            lambda x: int(round(x)) if pd.notna(x) and x != "" else 0
+                        )
+
+                # Garder 2 décimales pour les colonnes ajoutées via filtres
+                for col in extra_cols:
+                    if col in df_display_ps.columns:
+                        df_display_ps[col] = df_display_ps[col].apply(
+                            lambda x: round(x, 2) if pd.notna(x) and x != "" else 0.0
+                        )
+
+                # Configuration AgGrid (fusionnée)
+                gb = GridOptionsBuilder.from_dataframe(df_display_ps)
+                gb.configure_selection(selection_mode="single", use_checkbox=True)
+                gb.configure_default_column(
+                    editable=False, 
+                    groupable=True, 
+                    sortable=True, 
+                    filter="agTextColumnFilter",
+                    flex=1,
+                    headerStyle={'textAlign': 'center'}
+                )
+
+                # Configuration spécifique des colonnes numériques
+                for col in [minutes_col, age_col, "xTECH", "xDEF"] + extra_cols:
+                    if col in df_display_ps.columns:
+                        gb.configure_column(
+                            col, 
+                            type=["numericColumn", "numberColumnFilter"],
+                            flex=1
+                        )
+
+                # Player Name : épinglée à gauche et plus large
+                if "Player Name" in df_display_ps.columns:
+                    gb.configure_column(
+                        "Player Name", 
+                        pinned="left",
+                        flex=2,
+                        minWidth=200,
+                        cellStyle={'textAlign': 'left'}
                     )
 
-            if "Transfermarkt" in player_display.columns:
-                gob.configure_column("Transfermarkt", hide=True)
+                # Masquer Transfermarkt
+                if "Transfermarkt" in df_display_ps.columns:
+                    gb.configure_column("Transfermarkt", hide=True)
 
-            gob.configure_selection(selection_mode="single", use_checkbox=True)
-            gob.configure_pagination(enabled=True, paginationAutoPageSize=True)
-            gob.configure_grid_options(domLayout="autoHeight")
+                # Pas de pagination
+                gb.configure_pagination(enabled=False)
 
-            # Clé unique basée sur le hash des filtres pour forcer le rafraîchissement
-            grid_key = f"xtech_ps_grid_{hash(tuple(st.session_state.xtech_ps_last_seasons + st.session_state.xtech_ps_last_comps))}"
+                grid_response = AgGrid(
+                    df_display_ps,
+                    gridOptions=gb.build(),
+                    height=500,
+                    theme='streamlit',
+                    update_mode=GridUpdateMode.SELECTION_CHANGED,
+                    allow_unsafe_jscode=True,
+                    fit_columns_on_grid_load=True,
+                    key="xtech_ps_grid_merged_style"
+                )
 
-            grid_response = AgGrid(
-                player_display,
-                gridOptions=gob.build(),
-                update_mode=GridUpdateMode.SELECTION_CHANGED,
-                data_return_mode=DataReturnMode.FILTERED,
-                fit_columns_on_grid_load=True,
-                theme="streamlit",
-                height=520,
-                reload_data=True,
-                enable_enterprise_modules=False,
-                allow_unsafe_jscode=True,
-                key=grid_key,  # ← CLÉ DYNAMIQUE
-            )
+                # Récupération sécurisée de la sélection
+                selected_rows = grid_response.get("selected_rows", [])
+                if isinstance(selected_rows, pd.DataFrame):
+                    selected_rows = selected_rows.to_dict(orient='records')
 
-            # Récupération sécurisée de la sélection
-            try:
-                sel = grid_response.get("selected_rows", [])
-                if isinstance(sel, pd.DataFrame):
-                    sel = sel.to_dict(orient='records') if not sel.empty else []
-                elif not isinstance(sel, list):
-                    sel = []
-            except Exception:
-                sel = []
+                has_sel = False
+                sel_row = None
 
-            has_sel, sel_row = False, None
-            if isinstance(sel, list) and len(sel) > 0:
-                has_sel, sel_row = True, sel[0]
+                if isinstance(selected_rows, list) and len(selected_rows) > 0 and isinstance(selected_rows[0], dict):
+                    has_sel = True
+                    sel_row = selected_rows[0]
+                    player_name_sel = sel_row.get("Player Name")
 
-            filters_summary = [
-                f"Season(s): {', '.join(st.session_state.xtech_ps_last_seasons)}",
-                f"Competition(s): {', '.join(st.session_state.xtech_ps_last_comps)}",
-                f"Positions: {', '.join(selected_positions) if selected_positions else 'All'}",
-                f"Preferred Foot: {', '.join(selected_feet) if selected_feet else 'All'}",
-            ]
-            if selected_age:
-                filters_summary.append(f"Age: {selected_age[0]}–{selected_age[1]}")
-            if selected_minutes:
-                filters_summary.append(f"Minutes: {selected_minutes[0]}–{selected_minutes[1]}")
+                    full_row = player_display[player_display["Player Name"] == player_name_sel]
 
-            st.markdown(
-                "<div style='font-size:0.85em; margin-top:-15px;'>Filters applied: " + " | ".join(filters_summary) + "</div>",
-                unsafe_allow_html=True
-            )
+                    if not full_row.empty:
+                        tm_url = full_row.iloc[0].get("Transfermarkt")
 
-            try:
-                export_df = pd.DataFrame(grid.get("data", []))
-                if export_df.empty:
-                    export_df = player_display.copy()
-            except Exception:
-                export_df = player_display.copy()
-
-            if "Transfermarkt" in export_df.columns:
-                export_df = export_df.drop(columns=["Transfermarkt"])
-
-            export_cols_order = [c for c in ["Player Name", "Team Name", "Competition Name", pos_col,
-                                             minutes_col, age_col, "xTECH", "xDEF"] if c in export_df.columns]
-            if export_cols_order:
-                export_df = export_df[export_cols_order]
-
-            csv_bytes = export_df.to_csv(index=False).encode("utf-8-sig")
-            file_name = f"player_search_{len(export_df)}.csv"
-
-            st.download_button(
-                label="Download selection as CSV",
-                data=csv_bytes,
-                file_name=file_name,
-                mime="text/csv",
-                key="xtech_ps_download_csv",
-                use_container_width=False
-            )
-            
-            if 'tm_btn_slot' in locals():
-                if has_sel and sel_row:
-                    tm_url = sel_row.get("Transfermarkt")
-                    if isinstance(tm_url, str) and tm_url.strip():
-                        tm_btn_slot.link_button(
-                            f"TM Player Page",
-                            tm_url,
-                            use_container_width=True,
-                        )
-                    else:
+                        # Vérifier existence du slot avant utilisation
+                        if 'tm_btn_slot' in locals() and tm_url and isinstance(tm_url, str) and tm_url.strip():
+                            with tm_btn_slot:
+                                st.link_button(
+                                    "🔗 TM Player Page",
+                                    tm_url,
+                                    use_container_width=True
+                                )
+                        elif 'tm_btn_slot' in locals():
+                            tm_btn_slot.empty()
+                    elif 'tm_btn_slot' in locals():
                         tm_btn_slot.empty()
-                else:
+                elif 'tm_btn_slot' in locals():
                     tm_btn_slot.empty()
-                    
-                    st.write("")
-                    st.write("")
-                    xtech_glossary_expander()
+            else:
+                st.info("No data to display.")
+
+            st.write("")
+            st.write("")
+            xtech_glossary_expander()
+        
 
 #######################=== Onglet Scatter Plot ===
     with tab1:
@@ -4563,33 +4650,31 @@ elif page == "xTech/xDef":
 
         # On restreint la liste des compétitions à celles présentes en 2025/2026
         comps_2026 = (
-            df_tech.loc[df_tech["Season Name"].isin(ROOKIE_SEASON), "Competition Name"]  # ✅ .isin() au lieu de ==
+            df_tech.loc[df_tech["Season Name"].isin(ROOKIE_SEASON), "Competition Name"]
             .dropna().sort_values().unique().tolist()
         )
         if not comps_2026:
-            st.info("Aucune compétition trouvée pour les saisons sélectionnées dans le jeu de données xTech/xDef.")
+            st.info("No competition found for the selected seasons in the xTech/xDef dataset.")
             st.stop()
 
-       # --- Ligne 1 : Competition + Position Group
+        # --- Ligne 1 : Competition + Position Group + Preferred Foot
         c1, c2, c3 = st.columns([1.2, 1.2, 1.0])
 
         with c1:
             # --- Init session state (état initial : rien sélectionné, case décochée)
             if "selected_comps" not in st.session_state:
-                st.session_state.selected_comps = []            # vide au premier accès
+                st.session_state.selected_comps = []
             if "select_all_comps" not in st.session_state:
-                st.session_state.select_all_comps = False       # décoché au premier accès
+                st.session_state.select_all_comps = False
 
             # --- Callbacks
             def _sync_select_all_from_multiselect():
-                # si l'utilisateur modifie la sélection, on (dé)coche la case si tout est sélectionné ou non
                 st.session_state.select_all_comps = set(st.session_state.selected_comps) == set(comps_2026)
 
             def _apply_select_all():
-                # coché => tout sélectionner ; décoché => vider
                 st.session_state.selected_comps = comps_2026.copy() if st.session_state.select_all_comps else []
 
-            # --- Multiselect (au-dessus)
+            # --- Multiselect
             st.multiselect(
                 "Competition(s)",
                 options=comps_2026,
@@ -4598,37 +4683,31 @@ elif page == "xTech/xDef":
                 on_change=_sync_select_all_from_multiselect,
             )
 
-            # --- Checkbox (en dessous)
+            # --- Checkbox
             st.checkbox(
                 "Select All Competitions",
                 key="select_all_comps",
                 on_change=_apply_select_all,
             )
 
-            # Valeur finale à utiliser pour les filtres
             selected_comps = st.session_state.selected_comps
 
         with c2:
             pos_base = df_tech[df_tech["Season Name"].isin(ROOKIE_SEASON)].copy()
             if selected_comps:
                 pos_base = pos_base[pos_base["Competition Name"].isin(selected_comps)]
+
             desired_order = ["Goalkeeper", "Full Back", "Central Defender", "Midfielder",
                              "Attacking Midfielder", "Winger", "Striker"]
             order_idx = {v: i for i, v in enumerate(desired_order)}
 
-            pos_base = df_tech[df_tech["Season Name"].isin(ROOKIE_SEASON)]
-            if selected_comps:
-                pos_base = pos_base[pos_base["Competition Name"].isin(selected_comps)]
-
-            # Options uniques puis tri selon desired_order (les inconnus vont à la fin)
-            raw = (pos_base["Position Group"].dropna().astype(str).str.strip().unique().tolist())
+            raw = pos_base["Position Group"].dropna().astype(str).str.strip().unique().tolist()
             pos_options = sorted(raw, key=lambda x: order_idx.get(x, 999))
 
             selected_positions = st.multiselect("Position Group(s)", options=pos_options, default=[])
-            
+
         with c3:
-            # --- Preferred Foot
-            pf_col = "Prefered Foot"  # nom EXACT de la colonne dans ta BDD
+            pf_col = "Prefered Foot"
             standard_pf = ["Right Footed", "Left Footed", "Ambidextrous"]
 
             if pf_col in df_tech.columns:
@@ -4636,7 +4715,6 @@ elif page == "xTech/xDef":
                     df_tech.loc[df_tech["Season Name"].isin(ROOKIE_SEASON), pf_col]
                     .dropna().astype(str).str.strip().unique().tolist()
                 )
-                # on ne garde que les valeurs présentes, sinon on retombe sur les 3 standards
                 pf_options = [p for p in standard_pf if p in pf_seen] or standard_pf
             else:
                 pf_options = standard_pf
@@ -4644,16 +4722,14 @@ elif page == "xTech/xDef":
             selected_foots = st.multiselect(
                 "Preferred Foot",
                 options=pf_options,
-                default=pf_options,   # les 3 cochées par défaut
+                default=pf_options,
                 key="rookies_pf"
             )
-
 
         # --- Ligne 2 : Sliders Age + Minutes
         c4, c5 = st.columns([1.0, 1.4])
 
         with c4:
-            # borne dynamique selon filtres actuels (comp + pos)
             age_min_present = int(
                 df_tech.loc[df_tech["Season Name"].isin(ROOKIE_SEASON), "Age"].min()
             )
@@ -4667,7 +4743,6 @@ elif page == "xTech/xDef":
             )
 
         with c5:
-            # borne max dynamique selon filtres comp + pos + age
             rookies_tmp = df_tech[df_tech["Season Name"].isin(ROOKIE_SEASON)].copy()
             if selected_comps:
                 rookies_tmp = rookies_tmp[rookies_tmp["Competition Name"].isin(selected_comps)]
@@ -4682,19 +4757,18 @@ elif page == "xTech/xDef":
             if np.isnan(minutes_max_raw):
                 minutes_max = 0
             else:
-                # arrondi au multiple de 50 supérieur pour ne pas perdre le max réel
                 minutes_max = int(np.ceil(minutes_max_raw / 50.0) * 50)
 
             selected_minutes = st.slider(
                 "Minutes",
                 min_value=0,
-                max_value=minutes_max,          # borne max inclusive (arrondie)
+                max_value=minutes_max,
                 value=(0, minutes_max),
                 step=50,
                 key="rookies_minutes",
             )
-            
-        # --- Ligne 3 : xTECH min + xDEF min + (slot bouton à droite)
+
+        # --- Ligne 3 : xTECH min + xDEF min + slot bouton TM
         c6, c7, c8 = st.columns([1.0, 1.0, 0.8])
 
         with c6:
@@ -4713,145 +4787,160 @@ elif page == "xTech/xDef":
                 key="rookies_xdef_min",
             )
 
-        # Slot du bouton de redirection, à DROITE de la 3e ligne
         with c8:
-            # Ajoute un peu d'espace avant le bouton
             st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
             btn_slot = st.empty()
 
-        rookies = df_tech.copy()
-        rookies = df_tech[df_tech["Season Name"].isin(ROOKIE_SEASON)]
+        # --- Filtrage des données
+        rookies = df_tech[df_tech["Season Name"].isin(ROOKIE_SEASON)].copy()
 
         if selected_comps:
             rookies = rookies[rookies["Competition Name"].isin(selected_comps)]
 
         if selected_positions:
             rookies = rookies[rookies["Position Group"].isin(selected_positions)]
-            
+
         if selected_foots:
             rookies = rookies[rookies["Prefered Foot"].astype(str).str.strip().isin(selected_foots)]
 
-        # Âge ≤ seuil sélectionné (max 23)
         rookies = rookies[pd.to_numeric(rookies["Age"], errors="coerce") <= selected_age_max]
 
-        # Minutes dans la plage sélectionnée (voir correctif max arrondi + pas=50 que tu as déjà)
         rookies = rookies[
             (pd.to_numeric(rookies["Minutes"], errors="coerce") >= selected_minutes[0]) &
             (pd.to_numeric(rookies["Minutes"], errors="coerce") <= selected_minutes[1])
         ]
-        
-        # --- xTECH / xDEF : garder tous les GK, filtrer les autres ≥ seuils
+
+        # --- xTECH / xDEF : garder tous les GK, filtrer les autres
         pg = rookies["Position Group"].astype(str).str.strip()
-        is_gk = pg.isin(["Goalkeeper", "GK"])  # robustesse au libellé
+        is_gk = pg.isin(["Goalkeeper", "GK"])
 
         xtech_num = pd.to_numeric(rookies["xTECH"], errors="coerce")
         xdef_num  = pd.to_numeric(rookies["xDEF"],  errors="coerce")
 
-        # Conserver:
-        # - tous les GK (quelle que soit la valeur ou NaN),
-        # - les non-GK qui passent les deux seuils.
         mask_keep = is_gk | ((xtech_num >= xtech_min_sel) & (xdef_num >= xdef_min_sel))
         rookies = rookies[mask_keep]
-        
-        # Colonnes visibles (on insère "Position Group")
+
+        # --- Préparation du DataFrame d'affichage
         wanted_cols = ["Player Name", "Team Name", "Competition Name", "Position Group",
                        "Minutes", "Age", "xTECH", "xDEF"]
-
-        # Sélection robuste si la colonne existe
         visible_cols = [c for c in wanted_cols if c in rookies.columns]
         rookies_display = rookies[visible_cols].copy()
-        
-        rookies_display["Minutes"] = rookies_display["Minutes"].round(0).astype("Int64")
-        rookies_display["xTECH"] = rookies_display["xTECH"].round(1)
-        rookies_display["xDEF"]  = rookies_display["xDEF"].round(1)
+
+        # Typage robuste
+        rookies_display["Minutes"] = pd.to_numeric(rookies_display["Minutes"], errors="coerce").fillna(0).astype(int)
+        rookies_display["Age"] = pd.to_numeric(rookies_display["Age"], errors="coerce").fillna(0).astype(int)
+        rookies_display["xTECH"] = pd.to_numeric(rookies_display["xTECH"], errors="coerce").fillna(0).astype(int)
+        rookies_display["xDEF"] = pd.to_numeric(rookies_display["xDEF"], errors="coerce").fillna(0).astype(int)
 
         # Tri par défaut
-        if all(c in rookies_display.columns for c in ["xTECH","Minutes"]):
-            rookies_display = rookies_display.sort_values(["xTECH","Minutes"], ascending=[False, False])
+        rookies_display = rookies_display.sort_values(["xTECH", "Minutes"], ascending=[False, False])
 
-        # --- Construire le DF d'affichage (colonnes visibles + URL masquée)
+        # Colonne URL Transfermarkt
         import urllib.parse as _parse
         TM_BASE = "https://www.transfermarkt.fr/schnellsuche/ergebnis/schnellsuche?query="
-
-        rookies_display = rookies[["Player Name", "Team Name", "Position Group", "Competition Name", "Minutes", "Age", "xTECH", "xDEF"]].copy()
-        # Tri par défaut
-        rookies_display = rookies_display.sort_values(["xTECH","Minutes"], ascending=[False, False])
-
-        # Colonne URL (sera masquée dans la grille)
         rookies_display["Transfermarkt"] = rookies_display["Player Name"].apply(
             lambda name: TM_BASE + _parse.quote(str(name)) if pd.notna(name) else ""
         )
 
-       # --- Tableau AgGrid (aucun affichage natif ailleurs)
-        # === AgGrid Rookie (isolé avec clé unique) ===
-        from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode, DataReturnMode
+        # ========== AgGrid Rookie (style Player Search) ==========
+        if not rookies_display.empty:
+            from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode
 
-        # S'assurer que rookies_display existe et n'est pas vide
-        if 'rookies_display' not in locals() or rookies_display.empty:
-            st.info("🔍 No players match your current filters.")
-            st.stop()
+            df_display_rookie = rookies_display.reset_index(drop=True)
 
-        gob = GridOptionsBuilder.from_dataframe(rookies_display)
-        gob.configure_default_column(
-            resizable=True,
-            filter=True,
-            sortable=True,
-            flex=1,
-            min_width=120
-        )
+            # Typage des colonnes texte
+            for col in ["Competition Name", "Position Group"]:
+                if col in df_display_rookie.columns:
+                    df_display_rookie[col] = df_display_rookie[col].astype(str)
 
-        for col in ["Minutes", "Age", "xTECH", "xDEF"]:
-            if col in rookies_display.columns:
-                gob.configure_column(
-                    col,
-                    type=["numericColumn", "numberColumnFilter"],
-                    cellStyle={'textAlign': 'right'}
+            # Configuration AgGrid (même style que Player Search)
+            gb = GridOptionsBuilder.from_dataframe(df_display_rookie)
+            gb.configure_selection(selection_mode="single", use_checkbox=True)
+            gb.configure_default_column(
+                editable=False, 
+                groupable=True, 
+                sortable=True, 
+                filter="agTextColumnFilter",
+                flex=1,
+                headerStyle={'textAlign': 'center'}
+            )
+
+            # Configuration des colonnes numériques
+            for col in ["Minutes", "Age", "xTECH", "xDEF"]:
+                if col in df_display_rookie.columns:
+                    gb.configure_column(
+                        col, 
+                        type=["numericColumn", "numberColumnFilter"],
+                        flex=1
+                    )
+
+            # Player Name : épinglée à gauche et plus large
+            if "Player Name" in df_display_rookie.columns:
+                gb.configure_column(
+                    "Player Name", 
+                    pinned="left",
+                    flex=2,
+                    minWidth=200,
+                    cellStyle={'textAlign': 'left'},
+                    headerStyle={'textAlign': 'center'}
                 )
 
-        if "Transfermarkt" in rookies_display.columns:
-            gob.configure_column("Transfermarkt", hide=True)
+            # Masquer Transfermarkt
+            if "Transfermarkt" in df_display_rookie.columns:
+                gb.configure_column("Transfermarkt", hide=True)
 
-        gob.configure_selection(selection_mode="single", use_checkbox=True)
-        gob.configure_pagination(enabled=True, paginationAutoPageSize=True)
-        gob.configure_grid_options(domLayout="autoHeight")
+            # Pas de pagination (scroll infini)
+            gb.configure_pagination(enabled=False)
 
-        # Clé unique basée sur les filtres pour éviter les conflits
-        rookie_key = f"rookies_grid_{hash((tuple(selected_comps or []), tuple(selected_positions or []), selected_age_max))}"
+            grid_response_rookie = AgGrid(
+                df_display_rookie,
+                gridOptions=gb.build(),
+                height=500,
+                theme='streamlit',
+                update_mode=GridUpdateMode.SELECTION_CHANGED,
+                allow_unsafe_jscode=True,
+                fit_columns_on_grid_load=True,
+                key="rookies_grid_merged_style"
+            )
 
-        grid_response_rookie = AgGrid(
-            rookies_display,
-            gridOptions=gob.build(),
-            update_mode=GridUpdateMode.SELECTION_CHANGED,
-            data_return_mode=DataReturnMode.FILTERED,
-            fit_columns_on_grid_load=True,
-            theme="streamlit",
-            height=520,
-            reload_data=True,
-            enable_enterprise_modules=False,
-            allow_unsafe_jscode=True,
-            key=rookie_key,  # ← CLÉ DYNAMIQUE
-        )
+            # Récupération sécurisée de la sélection
+            selected_rows = grid_response_rookie.get("selected_rows", [])
+            if isinstance(selected_rows, pd.DataFrame):
+                selected_rows = selected_rows.to_dict(orient='records')
 
-        # Récupération sécurisée de la sélection
-        try:
-            sel = grid_response_rookie.get("selected_rows", [])
-            if isinstance(sel, pd.DataFrame):
-                sel = sel.to_dict(orient='records') if not sel.empty else []
-            elif not isinstance(sel, list):
-                sel = []
-        except Exception:
-            sel = []
+            has_sel = False
+            sel_row = None
 
-        has_sel = False
-        sel_row = None
+            if isinstance(selected_rows, list) and len(selected_rows) > 0 and isinstance(selected_rows[0], dict):
+                has_sel = True
+                sel_row = selected_rows[0]
+                player_name_sel = sel_row.get("Player Name")
 
-        if isinstance(sel, list) and len(sel) > 0:
-            has_sel = True
-            sel_row = sel[0]
-        
+                full_row = rookies_display[rookies_display["Player Name"] == player_name_sel]
+
+                if not full_row.empty:
+                    tm_url = full_row.iloc[0].get("Transfermarkt")
+
+                    # Vérifier existence du slot avant utilisation
+                    if 'btn_slot' in locals() and tm_url and isinstance(tm_url, str) and tm_url.strip():
+                        with btn_slot:
+                            st.link_button(
+                                "🔗 TM Player Page",
+                                tm_url,
+                                use_container_width=True
+                            )
+                    elif 'btn_slot' in locals():
+                        btn_slot.empty()
+                elif 'btn_slot' in locals():
+                    btn_slot.empty()
+            elif 'btn_slot' in locals():
+                btn_slot.empty()
+        else:
+            st.info("🔍 No players match your current filters.")
+
         # --- Résumé des filtres appliqués
         filters_summary = [
-            f"Season: {ROOKIE_SEASON}",
+            f"Season: {', '.join(ROOKIE_SEASON)}",
             f"Competition(s): {', '.join(selected_comps) if selected_comps else 'All'}",
             f"Positions: {', '.join(selected_positions) if selected_positions else 'All'}",
             f"Preferred Foot: {', '.join(selected_foots) if selected_foots else 'All'}",
@@ -4865,28 +4954,25 @@ elif page == "xTech/xDef":
             "<div style='font-size:0.85em; margin-top:-15px;'>Filters applied: " + " | ".join(filters_summary) + "</div>",
             unsafe_allow_html=True
         )
-        
-        # --- Export CSV : récupère ce qui est affiché dans la grille (post-filtres/tri AgGrid)
+
+        # --- Export CSV
         try:
-            export_df = pd.DataFrame(grid.get("data", []))  # DataReturnMode.FILTERED => données visibles
+            export_df = pd.DataFrame(grid_response_rookie.get("data", []))
             if export_df.empty:
                 export_df = rookies_display.copy()
         except Exception:
             export_df = rookies_display.copy()
 
-        # On enlève la colonne masquée si présente
         if "Transfermarkt" in export_df.columns:
             export_df = export_df.drop(columns=["Transfermarkt"])
 
-        # Optionnel : garantir l'ordre des colonnes comme l'affichage
         export_cols_order = [c for c in ["Player Name", "Team Name", "Competition Name", "Position Group",
                                          "Minutes", "Age", "xTECH", "xDEF"] if c in export_df.columns]
         if export_cols_order:
             export_df = export_df[export_cols_order]
 
-        # Encodage CSV (UTF-8 avec BOM pour Excel) + nom de fichier parlant
         csv_bytes = export_df.to_csv(index=False).encode("utf-8-sig")
-        file_name = f"rookies_{ROOKIE_SEASON}_{len(export_df)}.csv"
+        file_name = f"rookies_{'+'.join(ROOKIE_SEASON)}_{len(export_df)}.csv"
 
         st.download_button(
             label="Download selection as CSV",
@@ -4895,33 +4981,6 @@ elif page == "xTech/xDef":
             mime="text/csv",
             use_container_width=False
         )
-
-        # Utiliser grid_response_rookie au lieu de grid
-        try:
-            sel = grid_response_rookie.get("selected_rows", [])
-            if isinstance(sel, pd.DataFrame):
-                sel = sel.to_dict(orient='records') if not sel.empty else []
-            elif not isinstance(sel, list):
-                sel = []
-        except Exception:
-            sel = []
-
-        has_sel = False
-        sel_row = None
-
-        if isinstance(sel, list) and len(sel) > 0:
-            has_sel = True
-            sel_row = sel[0]
-
-        if has_sel and sel_row:
-            pname = (str(sel_row.get("Player Name", "")).strip())
-            tm_url = sel_row.get("Transfermarkt")
-            if pname and tm_url:
-                # Le bouton s’affiche dans le slot à droite de la 3ᵉ ligne (c7)
-                with btn_slot:
-                    st.link_button(f"Transfermarkt Player Page", tm_url, use_container_width=True)
-        else:
-            btn_slot.empty()
         
 # ============================================= VOLET Merged Data ========================================================
 
