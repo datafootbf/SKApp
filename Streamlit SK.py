@@ -104,13 +104,13 @@ def shorten_season(s):
 
 @st.cache_data
 def load_xphysical():
-    df = pd.read_csv('/Users/favie/Desktop/SKApp/SK_All.csv', sep=",")
+    df = pd.read_csv('SK_All.csv', sep=",")
     df.columns = df.columns.str.strip()
     return df
 
 @st.cache_data
 def load_xtechnical():
-    df_tech = pd.read_csv('/Users/favie/Desktop/SKApp/SB_All.csv', sep=",")
+    df_tech = pd.read_csv('SB_All.csv', sep=",")
     df_tech.columns = df_tech.columns.str.strip()
     df_tech["season_short"] = df_tech["Season Name"].apply(shorten_season)
     df_tech["Display Name"] = df_tech.apply(
@@ -123,7 +123,7 @@ def load_xtechnical():
 
 @st.cache_data
 def load_merged():
-    df_merged = pd.read_csv('/Users/favie/Desktop/SKApp/SB_SK_MERGED.csv')
+    df_merged = pd.read_csv('SB_SK_MERGED.csv')
     df_merged.columns = df_merged.columns.str.strip()
     return df_merged
 
@@ -989,7 +989,7 @@ graph_columns = [
 ]
 
 # Charge le logo (met le chemin exact si besoin)
-logo_path = '/Users/favie/Statsbomb/TEST/AS Roma.png'
+logo_path = 'AS Roma.png'
 logo = Image.open(logo_path)
 st.sidebar.image(logo, use_container_width=True)
 
