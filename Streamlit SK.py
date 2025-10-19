@@ -1415,7 +1415,7 @@ if page == "xPhysical":
                     df_display_phy,
                     gridOptions=gb.build(),
                     height=500,
-                    theme='streamlit',
+                    theme='balham',
                     update_mode=GridUpdateMode.SELECTION_CHANGED,
                     allow_unsafe_jscode=True,
                     fit_columns_on_grid_load=True,
