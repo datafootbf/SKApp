@@ -2995,35 +2995,11 @@ elif page == "xTech/xDef":
                 if m in player_display.columns:
                     player_display[m] = pd.to_numeric(player_display[m], errors="coerce").fillna(0).round(2)
         
-            from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode, DataReturnMode
-            # Configuration AgGrid avec filtres numériques explicites
-            gob = GridOptionsBuilder.from_dataframe(player_display)
-            gob.configure_default_column(resizable=True, filter=True, sortable=True, flex=1, min_width=120)
-
-            for col in [minutes_col, age_col, "xTECH", "xDEF"] + extra_cols:
-                if col in player_display.columns:
-                    gob.configure_column(
-                        col, 
-                        type=["numericColumn", "numberColumnFilter"],  # ← AJOUT
-                        cellStyle={'textAlign': 'right'}
-                    )                    
-            if "Transfermarkt" in player_display.columns:
-                gob.configure_column("Transfermarkt", hide=True)
-            gob.configure_selection(selection_mode="single", use_checkbox=True)
-            gob.configure_pagination(enabled=True, paginationAutoPageSize=True)
-            gob.configure_grid_options(domLayout="autoHeight")
-
-            grid = AgGrid(
+            st.dataframe(
                 player_display,
-                gridOptions=gob.build(),
-                update_mode=GridUpdateMode.SELECTION_CHANGED,
-                data_return_mode=DataReturnMode.FILTERED,
-                fit_columns_on_grid_load=True,
-                theme="streamlit",
+                use_container_width=True,
                 height=520,
-                reload_data=True,           # ← AJOUTER
-                enable_enterprise_modules=False,  # ← AJOUTER
-                key="xtech_ps_grid",
+                hide_index=True
             )
 
             filters_summary = [
