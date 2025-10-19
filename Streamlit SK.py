@@ -1353,96 +1353,82 @@ if page == "xPhysical":
 
                 df_display_phy = player_display_phy.reset_index(drop=True)
 
-                # Typage des colonnes texte
+                # Typage
                 for col in [comp_col, pos_col]:
                     if col in df_display_phy.columns:
                         df_display_phy[col] = df_display_phy[col].astype(str)
 
-                # Formatage différencié : entiers pour colonnes de base
                 for col in [age_col, "xPhysical"]:
                     if col in df_display_phy.columns:
                         df_display_phy[col] = df_display_phy[col].apply(
-                            lambda x: int(round(x)) if pd.notna(x) and x != "" else 0
+                            lambda x: int(round(x)) if pd.notna(x) else ""
                         )
 
-                # Garder 2 décimales pour les colonnes ajoutées via filtres
                 for col in extra_cols:
                     if col in df_display_phy.columns:
                         df_display_phy[col] = df_display_phy[col].apply(
-                            lambda x: round(x, 2) if pd.notna(x) and x != "" else 0.0
+                            lambda x: round(x, 2) if pd.notna(x) and x != "" else ""
                         )
 
-                # Configuration AgGrid
+                # Configuration AgGrid (style Merged Data)
                 gb = GridOptionsBuilder.from_dataframe(df_display_phy)
-                gb.configure_selection(selection_mode="single", use_checkbox=True)
+                gb.configure_selection(selection_mode="single", use_checkbox=False)  # ← PAS de checkbox
                 gb.configure_default_column(
                     editable=False, 
                     groupable=True, 
                     sortable=True, 
-                    filter="agTextColumnFilter",
-                    flex=1,
-                    headerStyle={'textAlign': 'center'}
+                    filter="agTextColumnFilter"
                 )
 
-                # Configuration des colonnes numériques
                 for col in [age_col, "xPhysical"] + extra_cols:
                     if col in df_display_phy.columns:
                         gb.configure_column(
                             col, 
                             type=["numericColumn", "numberColumnFilter"],
-                            flex=1
+                            cellStyle={'textAlign': 'center'}
                         )
 
-                # Player Name : épinglée à gauche et plus large
-                if "Player Name" in df_display_phy.columns:
-                    gb.configure_column(
-                        "Player Name", 
-                        pinned="left",
-                        flex=2,
-                        minWidth=200,
-                        cellStyle={'textAlign': 'left'},
-                        headerStyle={'textAlign': 'center'}
-                    )
+                for col in df_display_phy.columns:
+                    if col != "Transfermarkt":
+                        gb.configure_column(
+                            col, 
+                            headerClass='header-style', 
+                            cellStyle={'textAlign': 'center'}
+                        )
 
-                # Masquer Transfermarkt
+                if "Player Name" in df_display_phy.columns:
+                    gb.configure_column("Player Name", pinned="left")
+
                 if "Transfermarkt" in df_display_phy.columns:
                     gb.configure_column("Transfermarkt", hide=True)
 
-                # Pas de pagination
                 gb.configure_pagination(enabled=False)
 
                 grid_response = AgGrid(
                     df_display_phy,
                     gridOptions=gb.build(),
                     height=500,
-                    theme='balham',
+                    theme='balham',  # ← Theme Merged Data
                     update_mode=GridUpdateMode.SELECTION_CHANGED,
                     allow_unsafe_jscode=True,
-                    fit_columns_on_grid_load=True,
                     key="xphy_ps_grid_merged_style"
                 )
 
-                # Récupération sécurisée de la sélection
+                # Gestion sélection
                 selected_rows = grid_response.get("selected_rows", [])
                 if isinstance(selected_rows, pd.DataFrame):
                     selected_rows = selected_rows.to_dict(orient='records')
 
-                has_sel = False
-                sel_row = None
-
                 if isinstance(selected_rows, list) and len(selected_rows) > 0 and isinstance(selected_rows[0], dict):
-                    has_sel = True
-                    sel_row = selected_rows[0]
-                    player_name_sel = sel_row.get("Player Name")
+                    display_row = selected_rows[0]
+                    player_name_sel = display_row.get("Player Name")
 
                     full_row = player_display_phy[player_display_phy["Player Name"] == player_name_sel]
 
                     if not full_row.empty:
                         tm_url = full_row.iloc[0].get("Transfermarkt")
 
-                        # ═══════════════════════════════════════
-                        # BOUTON 1 : TM Player Page
-                        # ═══════════════════════════════════════
+                        # Bouton TM
                         if 'tm_btn_slot' in locals() and tm_url and isinstance(tm_url, str) and tm_url.strip():
                             with tm_btn_slot:
                                 st.link_button(
@@ -1453,31 +1439,24 @@ if page == "xPhysical":
                         elif 'tm_btn_slot' in locals():
                             tm_btn_slot.empty()
 
-                        # ═══════════════════════════════════════
-                        # BOUTON 2 : Send to Radar (TOUJOURS AFFICHÉ)
-                        # ═══════════════════════════════════════
+                        # Bouton Send to Radar
                         if 'send_radar_slot' in locals():
                             with send_radar_slot:
-                                # Le bouton s'affiche systématiquement si une ligne est sélectionnée
                                 if st.button("📊 Send to Radar", use_container_width=True, key="xphy_send_radar_btn"):
                                     try:
-                                        # 1) Reconstituer la Display Name
                                         _df_dn = df[[player_col, "Short Name"]].dropna().drop_duplicates()
                                         _df_dn["Display Name"] = _df_dn["Short Name"].astype(str) + " (" + _df_dn[player_col].astype(str) + ")"
                                         player_to_display_map = dict(zip(_df_dn[player_col], _df_dn["Display Name"]))
 
-                                        # player_name_sel peut être "Player Name" ou "Player"
-                                        player_key = sel_row.get("Player Name") or sel_row.get(player_col)
+                                        player_key = display_row.get("Player Name") or display_row.get(player_col)
                                         display_val = player_to_display_map.get(player_key)
 
                                         if display_val is None:
-                                            short_name_fallback = sel_row.get("Short Name")
+                                            short_name_fallback = display_row.get("Short Name")
                                             display_val = f"{short_name_fallback} ({player_key})" if short_name_fallback and player_key else player_key
 
-                                        # 2) Pousser vers l'onglet Radar
                                         st.session_state["radar_p1"] = display_val
 
-                                        # 3) Auto-switch vers l'onglet "Radar"
                                         import streamlit.components.v1 as components
                                         components.html(
                                             """
@@ -1497,15 +1476,12 @@ if page == "xPhysical":
                                             height=0,
                                         )
                                     except Exception:
-                                        pass  # Pas d'affichage d'erreur
-                    else:
-                        # Ligne sélectionnée mais pas trouvée dans le DataFrame
-                        if 'tm_btn_slot' in locals():
-                            tm_btn_slot.empty()
-                        if 'send_radar_slot' in locals():
-                            send_radar_slot.empty()
+                                        pass
+                    elif 'tm_btn_slot' in locals():
+                        tm_btn_slot.empty()
+                    if 'send_radar_slot' in locals():
+                        send_radar_slot.empty()
                 else:
-                    # Aucune ligne sélectionnée
                     if 'tm_btn_slot' in locals():
                         tm_btn_slot.empty()
                     if 'send_radar_slot' in locals():
