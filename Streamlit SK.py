@@ -1369,7 +1369,6 @@ if page == "xPhysical":
                     groupable=True, 
                     sortable=True, 
                     filter="agTextColumnFilter",
-                    flex=1,
                     headerStyle={'textAlign': 'center'}
                 )
 
