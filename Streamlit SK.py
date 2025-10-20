@@ -1358,10 +1358,20 @@ if page == "xPhysical":
             # ========== AgGrid Player Search (CORRIGÉ) ==========
             if not player_display_phy.empty:
                 from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode
-
+            
                 df_display_phy = player_display_phy.reset_index(drop=True)
-
-                # Configuration AgGrid (style Merged Data)
+            
+                # 🔥 AJOUT CRITIQUE : Forcer la conversion numérique AVANT AgGrid
+                for col in [age_col, "xPhysical"] + extra_cols:
+                    if col in df_display_phy.columns:
+                        df_display_phy[col] = pd.to_numeric(df_display_phy[col], errors="coerce").fillna(0)
+                
+                # Typer les colonnes texte
+                for col in [comp_col, pos_col]:
+                    if col in df_display_phy.columns:
+                        df_display_phy[col] = df_display_phy[col].astype(str)
+            
+                # Configuration AgGrid
                 gb = GridOptionsBuilder.from_dataframe(df_display_phy)
                 gb.configure_selection(selection_mode="single", use_checkbox=True)
                 gb.configure_default_column(
@@ -1370,28 +1380,48 @@ if page == "xPhysical":
                     sortable=True, 
                     filter="agTextColumnFilter"
                 )
-
+            
+                # 🔥 AJOUT CRITIQUE : Configurer les colonnes NUMÉRIQUES
+                for col in [age_col, "xPhysical"] + extra_cols:
+                    if col in df_display_phy.columns:
+                        gb.configure_column(
+                            col, 
+                            type=["numericColumn", "numberColumnFilter"],
+                            cellStyle={'textAlign': 'center'},
+                            headerStyle={'textAlign': 'center'}
+                        )
+            
+                # Configuration colonnes texte
                 for col in df_display_phy.columns:
-                    if col != "Transfermarkt":
+                    if col not in [age_col, "xPhysical"] + extra_cols + ["Transfermarkt"]:
                         gb.configure_column(
                             col, 
                             headerClass='header-style', 
-                            cellStyle={'textAlign': 'center'}
+                            cellStyle={'textAlign': 'center'},
+                            headerStyle={'textAlign': 'center'}
                         )
-
-                if "Player Name" in df_display_phy.columns:
-                    gb.configure_column("Player Name", pinned="left")
             
+                # Player Name épinglée
+                if "Player Name" in df_display_phy.columns:
+                    gb.configure_column(
+                        "Player Name", 
+                        pinned="left",
+                        cellStyle={'textAlign': 'left'},
+                        headerStyle={'textAlign': 'center'}
+                    )
+            
+                # Masquer Transfermarkt
                 if "Transfermarkt" in df_display_phy.columns:
                     gb.configure_column("Transfermarkt", hide=True)
             
+                # Pas de pagination
                 gb.configure_pagination(enabled=False)
             
                 grid_response = AgGrid(
                     df_display_phy,
                     gridOptions=gb.build(),
                     height=500,
-                    theme='balham',  # ← Theme Merged Data
+                    theme='balham',
                     update_mode=GridUpdateMode.SELECTION_CHANGED,
                     allow_unsafe_jscode=True,
                     key="xphy_ps_grid_merged_style"
@@ -1471,7 +1501,7 @@ if page == "xPhysical":
                         send_radar_slot.empty()
             else:
                 st.info("No data to display.")
-
+            
             # Résumé filtres
             filters_summary = [
                 f"Season(s): {', '.join(st.session_state.xphy_ps_last_seasons)}",
@@ -1483,7 +1513,7 @@ if page == "xPhysical":
                 "<div style='font-size:0.85em; margin-top:-15px;'>Filters applied: " + " | ".join(filters_summary) + "</div>",
                 unsafe_allow_html=True
             )
-
+            
             # Export CSV
             try:
                 export_df = pd.DataFrame(grid_response.get("data", []))
@@ -1491,18 +1521,18 @@ if page == "xPhysical":
                     export_df = player_display_phy.copy()
             except Exception:
                 export_df = player_display_phy.copy()
-
+            
             if "Transfermarkt" in export_df.columns:
                 export_df = export_df.drop(columns=["Transfermarkt"])
-
+            
             export_cols_order = [c for c in ["Player Name", "Team Name", comp_col,
                                              pos_col, age_col, "xPhysical"] if c in export_df.columns]
             if export_cols_order:
                 export_df = export_df[export_cols_order]
-
+            
             csv_bytes = export_df.to_csv(index=False).encode("utf-8-sig")
             file_name = f"xphysical_player_search_{len(export_df)}.csv"
-
+            
             st.download_button(
                 label="Download selection as CSV",
                 data=csv_bytes,
@@ -1510,7 +1540,7 @@ if page == "xPhysical":
                 mime="text/csv",
                 use_container_width=False
             )
-
+            
             st.write("")
             st.write("")
             xphysical_glossary_expander()
