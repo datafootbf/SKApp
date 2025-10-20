@@ -1400,7 +1400,6 @@ if page == "xPhysical":
                 st.write("**Debug types colonnes :**")
                 for col in df_display_phy.columns:
                     st.write(f"- {col}: {df_display_phy[col].dtype}")
-                ```
 
                 # Pas de pagination
                 gb.configure_pagination(enabled=False)
