@@ -1395,8 +1395,9 @@ if page == "xPhysical":
                 gb.configure_pagination(enabled=False)
 
                 gb.configure_grid_options(
-                    domLayout='normal',
-                    suppressColumnVirtualisation=True
+                    onFirstDataRendered='function(params) { params.api.sizeColumnsToFit(); }',
+                    onGridSizeChanged='function(params) { params.api.sizeColumnsToFit(); }',
+                    domLayout='normal'
                 )
     
                 grid_response = AgGrid(
@@ -1406,6 +1407,7 @@ if page == "xPhysical":
                     theme='streamlit',
                     update_mode=GridUpdateMode.SELECTION_CHANGED,
                     allow_unsafe_jscode=True,
+                    fit_columns_on_grid_load=True,
                     key="xphy_ps_grid"
                 )
     
