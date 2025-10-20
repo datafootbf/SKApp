@@ -1373,11 +1373,11 @@ if page == "xPhysical":
     
                 # Style colonnes - centrage AVEC en-têtes
                 for col in display_cols:
-                if col not in ["Transfermarkt", "Player Name"]:
-                    gb.configure_column(
-                        col,
-                        cellStyle={'textAlign': 'center'}
-                    )
+                    if col not in ["Transfermarkt", "Player Name"]:
+                        gb.configure_column(
+                            col,
+                            cellStyle={'textAlign': 'center'}
+                        )
                 
                 # Player Name épinglée à gauche
                 if "Player Name" in df_display.columns:
