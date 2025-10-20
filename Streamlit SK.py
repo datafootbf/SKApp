@@ -1346,13 +1346,14 @@ if page == "xPhysical":
                 # Formatage numériques (comme Merged Data)
                 for col in [age_col, "xPhysical"]:
                     if col in df_display.columns:
-                        df_display[col] = df_display[col].apply(lambda x: int(round(x)) if pd.notna(x) else "")
+                        df_display[col] = df_display[col].apply(lambda x: int(round(x)) if pd.notna(x) else 0)
+
 
                 # Colonnes de percentiles avec 2 décimales
                 for col in df_display.columns:
                     if col not in ["Player Name", "Team Name", comp_col, pos_col, age_col, "xPhysical", "Transfermarkt"]:
-                        df_display[col] = df_display[col].apply(lambda x: round(x, 2) if pd.notna(x) else "")
-
+                        df_display[col] = df_display[col].apply(lambda x: round(x, 2) if pd.notna(x) else 0.0)
+        
                 # Configuration AgGrid (comme Merged Data)
                 gb = GridOptionsBuilder.from_dataframe(df_display)
                 gb.configure_selection(selection_mode="single", use_checkbox=True)
