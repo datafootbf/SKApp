@@ -1375,8 +1375,8 @@ if page == "xPhysical":
                     if col not in ["Transfermarkt", "Player Name"]:
                         gb.configure_column(
                             col, 
-                            cellStyle={'textAlign': 'left'},
-                            headerStyle={'textAlign': 'left'}  # 🔥 AJOUTÉ
+                            cellStyle={'textAlign': 'center'},
+                            headerStyle={'textAlign': 'center'}  # 🔥 AJOUTÉ
                         )
                 
                 # Player Name épinglée à gauche
