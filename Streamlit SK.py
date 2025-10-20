@@ -1393,6 +1393,11 @@ if page == "xPhysical":
                     gb.configure_column("Transfermarkt", hide=True)
     
                 gb.configure_pagination(enabled=False)
+
+                gb.configure_grid_options(
+                    domLayout='normal',
+                    suppressColumnVirtualisation=True
+                )
     
                 grid_response = AgGrid(
                     df_display,
@@ -1408,68 +1413,62 @@ if page == "xPhysical":
                 selected_rows = grid_response.get("selected_rows", [])
                 if isinstance(selected_rows, pd.DataFrame):
                     selected_rows = selected_rows.to_dict(orient='records')
-    
+                
+                # 🔥 MODIFIÉ : Afficher boutons SEULEMENT si sélection
                 if isinstance(selected_rows, list) and len(selected_rows) > 0 and isinstance(selected_rows[0], dict):
                     display_row = selected_rows[0]
                     player_name_sel = display_row.get("Player Name")
-    
                     full_row = df_filtered[df_filtered["Player Name"] == player_name_sel]
-    
+                
                     if not full_row.empty:
                         tm_url = full_row.iloc[0].get("Transfermarkt")
-    
-                        if 'tm_btn_slot' in locals() and tm_url and isinstance(tm_url, str) and tm_url.strip():
+                
+                        # Bouton TM
+                        if tm_url and isinstance(tm_url, str) and tm_url.strip():
                             with tm_btn_slot:
                                 st.link_button("🔗 TM Player Page", tm_url, use_container_width=True)
-                        elif 'tm_btn_slot' in locals():
+                        else:
                             tm_btn_slot.empty()
-    
-                        if 'send_radar_slot' in locals():
-                            with send_radar_slot:
-                                if st.button("📊 Send to Radar", use_container_width=True, key="xphy_send_radar_btn"):
-                                    try:
-                                        _df_dn = df[[player_col, "Short Name"]].dropna().drop_duplicates()
-                                        _df_dn["Display Name"] = _df_dn["Short Name"].astype(str) + " (" + _df_dn[player_col].astype(str) + ")"
-                                        player_to_display_map = dict(zip(_df_dn[player_col], _df_dn["Display Name"]))
-    
-                                        player_key = display_row.get("Player Name") or display_row.get(player_col)
-                                        display_val = player_to_display_map.get(player_key)
-    
-                                        if display_val is None:
-                                            short_name_fallback = display_row.get("Short Name")
-                                            display_val = f"{short_name_fallback} ({player_key})" if short_name_fallback and player_key else player_key
-    
-                                        st.session_state["radar_p1"] = display_val
-    
-                                        import streamlit.components.v1 as components
-                                        components.html(
-                                            """
-                                            <script>
-                                            setTimeout(function(){
-                                              const root = window.parent.document;
-                                              const tabs = root.querySelectorAll('button[role="tab"]');
-                                              for (const t of tabs) {
-                                                if ((t.innerText || "").trim().toLowerCase().startsWith("radar")) {
-                                                  t.click();
-                                                  break;
-                                                }
-                                              }
-                                            }, 80);
-                                            </script>
-                                            """,
-                                            height=0,
-                                        )
-                                    except Exception:
-                                        pass
-                    elif 'tm_btn_slot' in locals():
+                
+                        # Bouton Send to Radar
+                        with send_radar_slot:
+                            if st.button("📊 Send to Radar", use_container_width=True, key="xphy_send_radar_btn"):
+                                try:
+                                    _df_dn = df[[player_col, "Short Name"]].dropna().drop_duplicates()
+                                    _df_dn["Display Name"] = _df_dn["Short Name"].astype(str) + " (" + _df_dn[player_col].astype(str) + ")"
+                                    player_to_display_map = dict(zip(_df_dn[player_col], _df_dn["Display Name"]))
+                                    player_key = display_row.get("Player Name") or display_row.get(player_col)
+                                    display_val = player_to_display_map.get(player_key)
+                                    if display_val is None:
+                                        short_name_fallback = display_row.get("Short Name")
+                                        display_val = f"{short_name_fallback} ({player_key})" if short_name_fallback and player_key else player_key
+                                    st.session_state["radar_p1"] = display_val
+                                    import streamlit.components.v1 as components
+                                    components.html(
+                                        """
+                                        <script>
+                                        setTimeout(function(){
+                                          const root = window.parent.document;
+                                          const tabs = root.querySelectorAll('button[role="tab"]');
+                                          for (const t of tabs) {
+                                            if ((t.innerText || "").trim().toLowerCase().startsWith("radar")) {
+                                              t.click();
+                                              break;
+                                            }
+                                          }
+                                        }, 80);
+                                        </script>
+                                        """,
+                                        height=0,
+                                    )
+                                except Exception:
+                                    pass
+                    else:
                         tm_btn_slot.empty()
-                    if 'send_radar_slot' in locals():
                         send_radar_slot.empty()
                 else:
-                    if 'tm_btn_slot' in locals():
-                        tm_btn_slot.empty()
-                    if 'send_radar_slot' in locals():
-                        send_radar_slot.empty()
+                    tm_btn_slot.empty()
+                    send_radar_slot.empty()
             else:
                 st.info("No data to display.")
     
