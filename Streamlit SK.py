@@ -1396,6 +1396,12 @@ if page == "xPhysical":
                 if "Transfermarkt" in df_display_phy.columns:
                     gb.configure_column("Transfermarkt", hide=True)
 
+                # Debug : vérifier les types
+                st.write("**Debug types colonnes :**")
+                for col in df_display_phy.columns:
+                    st.write(f"- {col}: {df_display_phy[col].dtype}")
+                ```
+
                 # Pas de pagination
                 gb.configure_pagination(enabled=False)
 
