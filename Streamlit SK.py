@@ -1356,33 +1356,14 @@ if page == "xPhysical":
                 )
 
             # ========== AgGrid Player Search (CORRIGÉ) ==========
-            if not player_display.empty:
+            if not player_display_phy.empty:
                 from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode
 
-                df_display_ps = player_display.reset_index(drop=True)
-
-                # Typage des colonnes texte
-                for col in [season_col, comp_col, pos_col]:
-                    if col in df_display_ps.columns:
-                        df_display_ps[col] = df_display_ps[col].astype(str)
-
-                # Formatage : entiers pour colonnes de base
-                for col in [minutes_col, age_col, "xTECH", "xDEF"]:
-                    if col in df_display_ps.columns:
-                        df_display_ps[col] = df_display_ps[col].apply(
-                            lambda x: int(round(x)) if pd.notna(x) else ""
-                        )
-
-                # 2 décimales pour colonnes de filtres
-                for col in extra_cols:
-                    if col in df_display_ps.columns:
-                        df_display_ps[col] = df_display_ps[col].apply(
-                            lambda x: round(x, 2) if pd.notna(x) and x != "" else ""
-                        )
+                df_display_phy = player_display_phy.reset_index(drop=True)
 
                 # Configuration AgGrid (style Merged Data)
-                gb = GridOptionsBuilder.from_dataframe(df_display_ps)
-                gb.configure_selection(selection_mode="single", use_checkbox=True)  # ← PAS de checkbox
+                gb = GridOptionsBuilder.from_dataframe(df_display_phy)
+                gb.configure_selection(selection_mode="single", use_checkbox=True)
                 gb.configure_default_column(
                     editable=False, 
                     groupable=True, 
@@ -1390,59 +1371,47 @@ if page == "xPhysical":
                     filter="agTextColumnFilter"
                 )
 
-                # Colonnes numériques
-                for col in [age_col, "xPhysical"] + extra_cols:
-                    if col in df_display_phy.columns:
+                for col in df_display_phy.columns:
+                    if col != "Transfermarkt":
                         gb.configure_column(
                             col, 
-                            type=["numericColumn", "numberColumnFilter"],  # ← OBLIGATOIRE
-                            flex=1
+                            headerClass='header-style', 
+                            cellStyle={'textAlign': 'center'}
                         )
-            
-                # Player Name épinglée à gauche
+
                 if "Player Name" in df_display_phy.columns:
-                    gb.configure_column(
-                        "Player Name", 
-                        pinned="left",
-                        flex=2,
-                        minWidth=200,
-                        cellStyle={'textAlign': 'left'},
-                        headerStyle={'textAlign': 'center'}
-                    )
+                    gb.configure_column("Player Name", pinned="left")
             
-                # Masquer Transfermarkt
                 if "Transfermarkt" in df_display_phy.columns:
                     gb.configure_column("Transfermarkt", hide=True)
             
-                # Pas de pagination
                 gb.configure_pagination(enabled=False)
-
-
+            
                 grid_response = AgGrid(
-                    df_display_ps,
+                    df_display_phy,
                     gridOptions=gb.build(),
                     height=500,
-                    theme='streamlit',  # ← Theme Merged Data
+                    theme='balham',  # ← Theme Merged Data
                     update_mode=GridUpdateMode.SELECTION_CHANGED,
                     allow_unsafe_jscode=True,
-                    key="xtech_ps_grid_merged_style"
+                    key="xphy_ps_grid_merged_style"
                 )
-
-                # Récupération sélection (même logique Merged Data)
+            
+                # Gestion sélection
                 selected_rows = grid_response.get("selected_rows", [])
                 if isinstance(selected_rows, pd.DataFrame):
                     selected_rows = selected_rows.to_dict(orient='records')
-
-                # Gestion boutons TM
+            
                 if isinstance(selected_rows, list) and len(selected_rows) > 0 and isinstance(selected_rows[0], dict):
                     display_row = selected_rows[0]
                     player_name_sel = display_row.get("Player Name")
-
-                    full_row = player_display[player_display["Player Name"] == player_name_sel]
-
+            
+                    full_row = player_display_phy[player_display_phy["Player Name"] == player_name_sel]
+            
                     if not full_row.empty:
                         tm_url = full_row.iloc[0].get("Transfermarkt")
-
+            
+                        # Bouton TM
                         if 'tm_btn_slot' in locals() and tm_url and isinstance(tm_url, str) and tm_url.strip():
                             with tm_btn_slot:
                                 st.link_button(
@@ -1452,16 +1421,99 @@ if page == "xPhysical":
                                 )
                         elif 'tm_btn_slot' in locals():
                             tm_btn_slot.empty()
+            
+                        # Bouton Send to Radar
+                        if 'send_radar_slot' in locals():
+                            with send_radar_slot:
+                                if st.button("📊 Send to Radar", use_container_width=True, key="xphy_send_radar_btn"):
+                                    try:
+                                        _df_dn = df[[player_col, "Short Name"]].dropna().drop_duplicates()
+                                        _df_dn["Display Name"] = _df_dn["Short Name"].astype(str) + " (" + _df_dn[player_col].astype(str) + ")"
+                                        player_to_display_map = dict(zip(_df_dn[player_col], _df_dn["Display Name"]))
+            
+                                        player_key = display_row.get("Player Name") or display_row.get(player_col)
+                                        display_val = player_to_display_map.get(player_key)
+                                        
+                                        if display_val is None:
+                                            short_name_fallback = display_row.get("Short Name")
+                                            display_val = f"{short_name_fallback} ({player_key})" if short_name_fallback and player_key else player_key
+            
+                                        st.session_state["radar_p1"] = display_val
+            
+                                        import streamlit.components.v1 as components
+                                        components.html(
+                                            """
+                                            <script>
+                                            setTimeout(function(){
+                                              const root = window.parent.document;
+                                              const tabs = root.querySelectorAll('button[role="tab"]');
+                                              for (const t of tabs) {
+                                                if ((t.innerText || "").trim().toLowerCase().startsWith("radar")) {
+                                                  t.click();
+                                                  break;
+                                                }
+                                              }
+                                            }, 80);
+                                            </script>
+                                            """,
+                                            height=0,
+                                        )
+                                    except Exception:
+                                        pass
                     elif 'tm_btn_slot' in locals():
                         tm_btn_slot.empty()
-                elif 'tm_btn_slot' in locals():
-                    tm_btn_slot.empty()
+                    if 'send_radar_slot' in locals():
+                        send_radar_slot.empty()
+                else:
+                    if 'tm_btn_slot' in locals():
+                        tm_btn_slot.empty()
+                    if 'send_radar_slot' in locals():
+                        send_radar_slot.empty()
             else:
                 st.info("No data to display.")
 
+            # Résumé filtres
+            filters_summary = [
+                f"Season(s): {', '.join(st.session_state.xphy_ps_last_seasons)}",
+                f"Competition(s): {', '.join(st.session_state.xphy_ps_last_comps)}",
+                f"Positions: {', '.join(selected_positions) if selected_positions else 'All'}",
+                f"Age: {selected_age[0]}–{selected_age[1]}" if selected_age else "Age: All",
+            ]
+            st.markdown(
+                "<div style='font-size:0.85em; margin-top:-15px;'>Filters applied: " + " | ".join(filters_summary) + "</div>",
+                unsafe_allow_html=True
+            )
+
+            # Export CSV
+            try:
+                export_df = pd.DataFrame(grid_response.get("data", []))
+                if export_df.empty:
+                    export_df = player_display_phy.copy()
+            except Exception:
+                export_df = player_display_phy.copy()
+
+            if "Transfermarkt" in export_df.columns:
+                export_df = export_df.drop(columns=["Transfermarkt"])
+
+            export_cols_order = [c for c in ["Player Name", "Team Name", comp_col,
+                                             pos_col, age_col, "xPhysical"] if c in export_df.columns]
+            if export_cols_order:
+                export_df = export_df[export_cols_order]
+
+            csv_bytes = export_df.to_csv(index=False).encode("utf-8-sig")
+            file_name = f"xphysical_player_search_{len(export_df)}.csv"
+
+            st.download_button(
+                label="Download selection as CSV",
+                data=csv_bytes,
+                file_name=file_name,
+                mime="text/csv",
+                use_container_width=False
+            )
+
             st.write("")
             st.write("")
-            xtech_glossary_expander()
+            xphysical_glossary_expander()
     
 ###################### --- Onglet Scatter Plot ---
     with tab1:
