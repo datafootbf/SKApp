@@ -1164,334 +1164,286 @@ if page == "xPhysical":
 
             # ==== Filtres dynamiques ====
             DESIRED_ORDER = ["Goalkeeper", "Central Defender", "Full Back", "Midfield", "Wide Attacker", "Center Forward"]
-
-            c3, c4 = st.columns([1.2, 1.2])
-
+            
+            c3, c4 = st.columns(2)
+            
             with c3:
+                # Position Group
                 if pos_col in df_loaded.columns:
-                    raw_pos = df_loaded[pos_col].dropna().astype(str).unique().tolist()
-                    order_idx = {v: i for i, v in enumerate(DESIRED_ORDER)}
-                    pos_options = sorted(raw_pos, key=lambda x: order_idx.get(x, 999))
-                else:
-                    pos_options = []
-                selected_positions = st.multiselect(
-                    "Position Group(s)",
-                    options=pos_options,
-                    default=[],
-                    key="xphy_ps_positions",
-                )
-
-            def _bounds(series, default=(0, 0)):
-                s = pd.to_numeric(series, errors="coerce")
-                return (int(s.min()), int(s.max())) if s.notna().any() else default
-
-            _ps_ver = str(hash((tuple(st.session_state.xphy_ps_last_seasons),
-                                tuple(st.session_state.xphy_ps_last_comps))))
-
-            with c4:
-                if age_col in df_loaded.columns and not df_loaded[age_col].isnull().all():
-                    a_min, a_max = _bounds(df_loaded[age_col], default=(16, 45))
-                    selected_age = st.slider(
-                        "Age",
-                        min_value=a_min, max_value=a_max,
-                        value=(a_min, a_max), step=1,
-                        key=f"xphy_ps_age_{_ps_ver}",
+                    positions_available = [pos for pos in DESIRED_ORDER if pos in df_loaded[pos_col].dropna().unique()]
+                    selected_positions = st.multiselect(
+                        "Position(s)",
+                        options=positions_available,
+                        default=[],
+                        key="xphy_ps_positions"
                     )
                 else:
-                    selected_age = None
-
-            # Appliquer les filtres Position + Age
-            df_filtered_base = df_loaded.copy()
-
-            if selected_positions:
-                df_filtered_base = df_filtered_base[df_filtered_base[pos_col].isin(selected_positions)]
-            if selected_age:
-                df_filtered_base = df_filtered_base[(df_filtered_base[age_col] >= selected_age[0]) & (df_filtered_base[age_col] <= selected_age[1])]
-
-            # ==== Groupes de métriques (INCHANGÉ) ====
+                    selected_positions = []
+                
+                # Age
+                if age_col in df_loaded.columns and not df_loaded[age_col].isnull().all():
+                    min_age, max_age = int(df_loaded[age_col].min()), int(df_loaded[age_col].max())
+                    age_range = st.slider("Age", min_value=min_age, max_value=max_age, value=(min_age, max_age))
+                else:
+                    age_range = None
+            
+            with c4:
+                pass  # Colonne vide pour symétrie
+            
+            st.markdown("---")
+            
+            # Initialisation du compteur reset
+            if "xphy_ps_reset_counter" not in st.session_state:
+                st.session_state.xphy_ps_reset_counter = 0
+            
+            # === POP-OVERS ===
             PSV_METRICS = [
                 ("PSV-99", "PSV-99"),
                 ("TOP 5 PSV-99", "TOP 5 PSV-99"),
             ]
             ALL_METRICS = [
-                ("xPhysical", "xPhysical (/100)"),
-                ("Total Distance P90", "Total Distance"),
-                ("M/min P90", "M/min"),
-                ("Running Distance P90", "Running Distance"),
-                ("HI Distance P90", "HI Distance"),
-                ("HSR Distance P90", "HSR Distance"),
-                ("Sprinting Distance P90", "Sprinting Distance"),
-                ("Sprint Count P90", "Sprint Count"),
-                ("High Acceleration Count P90", "High Accel. Count"),
-                ("Explosive Acceleration to HSR Count P90", "Expl. Accel → HSR"),
-                ("Explosive Acceleration to Sprint Count P90", "Expl. Accel → Sprint"),
+                ("xPhysical", "xPhysical"),
+                ("Total Distance P90", "Total Distance P90"),
+                ("M/min P90", "M/min P90"),
+                ("Running Distance P90", "Running Distance P90"),
+                ("HI Distance P90", "HI Distance P90"),
+                ("HSR Distance P90", "HSR Distance P90"),
+                ("Sprinting Distance P90", "Sprinting Distance P90"),
+                ("Sprint Count P90", "Sprint Count P90"),
+                ("High Acceleration Count P90", "High Acceleration Count P90"),
+                ("Explosive Acceleration to HSR Count P90", "Explosive Accel to HSR P90"),
+                ("Explosive Acceleration to Sprint Count P90", "Explosive Accel to Sprint P90"),
             ]
             TIP_METRICS = [
-                ("Total Distance TIP P30", "Total Distance TIP"),
-                ("M/min TIP P30", "M/min TIP"),
-                ("Running Distance TIP P30", "Running Distance TIP"),
-                ("HI Distance TIP P30", "HI Distance TIP"),
-                ("HSR Distance TIP P30", "HSR Distance TIP"),
-                ("Sprinting Distance TIP P30", "Sprinting Distance TIP"),
-                ("Sprint Count TIP P30", "Sprint Count TIP"),
-                ("High Acceleration Count TIP P30", "High Accel. Count TIP"),
-                ("Explosive Acceleration to HSR Count TIP P30", "Expl. Accel → HSR TIP"),
-                ("Explosive Acceleration to Sprint Count TIP P30", "Expl. Accel → Sprint TIP"),
+                ("Total Distance TIP P30", "Total Distance TIP P30"),
+                ("M/min TIP P30", "M/min TIP P30"),
+                ("Running Distance TIP P30", "Running Distance TIP P30"),
+                ("HI Distance TIP P30", "HI Distance TIP P30"),
+                ("HSR Distance TIP P30", "HSR Distance TIP P30"),
+                ("Sprinting Distance TIP P30", "Sprinting Distance TIP P30"),
+                ("Sprint Count TIP P30", "Sprint Count TIP P30"),
+                ("High Acceleration Count TIP P30", "High Accel Count TIP P30"),
+                ("Explosive Acceleration to HSR Count TIP P30", "Expl Accel HSR TIP P30"),
+                ("Explosive Acceleration to Sprint Count TIP P30", "Expl Accel Sprint TIP P30"),
             ]
             OTIP_METRICS = [
-                ("Total Distance OTIP P30", "Total Distance OTIP"),
-                ("M/min OTIP P30", "M/min OTIP"),
-                ("Running Distance OTIP P30", "Running Distance OTIP"),
-                ("HI Distance OTIP P30", "HI Distance OTIP"),
-                ("HSR Distance OTIP P30", "HSR Distance OTIP"),
-                ("Sprinting Distance OTIP P30", "Sprinting Distance OTIP"),
-                ("Sprint Count OTIP P30", "Sprint Count OTIP"),
-                ("High Acceleration Count OTIP P30", "High Accel. Count OTIP"),
-                ("Explosive Acceleration to HSR Count OTIP P30", "Expl. Accel → HSR OTIP"),
-                ("Explosive Acceleration to Sprint Count OTIP P30", "Expl. Accel → Sprint OTIP"),
+                ("Total Distance OTIP P30", "Total Distance OTIP P30"),
+                ("M/min OTIP P30", "M/min OTIP P30"),
+                ("Running Distance OTIP P30", "Running Distance OTIP P30"),
+                ("HI Distance OTIP P30", "HI Distance OTIP P30"),
+                ("HSR Distance OTIP P30", "HSR Distance OTIP P30"),
+                ("Sprinting Distance OTIP P30", "Sprinting Distance OTIP P30"),
+                ("Sprint Count OTIP P30", "Sprint Count OTIP P30"),
+                ("High Acceleration Count OTIP P30", "High Accel Count OTIP P30"),
+                ("Explosive Acceleration to HSR Count OTIP P30", "Expl Accel HSR OTIP P30"),
+                ("Explosive Acceleration to Sprint Count OTIP P30", "Expl Accel Sprint OTIP P30"),
             ]
-
+            
             metric_popovers = [
                 ("PSV", PSV_METRICS),
                 ("ALL (P90)", ALL_METRICS),
                 ("TIP (P30)", TIP_METRICS),
                 ("OTIP (P30)", OTIP_METRICS),
             ]
-
-            if "xphy_ps_reset_counter" not in st.session_state:
-                st.session_state.xphy_ps_reset_counter = 0
-
-            st.markdown("<hr style='margin:6px 0 0 0; border-color:#555;'>", unsafe_allow_html=True)
-            row = st.columns(4, gap="small")
-
+            
             filter_percentiles = {}
-            active_filters_count = {name: 0 for name, _ in metric_popovers}
-
-            for i, (name, metric_list) in enumerate(metric_popovers):
-                with row[i]:
-                    with st.popover(name, use_container_width=True):
-                        for col_name, label in metric_list:
-                            if col_name in df_filtered_base.columns:
-                                slider_key = f"xphy_pop_{name}_{col_name}_{st.session_state.xphy_ps_reset_counter}"
-                                s = pd.to_numeric(df_filtered_base[col_name], errors="coerce").dropna()
-                                if s.empty:
-                                    st.slider(f"{label} – Percentile", 0, 100, 0, 5, key=slider_key, disabled=True)
-                                    continue
-                                p = st.slider(f"{label} – Percentile", 0, 100, 0, 5, key=slider_key)
-                                filter_percentiles[(name, col_name)] = p
-                                if p > 0:
-                                    thr = float(np.nanpercentile(s, p))
-                                    st.caption(f"≥ **{thr:,.2f}** (min {s.min():,.2f} / max {s.max():,.2f})")
-                                    active_filters_count[name] = active_filters_count.get(name, 0) + 1
-                    cnt = active_filters_count.get(name, 0)
-                    st.caption(f"{cnt} active filter{'s' if cnt != 1 else ''}")
-
-            # --- Boutons Clear + TM + Send to Radar
+            
+            active_filters = {name: 0 for name, _ in metric_popovers}
+            pop_cols = st.columns(4, gap="small")
+            
+            for idx, (name, metric_list) in enumerate(metric_popovers):
+                with pop_cols[idx]:
+                    with st.popover(f"{name}", use_container_width=True):
+                        for col, label in metric_list:
+                            if col in df_loaded.columns:
+                                slider_key = f"pop_xphy_{name}_{col}_{st.session_state.xphy_ps_reset_counter}"
+                                min_percentile = st.slider(
+                                    f"{label} - Percentile",
+                                    min_value=0,
+                                    max_value=100,
+                                    value=0,
+                                    step=10,
+                                    key=slider_key
+                                )
+                                filter_percentiles[(name, col)] = min_percentile
+                                if min_percentile > 0:
+                                    active_filters[name] += 1
+                    count = active_filters[name]
+                    txt = f"{count} – active filter{'s' if count != 1 else ''}" if count > 0 else "0 – active filters"
+                    st.caption(txt)
+            
+            # Colonne pour bouton Clear + TM + Send to Radar
+            with pop_cols[3]:
+                pass  # Vide pour symétrie
+            
             col_btn1, col_btn2, col_btn3 = st.columns([1.0, 1.4, 1.4], gap="small")
-
+            
             with col_btn1:
-                if st.button("Clear filters", key="xphy_ps_clear_filters"):
+                if st.button("Clear filters", key="xphy_clear_btn"):
                     st.session_state.xphy_ps_reset_counter += 1
                     st.rerun()
-
+            
             with col_btn2:
                 tm_btn_slot = st.empty()
-
+            
             with col_btn3:
                 send_radar_slot = st.empty()
-
-            # ============== Filtrage PERCENTILES (comme Merged Data) ==============
+            
+            # ======================
+            # Filtrage pipeline final
+            # ======================
+            
+            df_filtered_base = df_loaded.copy()
+            
+            if selected_positions:
+                df_filtered_base = df_filtered_base[df_filtered_base[pos_col].isin(selected_positions)]
+            if age_range:
+                df_filtered_base = df_filtered_base[(df_filtered_base[age_col] >= age_range[0]) & (df_filtered_base[age_col] <= age_range[1])]
+            
             df_final = df_filtered_base.copy()
-
+            
             for (cat, col), min_pct in filter_percentiles.items():
                 if min_pct > 0 and col in df_final.columns:
-                    ref_vals = pd.to_numeric(df_final[col], errors="coerce").dropna()
+                    ref_vals = df_final[col].dropna()
                     if len(ref_vals) > 0:
                         threshold = ref_vals.quantile(min_pct / 100)
-                        df_final = df_final[pd.to_numeric(df_final[col], errors="coerce") >= threshold]
-
+                        df_final = df_final[df_final[col] >= threshold]
+            
             df_filtered = df_final.copy()
-
-            # Lien Transfermarkt
-            import urllib.parse as _parse
-            TM_BASE = "https://www.transfermarkt.fr/schnellsuche/ergebnis/schnellsuche?query="
-            if "Transfermarkt" not in df_filtered.columns:
-                df_filtered["Transfermarkt"] = df_filtered["Player Name"].apply(
-                    lambda name: TM_BASE + _parse.quote(str(name)) if pd.notna(name) else ""
-                )
-
-            # ========== AgGrid (COPIE EXACTE DE MERGED DATA) ==========
+            
+            # --- Bouton download CSV ---
+            csv = df_filtered.to_csv(index=False)
+            st.download_button(
+                label="Download selection as CSV",
+                data=csv,
+                file_name="selection_xphysical_data.csv",
+                mime="text/csv",
+                key="download_xphy_csv"
+            )
+            
+            # ========== AgGrid & Sélection joueur ==========
             if not df_filtered.empty:
-                from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode
-
-                # Colonnes à afficher (comme Merged Data)
+                # Colonnes à afficher
                 display_cols = [
-                    "Player Name", "Team Name", comp_col, pos_col, age_col, 
-                    "xPhysical", "Transfermarkt"
+                    'Player Name', 'Team Name', age_col, pos_col,
+                    comp_col, 'xPhysical'
                 ]
-
-                # Ajouter les colonnes filtrées via percentiles
-                for (cat, col), min_pct in filter_percentiles.items():
-                    if min_pct > 0 and col in df_filtered.columns and col not in display_cols:
-                        display_cols.append(col)
-
                 display_cols = [col for col in display_cols if col in df_filtered.columns]
                 df_display = df_filtered[display_cols].reset_index(drop=True).copy()
-
-                # Conversion texte (comme Merged Data)
+            
+                # Conversion texte pour colonnes non-numériques
                 for col in [comp_col, pos_col]:
                     if col in df_display.columns:
                         df_display[col] = df_display[col].astype(str)
-
-                # Formatage numériques (comme Merged Data)
+                
+                # Formatage des colonnes numériques en entiers
                 for col in [age_col, "xPhysical"]:
                     if col in df_display.columns:
-                        df_display[col] = df_display[col].apply(lambda x: int(round(x)) if pd.notna(x) else 0)
-
-
-                # Colonnes de percentiles avec 2 décimales
-                for col in df_display.columns:
-                    if col not in ["Player Name", "Team Name", comp_col, pos_col, age_col, "xPhysical", "Transfermarkt"]:
-                        df_display[col] = df_display[col].apply(lambda x: round(x, 2) if pd.notna(x) else 0.0)
-        
-                # Configuration AgGrid (comme Merged Data)
+                        df_display[col] = df_display[col].apply(lambda x: int(round(x)) if pd.notna(x) else "")
+            
+                # Configuration AgGrid
+                from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode
+                
                 gb = GridOptionsBuilder.from_dataframe(df_display)
-                gb.configure_selection(selection_mode="single", use_checkbox=True)
+                gb.configure_selection(selection_mode="single", use_checkbox=False)
                 gb.configure_default_column(editable=False, groupable=True, sortable=True, filter="agTextColumnFilter")
-
-                gb.configure_column("xPhysical", type=["numericColumn", "numberColumnFilter"])
-                gb.configure_column(age_col, type=["numericColumn", "numberColumnFilter"])
-
+                gb.configure_column("xPhysical", width=100, type=["numericColumn", "numberColumnFilter"])
+                gb.configure_column(age_col, width=90, type=["numericColumn", "numberColumnFilter"])
+            
                 for col in display_cols:
-                    if col != "Transfermarkt":
-                        gb.configure_column(col, cellStyle={'textAlign': 'center'}, headerStyle={'textAlign': 'center'})
-
+                    gb.configure_column(col, headerClass='header-style', cellStyle={'textAlign': 'center'})
+            
                 if "Player Name" in df_display.columns:
-                    gb.configure_column("Player Name", pinned="left", cellStyle={'textAlign': 'left'}, headerStyle={'textAlign': 'center'})
-
-                if "Transfermarkt" in df_display.columns:
-                    gb.configure_column("Transfermarkt", hide=True)
-
+                    gb.configure_column("Player Name", pinned="left")
+            
                 gb.configure_pagination(enabled=False)
-
+            
+                grid_options = gb.build()
+            
                 grid_response = AgGrid(
                     df_display,
-                    gridOptions=gb.build(),
+                    gridOptions=grid_options,
                     height=500,
                     theme='balham',
                     update_mode=GridUpdateMode.SELECTION_CHANGED,
                     allow_unsafe_jscode=True,
-                    key="xphy_ps_grid"
+                    key="xphy_grid_main"
                 )
-
-                # Gestion sélection
+            
                 selected_rows = grid_response.get("selected_rows", [])
                 if isinstance(selected_rows, pd.DataFrame):
                     selected_rows = selected_rows.to_dict(orient='records')
-
+            
+                # Gestion sélection pour boutons TM + Send to Radar
                 if isinstance(selected_rows, list) and len(selected_rows) > 0 and isinstance(selected_rows[0], dict):
                     display_row = selected_rows[0]
-                    player_name_sel = display_row.get("Player Name")
-
-                    full_row = df_filtered[df_filtered["Player Name"] == player_name_sel]
-
-                    if not full_row.empty:
-                        tm_url = full_row.iloc[0].get("Transfermarkt")
-
-                        if 'tm_btn_slot' in locals() and tm_url and isinstance(tm_url, str) and tm_url.strip():
-                            with tm_btn_slot:
-                                st.link_button("🔗 TM Player Page", tm_url, use_container_width=True)
-                        elif 'tm_btn_slot' in locals():
-                            tm_btn_slot.empty()
-
-                        if 'send_radar_slot' in locals():
-                            with send_radar_slot:
-                                if st.button("📊 Send to Radar", use_container_width=True, key="xphy_send_radar_btn"):
-                                    try:
-                                        _df_dn = df[[player_col, "Short Name"]].dropna().drop_duplicates()
-                                        _df_dn["Display Name"] = _df_dn["Short Name"].astype(str) + " (" + _df_dn[player_col].astype(str) + ")"
-                                        player_to_display_map = dict(zip(_df_dn[player_col], _df_dn["Display Name"]))
-
-                                        player_key = display_row.get("Player Name") or display_row.get(player_col)
-                                        display_val = player_to_display_map.get(player_key)
-
-                                        if display_val is None:
-                                            short_name_fallback = display_row.get("Short Name")
-                                            display_val = f"{short_name_fallback} ({player_key})" if short_name_fallback and player_key else player_key
-
-                                        st.session_state["radar_p1"] = display_val
-
-                                        import streamlit.components.v1 as components
-                                        components.html(
-                                            """
-                                            <script>
-                                            setTimeout(function(){
-                                              const root = window.parent.document;
-                                              const tabs = root.querySelectorAll('button[role="tab"]');
-                                              for (const t of tabs) {
-                                                if ((t.innerText || "").trim().toLowerCase().startsWith("radar")) {
-                                                  t.click();
-                                                  break;
-                                                }
-                                              }
-                                            }, 80);
-                                            </script>
-                                            """,
-                                            height=0,
-                                        )
-                                    except Exception:
-                                        pass
+                    player_name = display_row.get("Player Name")
+            
+                    # Lien Transfermarkt
+                    import urllib.parse as _parse
+                    TM_BASE = "https://www.transfermarkt.fr/schnellsuche/ergebnis/schnellsuche?query="
+                    tm_url = TM_BASE + _parse.quote(str(player_name)) if pd.notna(player_name) else ""
+            
+                    # Bouton TM
+                    if 'tm_btn_slot' in locals() and tm_url:
+                        with tm_btn_slot:
+                            st.link_button("🔗 TM Player Page", tm_url, use_container_width=True)
                     elif 'tm_btn_slot' in locals():
                         tm_btn_slot.empty()
+            
+                    # Bouton Send to Radar
                     if 'send_radar_slot' in locals():
-                        send_radar_slot.empty()
+                        with send_radar_slot:
+                            if st.button("📊 Send to Radar", use_container_width=True, key="xphy_send_radar_unique"):
+                                try:
+                                    _df_dn = df[[player_col, "Short Name"]].dropna().drop_duplicates()
+                                    _df_dn["Display Name"] = _df_dn["Short Name"].astype(str) + " (" + _df_dn[player_col].astype(str) + ")"
+                                    player_to_display_map = dict(zip(_df_dn[player_col], _df_dn["Display Name"]))
+            
+                                    display_val = player_to_display_map.get(player_name)
+                                    if display_val is None:
+                                        display_val = player_name
+            
+                                    st.session_state["radar_p1"] = display_val
+            
+                                    import streamlit.components.v1 as components
+                                    components.html(
+                                        """
+                                        <script>
+                                        setTimeout(function(){
+                                          const root = window.parent.document;
+                                          const tabs = root.querySelectorAll('button[role="tab"]');
+                                          for (const t of tabs) {
+                                            if ((t.innerText || "").trim().toLowerCase().startsWith("radar")) {
+                                              t.click();
+                                              break;
+                                            }
+                                          }
+                                        }, 80);
+                                        </script>
+                                        """,
+                                        height=0,
+                                    )
+                                except Exception:
+                                    pass
                 else:
                     if 'tm_btn_slot' in locals():
                         tm_btn_slot.empty()
                     if 'send_radar_slot' in locals():
                         send_radar_slot.empty()
-            else:
-                st.info("No data to display.")
-
+            
             # Résumé filtres
             filters_summary = [
                 f"Season(s): {', '.join(st.session_state.xphy_ps_last_seasons)}",
                 f"Competition(s): {', '.join(st.session_state.xphy_ps_last_comps)}",
                 f"Positions: {', '.join(selected_positions) if selected_positions else 'All'}",
-                f"Age: {selected_age[0]}–{selected_age[1]}" if selected_age else "Age: All",
+                f"Age: {age_range[0]}–{age_range[1]}" if age_range else "Age: All",
             ]
             st.markdown(
                 "<div style='font-size:0.85em; margin-top:-15px;'>Filters applied: " + " | ".join(filters_summary) + "</div>",
                 unsafe_allow_html=True
             )
-
-            # Export CSV
-            try:
-                export_df = pd.DataFrame(grid_response.get("data", []))
-                if export_df.empty:
-                    export_df = player_display_phy.copy()
-            except Exception:
-                export_df = player_display_phy.copy()
-
-            if "Transfermarkt" in export_df.columns:
-                export_df = export_df.drop(columns=["Transfermarkt"])
-
-            export_cols_order = [c for c in ["Player Name", "Team Name", comp_col,
-                                             pos_col, age_col, "xPhysical"] if c in export_df.columns]
-            if export_cols_order:
-                export_df = export_df[export_cols_order]
-
-            csv_bytes = export_df.to_csv(index=False).encode("utf-8-sig")
-            file_name = f"xphysical_player_search_{len(export_df)}.csv"
-
-            st.download_button(
-                label="Download selection as CSV",
-                data=csv_bytes,
-                file_name=file_name,
-                mime="text/csv",
-                use_container_width=False
-            )
-
+            
             st.write("")
             st.write("")
             xphysical_glossary_expander()
