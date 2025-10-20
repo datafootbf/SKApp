@@ -1326,27 +1326,6 @@ if page == "xPhysical":
 
             player_display_phy = df_f[final_cols].copy()
 
-            # 1. Convertir TOUTES les colonnes numériques en numeric d'abord
-            for col in [age_col, "xPhysical"] + extra_cols:
-                if col in player_display_phy.columns:
-                    player_display_phy[col] = pd.to_numeric(player_display_phy[col], errors="coerce")
-
-            # 2. PUIS formater selon le type souhaité
-            if age_col in player_display_phy.columns:
-                player_display_phy[age_col] = player_display_phy[age_col].fillna(0).astype(int)
-
-            if "xPhysical" in player_display_phy.columns:
-                player_display_phy["xPhysical"] = player_display_phy["xPhysical"].fillna(0).astype(int)
-
-            for m in extra_cols:
-                if m in player_display_phy.columns:
-                    player_display_phy[m] = player_display_phy[m].fillna(0).round(2)
-
-            # 3. Colonnes texte en dernier
-            for col in [comp_col, pos_col]:
-                if col in player_display_phy.columns:
-                    player_display_phy[col] = player_display_phy[col].astype(str)
-
             # Lien Transfermarkt (inchangé)
             import urllib.parse as _parse
             TM_BASE = "https://www.transfermarkt.fr/schnellsuche/ergebnis/schnellsuche?query="
@@ -1361,12 +1340,25 @@ if page == "xPhysical":
             
                 df_display_phy = player_display_phy.reset_index(drop=True)
             
-                # 🔥 AJOUT CRITIQUE : Forcer la conversion numérique AVANT AgGrid
-                for col in [age_col, "xPhysical"] + extra_cols:
+                # 🔥 ÉTAPE 1 : FORCER conversion numérique (AVANT tout formatage)
+                numeric_cols = [age_col, "xPhysical"] + extra_cols
+                for col in numeric_cols:
                     if col in df_display_phy.columns:
-                        df_display_phy[col] = pd.to_numeric(df_display_phy[col], errors="coerce").fillna(0)
+                        # Conversion STRING → NUMERIC (critique)
+                        df_display_phy[col] = pd.to_numeric(df_display_phy[col], errors="coerce")
                 
-                # Typer les colonnes texte
+                # 🔥 ÉTAPE 2 : Formater APRÈS conversion
+                if age_col in df_display_phy.columns:
+                    df_display_phy[age_col] = df_display_phy[age_col].fillna(0).astype(int)
+                
+                if "xPhysical" in df_display_phy.columns:
+                    df_display_phy["xPhysical"] = df_display_phy["xPhysical"].fillna(0).astype(int)
+                
+                for col in extra_cols:
+                    if col in df_display_phy.columns:
+                        df_display_phy[col] = df_display_phy[col].fillna(0).round(2)
+                
+                # 🔥 ÉTAPE 3 : Typer les colonnes texte
                 for col in [comp_col, pos_col]:
                     if col in df_display_phy.columns:
                         df_display_phy[col] = df_display_phy[col].astype(str)
@@ -1381,8 +1373,8 @@ if page == "xPhysical":
                     filter="agTextColumnFilter"
                 )
             
-                # 🔥 AJOUT CRITIQUE : Configurer les colonnes NUMÉRIQUES
-                for col in [age_col, "xPhysical"] + extra_cols:
+                # 🔥 Configuration NUMÉRIQUES (critique pour éviter "Invalid Number")
+                for col in numeric_cols:
                     if col in df_display_phy.columns:
                         gb.configure_column(
                             col, 
@@ -1391,9 +1383,9 @@ if page == "xPhysical":
                             headerStyle={'textAlign': 'center'}
                         )
             
-                # Configuration colonnes texte
+                # Configuration colonnes TEXTE
                 for col in df_display_phy.columns:
-                    if col not in [age_col, "xPhysical"] + extra_cols + ["Transfermarkt"]:
+                    if col not in numeric_cols + ["Transfermarkt", "Player Name"]:
                         gb.configure_column(
                             col, 
                             headerClass='header-style', 
