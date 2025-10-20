@@ -1326,20 +1326,28 @@ if page == "xPhysical":
 
             player_display_phy = df_f[final_cols].copy()
 
-            # Typage robuste
+            # 1. Convertir TOUTES les colonnes numériques en numeric d'abord
+            for col in [age_col, "xPhysical"] + extra_cols:
+                if col in player_display_phy.columns:
+                    player_display_phy[col] = pd.to_numeric(player_display_phy[col], errors="coerce")
+
+            # 2. PUIS formater selon le type souhaité
             if age_col in player_display_phy.columns:
-                player_display_phy[age_col] = pd.to_numeric(player_display_phy[age_col], errors="coerce").fillna(0).astype(int)
+                player_display_phy[age_col] = player_display_phy[age_col].fillna(0).astype(int)
 
-            # xPhysical en entier
             if "xPhysical" in player_display_phy.columns:
-                player_display_phy["xPhysical"] = pd.to_numeric(player_display_phy["xPhysical"], errors="coerce").fillna(0).astype(int)
+                player_display_phy["xPhysical"] = player_display_phy["xPhysical"].fillna(0).astype(int)
 
-            # Extra_cols avec 2 décimales
             for m in extra_cols:
                 if m in player_display_phy.columns:
-                    player_display_phy[m] = pd.to_numeric(player_display_phy[m], errors="coerce").fillna(0).round(2)
+                    player_display_phy[m] = player_display_phy[m].fillna(0).round(2)
 
-            # Lien Transfermarkt
+            # 3. Colonnes texte en dernier
+            for col in [comp_col, pos_col]:
+                if col in player_display_phy.columns:
+                    player_display_phy[col] = player_display_phy[col].astype(str)
+
+            # Lien Transfermarkt (inchangé)
             import urllib.parse as _parse
             TM_BASE = "https://www.transfermarkt.fr/schnellsuche/ergebnis/schnellsuche?query="
             if "Transfermarkt" not in player_display_phy.columns:
@@ -1353,64 +1361,53 @@ if page == "xPhysical":
 
                 df_display_phy = player_display_phy.reset_index(drop=True)
 
-                # Typage
-                for col in [comp_col, pos_col]:
-                    if col in df_display_phy.columns:
-                        df_display_phy[col] = df_display_phy[col].astype(str)
-
-                for col in [age_col, "xPhysical"]:
-                    if col in df_display_phy.columns:
-                        df_display_phy[col] = df_display_phy[col].apply(
-                            lambda x: int(round(x)) if pd.notna(x) else ""
-                        )
-
-                for col in extra_cols:
-                    if col in df_display_phy.columns:
-                        df_display_phy[col] = df_display_phy[col].apply(
-                            lambda x: round(x, 2) if pd.notna(x) and x != "" else ""
-                        )
-
                 # Configuration AgGrid (style Merged Data)
                 gb = GridOptionsBuilder.from_dataframe(df_display_phy)
-                gb.configure_selection(selection_mode="single", use_checkbox=True)  # ← PAS de checkbox
+                gb.configure_selection(selection_mode="single", use_checkbox=True)
                 gb.configure_default_column(
                     editable=False, 
                     groupable=True, 
                     sortable=True, 
-                    filter="agTextColumnFilter"
+                    filter="agTextColumnFilter",
+                    flex=1,
+                    headerStyle={'textAlign': 'center'}
                 )
 
+                # Configuration des colonnes numériques
                 for col in [age_col, "xPhysical"] + extra_cols:
                     if col in df_display_phy.columns:
                         gb.configure_column(
                             col, 
                             type=["numericColumn", "numberColumnFilter"],
-                            cellStyle={'textAlign': 'center'}
+                            flex=1
                         )
 
-                for col in df_display_phy.columns:
-                    if col != "Transfermarkt":
-                        gb.configure_column(
-                            col, 
-                            headerClass='header-style', 
-                            cellStyle={'textAlign': 'center'}
-                        )
-
+                # Player Name : épinglée à gauche
                 if "Player Name" in df_display_phy.columns:
-                    gb.configure_column("Player Name", pinned="left")
+                    gb.configure_column(
+                        "Player Name", 
+                        pinned="left",
+                        flex=2,
+                        minWidth=200,
+                        cellStyle={'textAlign': 'left'},
+                        headerStyle={'textAlign': 'center'}
+                    )
 
+                # Masquer Transfermarkt
                 if "Transfermarkt" in df_display_phy.columns:
                     gb.configure_column("Transfermarkt", hide=True)
 
+                # Pas de pagination
                 gb.configure_pagination(enabled=False)
 
                 grid_response = AgGrid(
                     df_display_phy,
                     gridOptions=gb.build(),
                     height=500,
-                    theme='streamlit',  # ← Theme Merged Data
+                    theme='streamlit',
                     update_mode=GridUpdateMode.SELECTION_CHANGED,
                     allow_unsafe_jscode=True,
+                    fit_columns_on_grid_load=True,
                     key="xphy_ps_grid_merged_style"
                 )
 
