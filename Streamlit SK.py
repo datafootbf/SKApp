@@ -1206,6 +1206,28 @@ if page == "xPhysical":
                 df_f = df_f[df_f[pos_col].isin(selected_positions)]
             if selected_age:
                 df_f = df_f[(df_f[age_col] >= selected_age[0]) & (df_f[age_col] <= selected_age[1])]
+            
+            # 🔥 TYPAGE CRITIQUE : Forcer TOUT en numeric/string IMMÉDIATEMENT après filtrage
+            # Colonnes numériques
+            for col in [age_col, "xPhysical", "Total Distance P90", "M/min P90", "Running Distance P90", 
+                        "HI Distance P90", "HSR Distance P90", "Sprinting Distance P90", "Sprint Count P90",
+                        "High Acceleration Count P90", "Explosive Acceleration to HSR Count P90",
+                        "Explosive Acceleration to Sprint Count P90", "PSV-99", "TOP 5 PSV-99",
+                        "Total Distance TIP P30", "M/min TIP P30", "Running Distance TIP P30",
+                        "HI Distance TIP P30", "HSR Distance TIP P30", "Sprinting Distance TIP P30",
+                        "Sprint Count TIP P30", "High Acceleration Count TIP P30",
+                        "Explosive Acceleration to HSR Count TIP P30", "Explosive Acceleration to Sprint Count TIP P30",
+                        "Total Distance OTIP P30", "M/min OTIP P30", "Running Distance OTIP P30",
+                        "HI Distance OTIP P30", "HSR Distance OTIP P30", "Sprinting Distance OTIP P30",
+                        "Sprint Count OTIP P30", "High Acceleration Count OTIP P30",
+                        "Explosive Acceleration to HSR Count OTIP P30", "Explosive Acceleration to Sprint Count OTIP P30"]:
+                if col in df_f.columns:
+                    df_f[col] = pd.to_numeric(df_f[col], errors="coerce")
+            
+            # Colonnes texte
+            for col in [comp_col, pos_col, "Player Name", "Team Name"]:
+                if col in df_f.columns:
+                    df_f[col] = df_f[col].astype(str)
 
             # ==== Groupes de métriques ====
             PSV_METRICS = [
@@ -1334,40 +1356,24 @@ if page == "xPhysical":
                     lambda name: TM_BASE + _parse.quote(str(name)) if pd.notna(name) else ""
                 )
             
-            # ========== AgGrid Player Search (LOGIQUE MERGED DATA) ==========
+            # ========== AgGrid Player Search ==========
             if not player_display_phy.empty:
                 from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode
             
-                # Sélection colonnes à afficher
-                display_cols = [
-                    "Player Name", "Team Name", comp_col, pos_col, age_col, 
-                    "xPhysical", "Transfermarkt"
-                ] + extra_cols
-                display_cols = [col for col in display_cols if col in player_display_phy.columns]
-                
-                df_display_phy = player_display_phy[display_cols].reset_index(drop=True).copy()
+                df_display_phy = player_display_phy.reset_index(drop=True)
             
-                # 🔥 ÉTAPE 1 : Conversion texte pour colonnes non-numériques
-                for col in [comp_col, pos_col]:
-                    if col in df_display_phy.columns:
-                        df_display_phy[col] = df_display_phy[col].astype(str)
+                # Formatage final (données déjà numeric grâce au typage de df_f)
+                if age_col in df_display_phy.columns:
+                    df_display_phy[age_col] = df_display_phy[age_col].fillna(0).astype(int)
                 
-                # 🔥 ÉTAPE 2 : Formatage colonnes numériques (COMME MERGED DATA)
-                numeric_base_cols = [age_col, "xPhysical"]
-                for col in numeric_base_cols:
-                    if col in df_display_phy.columns:
-                        df_display_phy[col] = df_display_phy[col].apply(
-                            lambda x: int(round(x)) if pd.notna(x) else ""
-                        )
+                if "xPhysical" in df_display_phy.columns:
+                    df_display_phy["xPhysical"] = df_display_phy["xPhysical"].fillna(0).astype(int)
                 
-                # 🔥 ÉTAPE 3 : Formatage extra_cols avec 2 décimales
                 for col in extra_cols:
                     if col in df_display_phy.columns:
-                        df_display_phy[col] = df_display_phy[col].apply(
-                            lambda x: round(x, 2) if pd.notna(x) else ""
-                        )
+                        df_display_phy[col] = df_display_phy[col].fillna(0).round(2)
             
-                # Configuration AgGrid (COMME MERGED DATA)
+                # Configuration AgGrid
                 gb = GridOptionsBuilder.from_dataframe(df_display_phy)
                 gb.configure_selection(selection_mode="single", use_checkbox=True)
                 gb.configure_default_column(
@@ -1378,19 +1384,20 @@ if page == "xPhysical":
                 )
             
                 # Configuration colonnes numériques
-                gb.configure_column("xPhysical", type=["numericColumn", "numberColumnFilter"])
-                gb.configure_column(age_col, type=["numericColumn", "numberColumnFilter"])
-                
-                for col in extra_cols:
+                for col in [age_col, "xPhysical"] + extra_cols:
                     if col in df_display_phy.columns:
-                        gb.configure_column(col, type=["numericColumn", "numberColumnFilter"])
-            
-                # Configuration toutes colonnes (centrage)
-                for col in display_cols:
-                    if col != "Transfermarkt":
                         gb.configure_column(
                             col, 
-                            headerClass='header-style', 
+                            type=["numericColumn", "numberColumnFilter"],
+                            cellStyle={'textAlign': 'center'},
+                            headerStyle={'textAlign': 'center'}
+                        )
+            
+                # Configuration colonnes texte
+                for col in df_display_phy.columns:
+                    if col not in [age_col, "xPhysical"] + extra_cols + ["Transfermarkt", "Player Name"]:
+                        gb.configure_column(
+                            col, 
                             cellStyle={'textAlign': 'center'},
                             headerStyle={'textAlign': 'center'}
                         )
@@ -1408,7 +1415,6 @@ if page == "xPhysical":
                 if "Transfermarkt" in df_display_phy.columns:
                     gb.configure_column("Transfermarkt", hide=True)
             
-                # Pas de pagination
                 gb.configure_pagination(enabled=False)
             
                 grid_response = AgGrid(
