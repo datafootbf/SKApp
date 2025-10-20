@@ -1376,7 +1376,7 @@ if page == "xPhysical":
                         gb.configure_column(
                             col, 
                             cellStyle={'textAlign': 'left'},
-                            headerStyle={'textAlign': 'center'}  # 🔥 AJOUTÉ
+                            headerStyle={'textAlign': 'left'}  # 🔥 AJOUTÉ
                         )
                 
                 # Player Name épinglée à gauche
