@@ -1374,9 +1374,8 @@ if page == "xPhysical":
                 for col in display_cols:
                     if col not in ["Transfermarkt", "Player Name"]:
                         gb.configure_column(
-                            col, 
-                            cellStyle={'textAlign': 'center'},
-                            headerStyle={'textAlign': 'center'}  # 🔥 AJOUTÉ
+                            col,
+                            cellStyle={'textAlign': 'center'}
                         )
                 
                 # Player Name épinglée à gauche
@@ -1385,7 +1384,6 @@ if page == "xPhysical":
                         "Player Name", 
                         pinned="left",
                         cellStyle={'textAlign': 'left'},
-                        headerStyle={'textAlign': 'center'}
                     )
     
                 # Masquer Transfermarkt
@@ -1399,7 +1397,21 @@ if page == "xPhysical":
                     onGridSizeChanged='function(params) { params.api.sizeColumnsToFit(); }',
                     domLayout='normal'
                 )
-    
+
+                # ---- Style CSS pour aligner les en-têtes
+                st.markdown("""
+                    <style>
+                    .ag-header-cell-label {
+                        justify-content: flex-start !important;  /* left */
+                        text-align: left !important;
+                    }
+                    .ag-header-group-cell-label {
+                        justify-content: flex-start !important;
+                        text-align: left !important;
+                    }
+                    </style>
+                """, unsafe_allow_html=True)
+
                 grid_response = AgGrid(
                     df_display,
                     gridOptions=gb.build(),
