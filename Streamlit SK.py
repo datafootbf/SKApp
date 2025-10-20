@@ -1358,7 +1358,8 @@ if page == "xPhysical":
                     editable=False, 
                     groupable=True, 
                     sortable=True, 
-                    filter="agTextColumnFilter"
+                    filter="agTextColumnFilter",
+                    headerClass="ag-left-header",
                 )
     
                 # Configuration colonnes numériques
@@ -1372,18 +1373,18 @@ if page == "xPhysical":
     
                 # Style colonnes - centrage AVEC en-têtes
                 for col in display_cols:
-                    if col not in ["Transfermarkt", "Player Name"]:
-                        gb.configure_column(
-                            col,
-                            cellStyle={'textAlign': 'center'}
-                        )
+                if col not in ["Transfermarkt", "Player Name"]:
+                    gb.configure_column(
+                        col,
+                        cellStyle={'textAlign': 'center'}
+                    )
                 
                 # Player Name épinglée à gauche
                 if "Player Name" in df_display.columns:
                     gb.configure_column(
-                        "Player Name", 
+                        "Player Name",
                         pinned="left",
-                        cellStyle={'textAlign': 'left'},
+                        cellStyle={'textAlign': 'left'}
                     )
     
                 # Masquer Transfermarkt
@@ -1400,17 +1401,15 @@ if page == "xPhysical":
 
                 # ---- Style CSS pour aligner les en-têtes
                 st.markdown("""
-                    <style>
-                    .ag-header-cell-label {
-                        justify-content: flex-start !important;  /* left */
-                        text-align: left !important;
-                    }
-                    .ag-header-group-cell-label {
-                        justify-content: flex-start !important;
-                        text-align: left !important;
-                    }
-                    </style>
+                <style>
+                /* make any column with this class left-align its header text */
+                .ag-left-header .ag-header-cell-label { justify-content: flex-start !important; }
+                .ag-left-header .ag-header-cell-text  { text-align: left !important; }
+                /* keep icons (sort/filter) with a small gap so they don't shove the title */
+                .ag-left-header .ag-header-icon { margin-left: 6px !important; }
+                </style>
                 """, unsafe_allow_html=True)
+
 
                 grid_response = AgGrid(
                     df_display,
