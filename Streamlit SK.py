@@ -1326,44 +1326,48 @@ if page == "xPhysical":
 
             player_display_phy = df_f[final_cols].copy()
 
-            # Lien Transfermarkt (inchangé)
+            # Lien Transfermarkt
             import urllib.parse as _parse
             TM_BASE = "https://www.transfermarkt.fr/schnellsuche/ergebnis/schnellsuche?query="
             if "Transfermarkt" not in player_display_phy.columns:
                 player_display_phy["Transfermarkt"] = player_display_phy["Player Name"].apply(
                     lambda name: TM_BASE + _parse.quote(str(name)) if pd.notna(name) else ""
                 )
-
-            # ========== AgGrid Player Search (CORRIGÉ) ==========
+            
+            # ========== AgGrid Player Search (LOGIQUE MERGED DATA) ==========
             if not player_display_phy.empty:
                 from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode
             
-                df_display_phy = player_display_phy.reset_index(drop=True)
+                # Sélection colonnes à afficher
+                display_cols = [
+                    "Player Name", "Team Name", comp_col, pos_col, age_col, 
+                    "xPhysical", "Transfermarkt"
+                ] + extra_cols
+                display_cols = [col for col in display_cols if col in player_display_phy.columns]
+                
+                df_display_phy = player_display_phy[display_cols].reset_index(drop=True).copy()
             
-                # 🔥 ÉTAPE 1 : FORCER conversion numérique (AVANT tout formatage)
-                numeric_cols = [age_col, "xPhysical"] + extra_cols
-                for col in numeric_cols:
-                    if col in df_display_phy.columns:
-                        # Conversion STRING → NUMERIC (critique)
-                        df_display_phy[col] = pd.to_numeric(df_display_phy[col], errors="coerce")
-                
-                # 🔥 ÉTAPE 2 : Formater APRÈS conversion
-                if age_col in df_display_phy.columns:
-                    df_display_phy[age_col] = df_display_phy[age_col].fillna(0).astype(int)
-                
-                if "xPhysical" in df_display_phy.columns:
-                    df_display_phy["xPhysical"] = df_display_phy["xPhysical"].fillna(0).astype(int)
-                
-                for col in extra_cols:
-                    if col in df_display_phy.columns:
-                        df_display_phy[col] = df_display_phy[col].fillna(0).round(2)
-                
-                # 🔥 ÉTAPE 3 : Typer les colonnes texte
+                # 🔥 ÉTAPE 1 : Conversion texte pour colonnes non-numériques
                 for col in [comp_col, pos_col]:
                     if col in df_display_phy.columns:
                         df_display_phy[col] = df_display_phy[col].astype(str)
+                
+                # 🔥 ÉTAPE 2 : Formatage colonnes numériques (COMME MERGED DATA)
+                numeric_base_cols = [age_col, "xPhysical"]
+                for col in numeric_base_cols:
+                    if col in df_display_phy.columns:
+                        df_display_phy[col] = df_display_phy[col].apply(
+                            lambda x: int(round(x)) if pd.notna(x) else ""
+                        )
+                
+                # 🔥 ÉTAPE 3 : Formatage extra_cols avec 2 décimales
+                for col in extra_cols:
+                    if col in df_display_phy.columns:
+                        df_display_phy[col] = df_display_phy[col].apply(
+                            lambda x: round(x, 2) if pd.notna(x) else ""
+                        )
             
-                # Configuration AgGrid
+                # Configuration AgGrid (COMME MERGED DATA)
                 gb = GridOptionsBuilder.from_dataframe(df_display_phy)
                 gb.configure_selection(selection_mode="single", use_checkbox=True)
                 gb.configure_default_column(
@@ -1373,19 +1377,17 @@ if page == "xPhysical":
                     filter="agTextColumnFilter"
                 )
             
-                # 🔥 Configuration NUMÉRIQUES (critique pour éviter "Invalid Number")
-                for col in numeric_cols:
+                # Configuration colonnes numériques
+                gb.configure_column("xPhysical", type=["numericColumn", "numberColumnFilter"])
+                gb.configure_column(age_col, type=["numericColumn", "numberColumnFilter"])
+                
+                for col in extra_cols:
                     if col in df_display_phy.columns:
-                        gb.configure_column(
-                            col, 
-                            type=["numericColumn", "numberColumnFilter"],
-                            cellStyle={'textAlign': 'center'},
-                            headerStyle={'textAlign': 'center'}
-                        )
+                        gb.configure_column(col, type=["numericColumn", "numberColumnFilter"])
             
-                # Configuration colonnes TEXTE
-                for col in df_display_phy.columns:
-                    if col not in numeric_cols + ["Transfermarkt", "Player Name"]:
+                # Configuration toutes colonnes (centrage)
+                for col in display_cols:
+                    if col != "Transfermarkt":
                         gb.configure_column(
                             col, 
                             headerClass='header-style', 
