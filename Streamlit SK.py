@@ -1368,122 +1368,109 @@ if page == "xPhysical":
                     editable=False, 
                     groupable=True, 
                     sortable=True, 
-                    filter="agTextColumnFilter",
-                    headerStyle={'textAlign': 'center'}
+                    filter="agTextColumnFilter"
                 )
 
-                # Configuration des colonnes numériques
-                for col in [age_col, "xPhysical"] + extra_cols:
-                    if col in df_display_phy.columns:
+                for col in df_display_phy.columns:
+                    if col != "Transfermarkt":
                         gb.configure_column(
                             col, 
-                            type=["numericColumn", "numberColumnFilter"],
-                            flex=1
+                            headerClass='header-style', 
+                            cellStyle={'textAlign': 'center'}
                         )
 
-                # Player Name : épinglée à gauche
-                if "Player Name" in df_display_phy.columns:
-                    gb.configure_column(
-                        "Player Name", 
-                        pinned="left",
-                        flex=2,
-                        minWidth=200,
-                        cellStyle={'textAlign': 'left'},
-                        headerStyle={'textAlign': 'center'}
+                    if "Player Name" in df_display_phy.columns:
+                        gb.configure_column("Player Name", pinned="left")
+                
+                    if "Transfermarkt" in df_display_phy.columns:
+                        gb.configure_column("Transfermarkt", hide=True)
+                
+                    gb.configure_pagination(enabled=False)
+                
+                    grid_response = AgGrid(
+                        df_display_phy,
+                        gridOptions=gb.build(),
+                        height=500,
+                        theme='balham',  # ← Theme Merged Data
+                        update_mode=GridUpdateMode.SELECTION_CHANGED,
+                        allow_unsafe_jscode=True,
+                        key="xphy_ps_grid_merged_style"
                     )
-
-                # Masquer Transfermarkt
-                if "Transfermarkt" in df_display_phy.columns:
-                    gb.configure_column("Transfermarkt", hide=True)
-
-                # Pas de pagination
-                gb.configure_pagination(enabled=False)
-
-                grid_response = AgGrid(
-                    df_display_phy,
-                    gridOptions=gb.build(),
-                    height=500,
-                    theme='streamlit',
-                    update_mode=GridUpdateMode.SELECTION_CHANGED,
-                    allow_unsafe_jscode=True,
-                    fit_columns_on_grid_load=True,
-                    key="xphy_ps_grid_merged_style"
-                )
-
-                # Gestion sélection
-                selected_rows = grid_response.get("selected_rows", [])
-                if isinstance(selected_rows, pd.DataFrame):
-                    selected_rows = selected_rows.to_dict(orient='records')
-
-                if isinstance(selected_rows, list) and len(selected_rows) > 0 and isinstance(selected_rows[0], dict):
-                    display_row = selected_rows[0]
-                    player_name_sel = display_row.get("Player Name")
-
-                    full_row = player_display_phy[player_display_phy["Player Name"] == player_name_sel]
-
-                    if not full_row.empty:
-                        tm_url = full_row.iloc[0].get("Transfermarkt")
-
-                        # Bouton TM
-                        if 'tm_btn_slot' in locals() and tm_url and isinstance(tm_url, str) and tm_url.strip():
-                            with tm_btn_slot:
-                                st.link_button(
-                                    "🔗 TM Player Page",
-                                    tm_url,
-                                    use_container_width=True
-                                )
+                
+                    # Gestion sélection
+                    selected_rows = grid_response.get("selected_rows", [])
+                    if isinstance(selected_rows, pd.DataFrame):
+                        selected_rows = selected_rows.to_dict(orient='records')
+                
+                    if isinstance(selected_rows, list) and len(selected_rows) > 0 and isinstance(selected_rows[0], dict):
+                        display_row = selected_rows[0]
+                        player_name_sel = display_row.get("Player Name")
+                
+                        full_row = player_display_phy[player_display_phy["Player Name"] == player_name_sel]
+                
+                        if not full_row.empty:
+                            tm_url = full_row.iloc[0].get("Transfermarkt")
+                
+                            # Bouton TM
+                            if 'tm_btn_slot' in locals() and tm_url and isinstance(tm_url, str) and tm_url.strip():
+                                with tm_btn_slot:
+                                    st.link_button(
+                                        "🔗 TM Player Page",
+                                        tm_url,
+                                        use_container_width=True
+                                    )
+                            elif 'tm_btn_slot' in locals():
+                                tm_btn_slot.empty()
+                
+                            # Bouton Send to Radar
+                            if 'send_radar_slot' in locals():
+                                with send_radar_slot:
+                                    if st.button("📊 Send to Radar", use_container_width=True, key="xphy_send_radar_btn"):
+                                        try:
+                                            _df_dn = df[[player_col, "Short Name"]].dropna().drop_duplicates()
+                                            _df_dn["Display Name"] = _df_dn["Short Name"].astype(str) + " (" + _df_dn[player_col].astype(str) + ")"
+                                            player_to_display_map = dict(zip(_df_dn[player_col], _df_dn["Display Name"]))
+                
+                                            player_key = display_row.get("Player Name") or display_row.get(player_col)
+                                            display_val = player_to_display_map.get(player_key)
+                                            
+                                            if display_val is None:
+                                                short_name_fallback = display_row.get("Short Name")
+                                                display_val = f"{short_name_fallback} ({player_key})" if short_name_fallback and player_key else player_key
+                
+                                            st.session_state["radar_p1"] = display_val
+                
+                                            import streamlit.components.v1 as components
+                                            components.html(
+                                                """
+                                                <script>
+                                                setTimeout(function(){
+                                                  const root = window.parent.document;
+                                                  const tabs = root.querySelectorAll('button[role="tab"]');
+                                                  for (const t of tabs) {
+                                                    if ((t.innerText || "").trim().toLowerCase().startsWith("radar")) {
+                                                      t.click();
+                                                      break;
+                                                    }
+                                                  }
+                                                }, 80);
+                                                </script>
+                                                """,
+                                                height=0,
+                                            )
+                                        except Exception:
+                                            pass
                         elif 'tm_btn_slot' in locals():
                             tm_btn_slot.empty()
-
-                        # Bouton Send to Radar
                         if 'send_radar_slot' in locals():
-                            with send_radar_slot:
-                                if st.button("📊 Send to Radar", use_container_width=True, key="xphy_send_radar_btn"):
-                                    try:
-                                        _df_dn = df[[player_col, "Short Name"]].dropna().drop_duplicates()
-                                        _df_dn["Display Name"] = _df_dn["Short Name"].astype(str) + " (" + _df_dn[player_col].astype(str) + ")"
-                                        player_to_display_map = dict(zip(_df_dn[player_col], _df_dn["Display Name"]))
-
-                                        player_key = display_row.get("Player Name") or display_row.get(player_col)
-                                        display_val = player_to_display_map.get(player_key)
-
-                                        if display_val is None:
-                                            short_name_fallback = display_row.get("Short Name")
-                                            display_val = f"{short_name_fallback} ({player_key})" if short_name_fallback and player_key else player_key
-
-                                        st.session_state["radar_p1"] = display_val
-
-                                        import streamlit.components.v1 as components
-                                        components.html(
-                                            """
-                                            <script>
-                                            setTimeout(function(){
-                                              const root = window.parent.document;
-                                              const tabs = root.querySelectorAll('button[role="tab"]');
-                                              for (const t of tabs) {
-                                                if ((t.innerText || "").trim().toLowerCase().startsWith("radar")) {
-                                                  t.click();
-                                                  break;
-                                                }
-                                              }
-                                            }, 80);
-                                            </script>
-                                            """,
-                                            height=0,
-                                        )
-                                    except Exception:
-                                        pass
-                    elif 'tm_btn_slot' in locals():
-                        tm_btn_slot.empty()
-                    if 'send_radar_slot' in locals():
-                        send_radar_slot.empty()
+                            send_radar_slot.empty()
+                    else:
+                        if 'tm_btn_slot' in locals():
+                            tm_btn_slot.empty()
+                        if 'send_radar_slot' in locals():
+                            send_radar_slot.empty()
                 else:
-                    if 'tm_btn_slot' in locals():
-                        tm_btn_slot.empty()
-                    if 'send_radar_slot' in locals():
-                        send_radar_slot.empty()
-            else:
-                st.info("No data to display.")
+                    st.info("No data to display.")
 
             # Résumé filtres
             filters_summary = [
