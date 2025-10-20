@@ -3076,33 +3076,32 @@ elif page == "xTech/xDef":
                 )
 
                 # Colonnes numériques
-                for col in [minutes_col, age_col, "xTECH", "xDEF"] + extra_cols:
-                    if col in df_display_ps.columns:
+                for col in [age_col, "xPhysical"] + extra_cols:
+                    if col in df_display_phy.columns:
                         gb.configure_column(
                             col, 
-                            type=["numericColumn", "numberColumnFilter"],
-                            cellStyle={'textAlign': 'center'}
+                            type=["numericColumn", "numberColumnFilter"],  # ← OBLIGATOIRE
+                            flex=1
                         )
-
-                # Configuration de toutes les colonnes (centrage)
-                for col in df_display_ps.columns:
-                    if col != "Transfermarkt":
-                        gb.configure_column(
-                            col, 
-                            headerClass='header-style', 
-                            cellStyle={'textAlign': 'center'}
-                        )
-
-                # Player Name épinglée
-                if "Player Name" in df_display_ps.columns:
-                    gb.configure_column("Player Name", pinned="left")
-
+            
+                # Player Name épinglée à gauche
+                if "Player Name" in df_display_phy.columns:
+                    gb.configure_column(
+                        "Player Name", 
+                        pinned="left",
+                        flex=2,
+                        minWidth=200,
+                        cellStyle={'textAlign': 'left'},
+                        headerStyle={'textAlign': 'center'}
+                    )
+            
                 # Masquer Transfermarkt
-                if "Transfermarkt" in df_display_ps.columns:
+                if "Transfermarkt" in df_display_phy.columns:
                     gb.configure_column("Transfermarkt", hide=True)
-
+            
                 # Pas de pagination
                 gb.configure_pagination(enabled=False)
+
 
                 grid_response = AgGrid(
                     df_display_ps,
