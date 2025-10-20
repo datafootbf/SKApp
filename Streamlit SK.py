@@ -1200,36 +1200,15 @@ if page == "xPhysical":
                 else:
                     selected_age = None
 
-            # Appliquer les filtres
-            df_f = df_loaded.copy()
-            if selected_positions:
-                df_f = df_f[df_f[pos_col].isin(selected_positions)]
-            if selected_age:
-                df_f = df_f[(df_f[age_col] >= selected_age[0]) & (df_f[age_col] <= selected_age[1])]
-            
-            # 🔥 TYPAGE CRITIQUE : Forcer TOUT en numeric/string IMMÉDIATEMENT après filtrage
-            # Colonnes numériques
-            for col in [age_col, "xPhysical", "Total Distance P90", "M/min P90", "Running Distance P90", 
-                        "HI Distance P90", "HSR Distance P90", "Sprinting Distance P90", "Sprint Count P90",
-                        "High Acceleration Count P90", "Explosive Acceleration to HSR Count P90",
-                        "Explosive Acceleration to Sprint Count P90", "PSV-99", "TOP 5 PSV-99",
-                        "Total Distance TIP P30", "M/min TIP P30", "Running Distance TIP P30",
-                        "HI Distance TIP P30", "HSR Distance TIP P30", "Sprinting Distance TIP P30",
-                        "Sprint Count TIP P30", "High Acceleration Count TIP P30",
-                        "Explosive Acceleration to HSR Count TIP P30", "Explosive Acceleration to Sprint Count TIP P30",
-                        "Total Distance OTIP P30", "M/min OTIP P30", "Running Distance OTIP P30",
-                        "HI Distance OTIP P30", "HSR Distance OTIP P30", "Sprinting Distance OTIP P30",
-                        "Sprint Count OTIP P30", "High Acceleration Count OTIP P30",
-                        "Explosive Acceleration to HSR Count OTIP P30", "Explosive Acceleration to Sprint Count OTIP P30"]:
-                if col in df_f.columns:
-                    df_f[col] = pd.to_numeric(df_f[col], errors="coerce")
-            
-            # Colonnes texte
-            for col in [comp_col, pos_col, "Player Name", "Team Name"]:
-                if col in df_f.columns:
-                    df_f[col] = df_f[col].astype(str)
+            # Appliquer les filtres Position + Age
+            df_filtered_base = df_loaded.copy()
 
-            # ==== Groupes de métriques ====
+            if selected_positions:
+                df_filtered_base = df_filtered_base[df_filtered_base[pos_col].isin(selected_positions)]
+            if selected_age:
+                df_filtered_base = df_filtered_base[(df_filtered_base[age_col] >= selected_age[0]) & (df_filtered_base[age_col] <= selected_age[1])]
+
+            # ==== Groupes de métriques (INCHANGÉ) ====
             PSV_METRICS = [
                 ("PSV-99", "PSV-99"),
                 ("TOP 5 PSV-99", "TOP 5 PSV-99"),
@@ -1282,8 +1261,6 @@ if page == "xPhysical":
             if "xphy_ps_reset_counter" not in st.session_state:
                 st.session_state.xphy_ps_reset_counter = 0
 
-            df_for_pct = df_f.copy()
-
             st.markdown("<hr style='margin:6px 0 0 0; border-color:#555;'>", unsafe_allow_html=True)
             row = st.columns(4, gap="small")
 
@@ -1294,9 +1271,9 @@ if page == "xPhysical":
                 with row[i]:
                     with st.popover(name, use_container_width=True):
                         for col_name, label in metric_list:
-                            if col_name in df_for_pct.columns:
+                            if col_name in df_filtered_base.columns:
                                 slider_key = f"xphy_pop_{name}_{col_name}_{st.session_state.xphy_ps_reset_counter}"
-                                s = pd.to_numeric(df_for_pct[col_name], errors="coerce").dropna()
+                                s = pd.to_numeric(df_filtered_base[col_name], errors="coerce").dropna()
                                 if s.empty:
                                     st.slider(f"{label} – Percentile", 0, 100, 0, 5, key=slider_key, disabled=True)
                                     continue
@@ -1309,7 +1286,7 @@ if page == "xPhysical":
                     cnt = active_filters_count.get(name, 0)
                     st.caption(f"{cnt} active filter{'s' if cnt != 1 else ''}")
 
-            # --- Clear Filters + TM + Send to Radar (3 boutons côte à côte)
+            # --- Boutons Clear + TM + Send to Radar
             col_btn1, col_btn2, col_btn3 = st.columns([1.0, 1.4, 1.4], gap="small")
 
             with col_btn1:
@@ -1323,136 +1300,109 @@ if page == "xPhysical":
             with col_btn3:
                 send_radar_slot = st.empty()
 
-            # Appliquer les seuils percentiles
-            extra_cols = []
-            for (grp, col_name), p in filter_percentiles.items():
-                if p and (col_name in df_f.columns):
-                    s_ref = pd.to_numeric(df_for_pct[col_name], errors="coerce").dropna()
-                    if not s_ref.empty:
-                        thr = float(np.nanpercentile(s_ref, p))
-                        df_f = df_f[pd.to_numeric(df_f[col_name], errors="coerce") >= thr]
-                        if col_name not in extra_cols:
-                            extra_cols.append(col_name)
+            # ============== Filtrage PERCENTILES (comme Merged Data) ==============
+            df_final = df_filtered_base.copy()
 
-            # ==== Préparation du tableau ====
-            base_cols = [
-                "Player Name", "Team Name", comp_col,
-                pos_col, age_col, "xPhysical", "Transfermarkt"
-            ]
-            extra_cols = [c for c in extra_cols if c not in base_cols]
+            for (cat, col), min_pct in filter_percentiles.items():
+                if min_pct > 0 and col in df_final.columns:
+                    ref_vals = pd.to_numeric(df_final[col], errors="coerce").dropna()
+                    if len(ref_vals) > 0:
+                        threshold = ref_vals.quantile(min_pct / 100)
+                        df_final = df_final[pd.to_numeric(df_final[col], errors="coerce") >= threshold]
 
-            final_cols = []
-            for c in base_cols + extra_cols:
-                if c in df_f.columns and c not in final_cols:
-                    final_cols.append(c)
-
-            player_display_phy = df_f[final_cols].copy()
+            df_filtered = df_final.copy()
 
             # Lien Transfermarkt
             import urllib.parse as _parse
             TM_BASE = "https://www.transfermarkt.fr/schnellsuche/ergebnis/schnellsuche?query="
-            if "Transfermarkt" not in player_display_phy.columns:
-                player_display_phy["Transfermarkt"] = player_display_phy["Player Name"].apply(
+            if "Transfermarkt" not in df_filtered.columns:
+                df_filtered["Transfermarkt"] = df_filtered["Player Name"].apply(
                     lambda name: TM_BASE + _parse.quote(str(name)) if pd.notna(name) else ""
                 )
-            
-            # ========== AgGrid Player Search ==========
-            if not player_display_phy.empty:
+
+            # ========== AgGrid (COPIE EXACTE DE MERGED DATA) ==========
+            if not df_filtered.empty:
                 from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode
-            
-                df_display_phy = player_display_phy.reset_index(drop=True)
-            
-                # Formatage final (données déjà numeric grâce au typage de df_f)
-                if age_col in df_display_phy.columns:
-                    df_display_phy[age_col] = df_display_phy[age_col].fillna(0).astype(int)
-                
-                if "xPhysical" in df_display_phy.columns:
-                    df_display_phy["xPhysical"] = df_display_phy["xPhysical"].fillna(0).astype(int)
-                
-                for col in extra_cols:
-                    if col in df_display_phy.columns:
-                        df_display_phy[col] = df_display_phy[col].fillna(0).round(2)
-            
-                # Configuration AgGrid
-                gb = GridOptionsBuilder.from_dataframe(df_display_phy)
+
+                # Colonnes à afficher (comme Merged Data)
+                display_cols = [
+                    "Player Name", "Team Name", comp_col, pos_col, age_col, 
+                    "xPhysical", "Transfermarkt"
+                ]
+
+                # Ajouter les colonnes filtrées via percentiles
+                for (cat, col), min_pct in filter_percentiles.items():
+                    if min_pct > 0 and col in df_filtered.columns and col not in display_cols:
+                        display_cols.append(col)
+
+                display_cols = [col for col in display_cols if col in df_filtered.columns]
+                df_display = df_filtered[display_cols].reset_index(drop=True).copy()
+
+                # Conversion texte (comme Merged Data)
+                for col in [comp_col, pos_col]:
+                    if col in df_display.columns:
+                        df_display[col] = df_display[col].astype(str)
+
+                # Formatage numériques (comme Merged Data)
+                for col in [age_col, "xPhysical"]:
+                    if col in df_display.columns:
+                        df_display[col] = df_display[col].apply(lambda x: int(round(x)) if pd.notna(x) else "")
+
+                # Colonnes de percentiles avec 2 décimales
+                for col in df_display.columns:
+                    if col not in ["Player Name", "Team Name", comp_col, pos_col, age_col, "xPhysical", "Transfermarkt"]:
+                        df_display[col] = df_display[col].apply(lambda x: round(x, 2) if pd.notna(x) else "")
+
+                # Configuration AgGrid (comme Merged Data)
+                gb = GridOptionsBuilder.from_dataframe(df_display)
                 gb.configure_selection(selection_mode="single", use_checkbox=True)
-                gb.configure_default_column(
-                    editable=False, 
-                    groupable=True, 
-                    sortable=True, 
-                    filter="agTextColumnFilter"
-                )
-            
-                # Configuration colonnes numériques
-                for col in [age_col, "xPhysical"] + extra_cols:
-                    if col in df_display_phy.columns:
-                        gb.configure_column(
-                            col, 
-                            type=["numericColumn", "numberColumnFilter"],
-                            cellStyle={'textAlign': 'center'},
-                            headerStyle={'textAlign': 'center'}
-                        )
-            
-                # Configuration colonnes texte
-                for col in df_display_phy.columns:
-                    if col not in [age_col, "xPhysical"] + extra_cols + ["Transfermarkt", "Player Name"]:
-                        gb.configure_column(
-                            col, 
-                            cellStyle={'textAlign': 'center'},
-                            headerStyle={'textAlign': 'center'}
-                        )
-            
-                # Player Name épinglée
-                if "Player Name" in df_display_phy.columns:
-                    gb.configure_column(
-                        "Player Name", 
-                        pinned="left",
-                        cellStyle={'textAlign': 'left'},
-                        headerStyle={'textAlign': 'center'}
-                    )
-            
-                # Masquer Transfermarkt
-                if "Transfermarkt" in df_display_phy.columns:
+                gb.configure_default_column(editable=False, groupable=True, sortable=True, filter="agTextColumnFilter")
+
+                gb.configure_column("xPhysical", type=["numericColumn", "numberColumnFilter"])
+                gb.configure_column(age_col, type=["numericColumn", "numberColumnFilter"])
+
+                for col in display_cols:
+                    if col != "Transfermarkt":
+                        gb.configure_column(col, cellStyle={'textAlign': 'center'}, headerStyle={'textAlign': 'center'})
+
+                if "Player Name" in df_display.columns:
+                    gb.configure_column("Player Name", pinned="left", cellStyle={'textAlign': 'left'}, headerStyle={'textAlign': 'center'})
+
+                if "Transfermarkt" in df_display.columns:
                     gb.configure_column("Transfermarkt", hide=True)
-            
+
                 gb.configure_pagination(enabled=False)
-            
+
                 grid_response = AgGrid(
-                    df_display_phy,
+                    df_display,
                     gridOptions=gb.build(),
                     height=500,
                     theme='balham',
                     update_mode=GridUpdateMode.SELECTION_CHANGED,
                     allow_unsafe_jscode=True,
-                    key="xphy_ps_grid_merged_style"
+                    key="xphy_ps_grid"
                 )
-            
+
                 # Gestion sélection
                 selected_rows = grid_response.get("selected_rows", [])
                 if isinstance(selected_rows, pd.DataFrame):
                     selected_rows = selected_rows.to_dict(orient='records')
-            
+
                 if isinstance(selected_rows, list) and len(selected_rows) > 0 and isinstance(selected_rows[0], dict):
                     display_row = selected_rows[0]
                     player_name_sel = display_row.get("Player Name")
-            
-                    full_row = player_display_phy[player_display_phy["Player Name"] == player_name_sel]
-            
+
+                    full_row = df_filtered[df_filtered["Player Name"] == player_name_sel]
+
                     if not full_row.empty:
                         tm_url = full_row.iloc[0].get("Transfermarkt")
-            
-                        # Bouton TM
+
                         if 'tm_btn_slot' in locals() and tm_url and isinstance(tm_url, str) and tm_url.strip():
                             with tm_btn_slot:
-                                st.link_button(
-                                    "🔗 TM Player Page",
-                                    tm_url,
-                                    use_container_width=True
-                                )
+                                st.link_button("🔗 TM Player Page", tm_url, use_container_width=True)
                         elif 'tm_btn_slot' in locals():
                             tm_btn_slot.empty()
-            
-                        # Bouton Send to Radar
+
                         if 'send_radar_slot' in locals():
                             with send_radar_slot:
                                 if st.button("📊 Send to Radar", use_container_width=True, key="xphy_send_radar_btn"):
@@ -1460,16 +1410,16 @@ if page == "xPhysical":
                                         _df_dn = df[[player_col, "Short Name"]].dropna().drop_duplicates()
                                         _df_dn["Display Name"] = _df_dn["Short Name"].astype(str) + " (" + _df_dn[player_col].astype(str) + ")"
                                         player_to_display_map = dict(zip(_df_dn[player_col], _df_dn["Display Name"]))
-            
+
                                         player_key = display_row.get("Player Name") or display_row.get(player_col)
                                         display_val = player_to_display_map.get(player_key)
-                                        
+
                                         if display_val is None:
                                             short_name_fallback = display_row.get("Short Name")
                                             display_val = f"{short_name_fallback} ({player_key})" if short_name_fallback and player_key else player_key
-            
+
                                         st.session_state["radar_p1"] = display_val
-            
+
                                         import streamlit.components.v1 as components
                                         components.html(
                                             """
@@ -1501,7 +1451,7 @@ if page == "xPhysical":
                         send_radar_slot.empty()
             else:
                 st.info("No data to display.")
-            
+
             # Résumé filtres
             filters_summary = [
                 f"Season(s): {', '.join(st.session_state.xphy_ps_last_seasons)}",
@@ -1513,7 +1463,7 @@ if page == "xPhysical":
                 "<div style='font-size:0.85em; margin-top:-15px;'>Filters applied: " + " | ".join(filters_summary) + "</div>",
                 unsafe_allow_html=True
             )
-            
+
             # Export CSV
             try:
                 export_df = pd.DataFrame(grid_response.get("data", []))
@@ -1521,18 +1471,18 @@ if page == "xPhysical":
                     export_df = player_display_phy.copy()
             except Exception:
                 export_df = player_display_phy.copy()
-            
+
             if "Transfermarkt" in export_df.columns:
                 export_df = export_df.drop(columns=["Transfermarkt"])
-            
+
             export_cols_order = [c for c in ["Player Name", "Team Name", comp_col,
                                              pos_col, age_col, "xPhysical"] if c in export_df.columns]
             if export_cols_order:
                 export_df = export_df[export_cols_order]
-            
+
             csv_bytes = export_df.to_csv(index=False).encode("utf-8-sig")
             file_name = f"xphysical_player_search_{len(export_df)}.csv"
-            
+
             st.download_button(
                 label="Download selection as CSV",
                 data=csv_bytes,
@@ -1540,7 +1490,7 @@ if page == "xPhysical":
                 mime="text/csv",
                 use_container_width=False
             )
-            
+
             st.write("")
             st.write("")
             xphysical_glossary_expander()
