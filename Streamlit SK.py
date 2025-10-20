@@ -1266,17 +1266,12 @@ if page == "xPhysical":
                 ]
                 display_cols = [col for col in display_cols if col in df_filtered.columns]
                 df_display = df_filtered[display_cols].reset_index(drop=True).copy()
-    
-                # Conversion texte
+
+                # Conversion texte UNIQUEMENT pour les colonnes non-numériques
                 for col in [season_col, comp_col, pos_col]:
                     if col in df_display.columns:
                         df_display[col] = df_display[col].astype(str)
                 
-                # Formatage colonnes entières
-                for col in [age_col, "xPhysical"]:
-                    if col in df_display.columns:
-                        df_display[col] = df_display[col].apply(lambda x: int(round(x)) if pd.notna(x) else "")
-    
                 # Configuration AgGrid
                 from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode
                 
