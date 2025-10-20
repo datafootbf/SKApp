@@ -1370,16 +1370,16 @@ if page == "xPhysical":
                     if col not in ["Player Name", "Team Name", comp_col, pos_col, age_col, "xPhysical", "Transfermarkt"]:
                         gb.configure_column(col, type=["numericColumn", "numberColumnFilter"])
     
-                # Style colonnes
+                # Style colonnes - centrage AVEC en-têtes
                 for col in display_cols:
-                    if col != "Transfermarkt":
+                    if col not in ["Transfermarkt", "Player Name"]:
                         gb.configure_column(
                             col, 
                             cellStyle={'textAlign': 'center'},
-                            headerStyle={'textAlign': 'center'}
+                            headerStyle={'textAlign': 'center'}  # 🔥 AJOUTÉ
                         )
-    
-                # Player Name épinglée
+                
+                # Player Name épinglée à gauche
                 if "Player Name" in df_display.columns:
                     gb.configure_column(
                         "Player Name", 
