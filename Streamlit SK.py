@@ -1141,11 +1141,42 @@ if page == "xPhysical":
             else:
                 st.session_state.xphy_ps_last_seasons = seasons_all
                 st.session_state.xphy_ps_last_comps   = comps_all
-
+        
             df_loaded = df[
                 df[season_col].isin(st.session_state.xphy_ps_last_seasons)
                 & df[comp_col].isin(st.session_state.xphy_ps_last_comps)
             ].copy()
+            
+            # 🔥 TYPAGE CRITIQUE : Forcer TOUT dès le chargement
+            # Colonnes numériques
+            numeric_cols_to_fix = [
+                age_col, "xPhysical", "PSV-99", "TOP 5 PSV-99",
+                "Total Distance P90", "M/min P90", "Running Distance P90",
+                "HI Distance P90", "HSR Distance P90", "Sprinting Distance P90",
+                "Sprint Count P90", "High Acceleration Count P90",
+                "Explosive Acceleration to HSR Count P90",
+                "Explosive Acceleration to Sprint Count P90",
+                "Total Distance TIP P30", "M/min TIP P30", "Running Distance TIP P30",
+                "HI Distance TIP P30", "HSR Distance TIP P30", "Sprinting Distance TIP P30",
+                "Sprint Count TIP P30", "High Acceleration Count TIP P30",
+                "Explosive Acceleration to HSR Count TIP P30",
+                "Explosive Acceleration to Sprint Count TIP P30",
+                "Total Distance OTIP P30", "M/min OTIP P30", "Running Distance OTIP P30",
+                "HI Distance OTIP P30", "HSR Distance OTIP P30", "Sprinting Distance OTIP P30",
+                "Sprint Count OTIP P30", "High Acceleration Count OTIP P30",
+                "Explosive Acceleration to HSR Count OTIP P30",
+                "Explosive Acceleration to Sprint Count OTIP P30"
+            ]
+            
+            for col in numeric_cols_to_fix:
+                if col in df_loaded.columns:
+                    df_loaded[col] = pd.to_numeric(df_loaded[col], errors="coerce")
+            
+            # Colonnes texte
+            for col in [comp_col, pos_col, "Player Name", "Team Name"]:
+                if col in df_loaded.columns:
+                    df_loaded[col] = df_loaded[col].astype(str)
+            
             st.session_state.xphy_ps_loaded_df = df_loaded
             st.session_state.xphy_ps_pending = False
             st.rerun()
