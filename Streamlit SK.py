@@ -3037,12 +3037,6 @@ elif page == "xTech/xDef":
                     if col in df_display.columns:
                         df_display[col] = df_display[col].astype(str)
 
-                # 🔥 FORMATAGE : Minutes, xTECH, xDEF en entiers
-                for col in [minutes_col, "xTECH", "xDEF"]:
-                    if col in df_display.columns:
-                        df_display[col] = pd.to_numeric(df_display[col], errors="coerce")
-                        df_display[col] = df_display[col].apply(lambda x: int(round(x)) if pd.notna(x) else x)
-
                 # Colonnes de percentiles avec 2 décimales
                 for col in df_display.columns:
                     if col not in ["Player Name", "Team Name", comp_col, pos_col, foot_col, age_col, minutes_col, "xTECH", "xDEF", "Transfermarkt"]:
