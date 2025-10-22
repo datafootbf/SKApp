@@ -3052,11 +3052,27 @@ elif page == "xTech/xDef":
                     filter="agTextColumnFilter"
                 )
 
-                # Configuration colonnes numériques
-                gb.configure_column(age_col, type=["numericColumn", "numberColumnFilter"])
-                gb.configure_column(minutes_col, type=["numericColumn", "numberColumnFilter"])
-                gb.configure_column("xTECH", type=["numericColumn", "numberColumnFilter"])
-                gb.configure_column("xDEF", type=["numericColumn", "numberColumnFilter"])
+                # Configuration colonnes numériques avec format d'affichage
+                gb.configure_column(
+                    age_col, 
+                    type=["numericColumn", "numberColumnFilter"],
+                    valueFormatter="value !== null && value !== undefined ? Math.round(value).toString() : ''"
+                )
+                gb.configure_column(
+                    minutes_col, 
+                    type=["numericColumn", "numberColumnFilter"],
+                    valueFormatter="value !== null && value !== undefined ? Math.round(value).toString() : ''"
+                )
+                gb.configure_column(
+                    "xTECH", 
+                    type=["numericColumn", "numberColumnFilter"],
+                    valueFormatter="value !== null && value !== undefined ? Math.round(value).toString() : ''"
+                )
+                gb.configure_column(
+                    "xDEF", 
+                    type=["numericColumn", "numberColumnFilter"],
+                    valueFormatter="value !== null && value !== undefined ? Math.round(value).toString() : ''"
+                )
 
                 # Configuration extra_cols (colonnes de percentiles)
                 for col in df_display.columns:
