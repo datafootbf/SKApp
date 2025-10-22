@@ -3055,7 +3055,7 @@ elif page == "xTech/xDef":
                 # Configuration colonnes numériques
                 for col in [age_col, minutes_col, "xTECH", "xDEF"]:
                     if col in df_display.columns:
-                        gb.configure_column(col, type=["numericColumn", "numberColumnFilter"])
+                        df_display[col] = pd.to_numeric(df_display[col], errors="coerce").fillna(0).round(0).astype(int)
 
                 # Configuration extra_cols (colonnes de percentiles)
                 for col in df_display.columns:
