@@ -4872,12 +4872,11 @@ elif page == "xTech/xDef":
             if col in rookies_display.columns:
                 rookies_display[col] = rookies_display[col].astype(str)
 
-        # Minutes, Age, xTECH, xDEF en entiers naturels
+        # Minutes, Age, xTECH, xDEF en entiers naturels (SANS types mixtes)
         for col in ["Minutes", "Age", "xTECH", "xDEF"]:
             if col in rookies_display.columns:
-                rookies_display[col] = pd.to_numeric(rookies_display[col], errors="coerce")
-                rookies_display[col] = rookies_display[col].apply(lambda x: int(round(x)) if pd.notna(x) else x)
-
+                rookies_display[col] = pd.to_numeric(rookies_display[col], errors="coerce").fillna(0).round(0).astype(int)
+                
         # Tri par défaut
         rookies_display = rookies_display.sort_values(["xTECH", "Minutes"], ascending=[False, False])
 
@@ -4906,14 +4905,31 @@ elif page == "xTech/xDef":
                 autoHeight=False
             )
 
-            # 🔥 Configuration colonnes numériques avec flex pour auto-fit
-            for col in ["Minutes", "Age", "xTECH", "xDEF"]:
-                if col in df_display_rookie.columns:
-                    gb.configure_column(
-                        col, 
-                        type=["numericColumn", "numberColumnFilter"],
-                        flex=1
-                    )
+            # 🔥 Configuration colonnes numériques avec valueFormatter
+            gb.configure_column(
+                "Minutes",
+                type=["numericColumn", "numberColumnFilter"],
+                valueFormatter="value !== null && value !== undefined ? Math.round(value).toString() : ''",
+                flex=1
+            )
+            gb.configure_column(
+                "Age",
+                type=["numericColumn", "numberColumnFilter"],
+                valueFormatter="value !== null && value !== undefined ? Math.round(value).toString() : ''",
+                flex=1
+            )
+            gb.configure_column(
+                "xTECH",
+                type=["numericColumn", "numberColumnFilter"],
+                valueFormatter="value !== null && value !== undefined ? Math.round(value).toString() : ''",
+                flex=1
+            )
+            gb.configure_column(
+                "xDEF",
+                type=["numericColumn", "numberColumnFilter"],
+                valueFormatter="value !== null && value !== undefined ? Math.round(value).toString() : ''",
+                flex=1
+            )
 
             # 🔥 Style colonnes - centrage AVEC en-têtes
             for col in df_display_rookie.columns:
