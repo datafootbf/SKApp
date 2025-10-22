@@ -4871,11 +4871,6 @@ elif page == "xTech/xDef":
         for col in ["Competition Name", "Position Group"]:
             if col in rookies_display.columns:
                 rookies_display[col] = rookies_display[col].astype(str)
-
-        # Minutes, Age, xTECH, xDEF en entiers naturels (SANS types mixtes)
-        for col in ["Minutes", "Age", "xTECH", "xDEF"]:
-            if col in rookies_display.columns:
-                rookies_display[col] = pd.to_numeric(rookies_display[col], errors="coerce").fillna(0).round(0).astype(int)
                 
         # Tri par défaut
         rookies_display = rookies_display.sort_values(["xTECH", "Minutes"], ascending=[False, False])
