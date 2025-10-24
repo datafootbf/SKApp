@@ -4900,32 +4900,28 @@ elif page == "xTech/xDef":
                 autoHeight=False
             )
 
-            # 🔥 Configuration colonnes numériques avec valueFormatter
+            # Configuration colonnes numériques avec format d'affichage
             gb.configure_column(
-                "Minutes",
+                "Age", 
                 type=["numericColumn", "numberColumnFilter"],
-                valueFormatter="value !== null && value !== undefined ? Math.round(value).toString() : ''",
-                flex=1
+                valueFormatter="value !== null && value !== undefined ? Math.round(value).toString() : ''"
             )
             gb.configure_column(
-                "Age",
+                "Minutes", 
                 type=["numericColumn", "numberColumnFilter"],
-                valueFormatter="value !== null && value !== undefined ? Math.round(value).toString() : ''",
-                flex=1
+                valueFormatter="value !== null && value !== undefined ? Math.round(value).toString() : ''"
             )
             gb.configure_column(
-                "xTECH",
+                "xTECH", 
                 type=["numericColumn", "numberColumnFilter"],
-                valueFormatter="value !== null && value !== undefined ? Math.round(value).toString() : ''",
-                flex=1
+                valueFormatter="value !== null && value !== undefined ? Math.round(value).toString() : ''"
             )
             gb.configure_column(
-                "xDEF",
+                "xDEF", 
                 type=["numericColumn", "numberColumnFilter"],
-                valueFormatter="value !== null && value !== undefined ? Math.round(value).toString() : ''",
-                flex=1
+                valueFormatter="value !== null && value !== undefined ? Math.round(value).toString() : ''"
             )
-
+            
             # 🔥 Style colonnes - centrage AVEC en-têtes
             for col in df_display_rookie.columns:
                 if col not in ["Transfermarkt", "Player Name"]:
@@ -4952,10 +4948,11 @@ elif page == "xTech/xDef":
 
             gb.configure_pagination(enabled=False)
 
-            # 🔥 Grid options pour auto-fit (comme Player Search)
+            # Grid options pour auto-fit
             gb.configure_grid_options(
-                domLayout='normal',
-                suppressColumnVirtualisation=True
+                onFirstDataRendered='function(params) { params.api.sizeColumnsToFit(); }',
+                onGridSizeChanged='function(params) { params.api.sizeColumnsToFit(); }',
+                domLayout='normal'
             )
 
             grid_response_rookie = AgGrid(
