@@ -2923,7 +2923,7 @@ elif page == "xTech/xDef":
             ]
             CREATIVITY_METRICS = [
                 ("Npxgxa P90","NPxG + xA"),("Op Xa P90","OP xA"),("Op Key Passes P90","OP Key Passes"),
-                ("Shots Key Passes P90","Shots + Key Passes"),("Op Passes Into And Touches Inside Box P90","OP Passes + Touches Into Box"),
+                ("Shots Key Passes P90","Shots + Key Passes"),("Op Passes Into And Touches Inside Box P90","OP Passes + Touches Into Box"), ("Touches Inside Box P90","Touches Inside Box"),
                 ("Through Balls P90","Throughballs"),("Crosses P90","Crosses"),("Crossing Ratio","Crossing %"),
                 ("Sp Key Passes P90","Set Pieces Key Passes"),("Sp Xa P90","Set Pieces xA"),
                 ("Dribbles P90","Dribbles Succ."),("Dribble Ratio","Dribble %"),("Penalty Wins P90","Penalty Won"),
