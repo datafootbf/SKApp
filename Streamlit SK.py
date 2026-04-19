@@ -1407,7 +1407,6 @@ if page == "xPhysical":
                     theme='streamlit',
                     update_mode=GridUpdateMode.SELECTION_CHANGED,
                     allow_unsafe_jscode=True,
-                    fit_columns_on_grid_load=True,
                     key="xphy_ps_grid"
                 )
     
@@ -3117,7 +3116,6 @@ elif page == "xTech/xDef":
                     theme='streamlit',
                     update_mode=GridUpdateMode.SELECTION_CHANGED,
                     allow_unsafe_jscode=True,
-                    fit_columns_on_grid_load=True,  # 🔥 AJOUTÉ
                     key="xtech_ps_grid"
                 )
 
@@ -4963,7 +4961,6 @@ elif page == "xTech/xDef":
                 theme='streamlit',
                 update_mode=GridUpdateMode.SELECTION_CHANGED,
                 allow_unsafe_jscode=True,
-                fit_columns_on_grid_load=True,
                 key="rookies_grid"
             )
 
