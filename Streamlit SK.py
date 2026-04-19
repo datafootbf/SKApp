@@ -67,6 +67,7 @@ def previous_season_label(label: str) -> str:
     return label
 
 
+import urllib.parse as _parse
 import pandas as pd
 import plotly.express as px
 import numpy as np
@@ -78,11 +79,10 @@ from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from streamlit import session_state as ss
 
 # === [CHANGED] Season helpers (robust to 'YYYY/YYYY' labels) ===
-import re as _re_season  # [CHANGED] alias to avoid clashes
 def sort_seasons(seasons):
     def _key(s):
         s = str(s)
-        m = _re_season.match(r'^(\d{4})/(\d{4})$', s)
+        m = re.match(r'^(\d{4})/(\d{4})$', s)
         return int(m.group(1)) if m else -10**9
     return sorted(seasons, key=_key)
 
@@ -1313,7 +1313,6 @@ if page == "xPhysical":
             df_filtered = df_final.copy()
     
             # Lien Transfermarkt
-            import urllib.parse as _parse
             TM_BASE = "https://www.transfermarkt.fr/schnellsuche/ergebnis/schnellsuche?query="
             if "Transfermarkt" not in df_filtered.columns:
                 df_filtered["Transfermarkt"] = df_filtered["Player Name"].apply(
@@ -1322,11 +1321,10 @@ if page == "xPhysical":
     
             # ========== AgGrid ==========
             if not df_filtered.empty:
-                from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode
-    
+
                 # Colonnes à afficher
                 display_cols = [
-                    "Player Name", "Team Name", comp_col, pos_col, age_col, 
+                    "Player Name", "Team Name", comp_col, pos_col, age_col,
                     "xPhysical", "Transfermarkt"
                 ]
     
@@ -2899,7 +2897,6 @@ elif page == "xTech/xDef":
                 df_filtered_base = df_filtered_base[(df_filtered_base[minutes_col] >= selected_minutes[0]) & (df_filtered_base[minutes_col] <= selected_minutes[1])]
 
             # --- Colonne URL Transfermarkt
-            import urllib.parse as _parse
             TM_BASE = "https://www.transfermarkt.fr/schnellsuche/ergebnis/schnellsuche?query="
             if "Transfermarkt" not in df_filtered_base.columns:
                 df_filtered_base["Transfermarkt"] = df_filtered_base["Player Name"].apply(
@@ -3015,7 +3012,6 @@ elif page == "xTech/xDef":
 
             # ========== AgGrid ==========
             if not df_filtered.empty:
-                from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode
 
                 # Colonnes à afficher
                 display_cols = [
@@ -4874,7 +4870,6 @@ elif page == "xTech/xDef":
         rookies_display = rookies_display.sort_values(["xTECH", "Minutes"], ascending=[False, False])
 
         # Colonne URL Transfermarkt
-        import urllib.parse as _parse
         TM_BASE = "https://www.transfermarkt.fr/schnellsuche/ergebnis/schnellsuche?query="
         rookies_display["Transfermarkt"] = rookies_display["Player Name"].apply(
             lambda name: TM_BASE + _parse.quote(str(name)) if pd.notna(name) else ""
@@ -4882,7 +4877,6 @@ elif page == "xTech/xDef":
 
         # ========== AgGrid Rookie (style Player Search harmonisé) ==========
         if not rookies_display.empty:
-            from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode
 
             df_display_rookie = rookies_display.reset_index(drop=True)
 
