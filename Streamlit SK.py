@@ -102,11 +102,23 @@ def shorten_season(s):
         return f"{y1[-2:]}/{y2[-2:]}"
     return s
 
+def _downcast_df(df):
+    float_cols = df.select_dtypes('float64').columns
+    if len(float_cols):
+        df[float_cols] = df[float_cols].astype('float32')
+    int_cols = df.select_dtypes('int64').columns
+    if len(int_cols):
+        df[int_cols] = df[int_cols].astype('int32')
+    for col in df.select_dtypes('object').columns:
+        if df[col].nunique() < 300:
+            df[col] = df[col].astype('category')
+    return df
+
 @st.cache_data
 def load_xphysical():
     df = pd.read_csv('SK_All.csv', sep=",")
     df.columns = df.columns.str.strip()
-    return df
+    return _downcast_df(df)
 
 @st.cache_data
 def load_xtechnical():
@@ -119,13 +131,13 @@ def load_xtechnical():
         else row["Player Name"],
         axis=1
     )
-    return df_tech
+    return _downcast_df(df_tech)
 
 @st.cache_data
 def load_merged():
     df_merged = pd.read_csv('SB_SK_MERGED.csv')
     df_merged.columns = df_merged.columns.str.strip()
-    return df_merged
+    return _downcast_df(df_merged)
 
 df_merged = load_merged()
 df = load_xphysical()
@@ -1160,8 +1172,8 @@ if page == "xPhysical":
             st.info("Please load data to continue.")
         else:
             st.markdown("---")
-            df_loaded = st.session_state.xphy_ps_loaded_df.copy()
-    
+            df_loaded = st.session_state.xphy_ps_loaded_df
+
             # ==== Filtres dynamiques ====
             DESIRED_ORDER = ["Goalkeeper", "Central Defender", "Full Back", "Midfield", "Wide Attacker", "Center Forward"]
     
@@ -1201,8 +1213,8 @@ if page == "xPhysical":
                     selected_age = None
     
             # Appliquer les filtres Position + Age
-            df_filtered_base = df_loaded.copy()
-    
+            df_filtered_base = df_loaded
+
             if selected_positions:
                 df_filtered_base = df_filtered_base[df_filtered_base[pos_col].isin(selected_positions)]
             if selected_age:
@@ -1301,17 +1313,17 @@ if page == "xPhysical":
                 send_radar_slot = st.empty()
     
             # ============== Filtrage PERCENTILES ==============
-            df_final = df_filtered_base.copy()
-    
+            df_final = df_filtered_base
+
             for (cat, col), min_pct in filter_percentiles.items():
                 if min_pct > 0 and col in df_final.columns:
                     ref_vals = pd.to_numeric(df_final[col], errors="coerce").dropna()
                     if len(ref_vals) > 0:
                         threshold = ref_vals.quantile(min_pct / 100)
                         df_final = df_final[pd.to_numeric(df_final[col], errors="coerce") >= threshold]
-    
+
             df_filtered = df_final.copy()
-    
+
             # Lien Transfermarkt
             TM_BASE = "https://www.transfermarkt.fr/schnellsuche/ergebnis/schnellsuche?query="
             if "Transfermarkt" not in df_filtered.columns:
@@ -1334,8 +1346,8 @@ if page == "xPhysical":
                         display_cols.append(col)
     
                 display_cols = [col for col in display_cols if col in df_filtered.columns]
-                df_display = df_filtered[display_cols].reset_index(drop=True).copy()
-    
+                df_display = df_filtered[display_cols].reset_index(drop=True)
+
                 # Conversion texte UNIQUEMENT
                 for col in [comp_col, pos_col]:
                     if col in df_display.columns:
@@ -2815,7 +2827,7 @@ elif page == "xTech/xDef":
             st.info("Please load data to continue.")
         else:
             st.markdown("---")
-            df_loaded = st.session_state.xtech_ps_loaded_df.copy()
+            df_loaded = st.session_state.xtech_ps_loaded_df
 
             # ============== Filtres dynamiques ==============
             DESIRED_ORDER = ["Goalkeeper", "Full Back", "Central Defender", "Midfielder", "Attacking Midfielder", "Winger", "Striker"]
@@ -2885,7 +2897,7 @@ elif page == "xTech/xDef":
                     selected_minutes = None
 
             # ============== Application filtres ==============
-            df_filtered_base = df_loaded.copy()
+            df_filtered_base = df_loaded
 
             if selected_positions:
                 df_filtered_base = df_filtered_base[df_filtered_base[pos_col].isin(selected_positions)]
@@ -2895,6 +2907,8 @@ elif page == "xTech/xDef":
                 df_filtered_base = df_filtered_base[(df_filtered_base[age_col] >= selected_age[0]) & (df_filtered_base[age_col] <= selected_age[1])]
             if selected_minutes:
                 df_filtered_base = df_filtered_base[(df_filtered_base[minutes_col] >= selected_minutes[0]) & (df_filtered_base[minutes_col] <= selected_minutes[1])]
+
+            df_filtered_base = df_filtered_base.copy()
 
             # --- Colonne URL Transfermarkt
             TM_BASE = "https://www.transfermarkt.fr/schnellsuche/ergebnis/schnellsuche?query="
@@ -2999,7 +3013,7 @@ elif page == "xTech/xDef":
                 send_radar_slot = st.empty()
 
             # ============== Filtrage PERCENTILES ==============
-            df_final = df_filtered_base.copy()
+            df_final = df_filtered_base
 
             for (cat, col), min_pct in filter_percentiles.items():
                 if min_pct > 0 and col in df_final.columns:
@@ -3008,7 +3022,7 @@ elif page == "xTech/xDef":
                         threshold = ref_vals.quantile(min_pct / 100)
                         df_final = df_final[pd.to_numeric(df_final[col], errors="coerce") >= threshold]
 
-            df_filtered = df_final.copy()
+            df_filtered = df_final
 
             # ========== AgGrid ==========
             if not df_filtered.empty:
@@ -3025,7 +3039,7 @@ elif page == "xTech/xDef":
                         display_cols.append(col)
 
                 display_cols = [col for col in display_cols if col in df_filtered.columns]
-                df_display = df_filtered[display_cols].reset_index(drop=True).copy()
+                df_display = df_filtered[display_cols].reset_index(drop=True)
 
                 # Conversion texte UNIQUEMENT
                 for col in [comp_col, pos_col, foot_col]:

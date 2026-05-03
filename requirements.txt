@@ -3,6 +3,5 @@ pandas==2.2.3
 numpy==2.2.5
 matplotlib>=3.7.0
 plotly>=5.17.0
-mplsoccer>=1.1.0
 streamlit-aggrid==1.2.1.post2
 pillow>=10.0.0
