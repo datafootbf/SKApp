@@ -1638,7 +1638,7 @@ if page == "xPhysical":
         plot_df = filtered_df.copy()
         # Ajout de la saison courte et du label complet
         plot_df["season_short"] = plot_df["Season"].apply(shorten_season)
-        plot_df["Player_Label"] = plot_df["Short Name"] + " " + plot_df["season_short"]
+        plot_df["Player_Label"] = plot_df["Short Name"].astype(str) + " " + plot_df["season_short"].astype(str)
         
         # Sécurité: vérifie colonnes
         if (selected_xaxis not in plot_df.columns) or (selected_yaxis not in plot_df.columns):
@@ -3482,7 +3482,7 @@ elif page == "xTech/xDef":
         
         # Ajout label + typage
         plot_df_tech = filtered_df_tech.copy()
-        plot_df_tech["Player_Label"] = plot_df_tech["Player Last Name"] + " " + plot_df_tech["season_short"]
+        plot_df_tech["Player_Label"] = plot_df_tech["Player Last Name"].astype(str) + " " + plot_df_tech["season_short"].astype(str)
 
         # Typage
         plot_df_tech[selected_xaxis_tech] = pd.to_numeric(plot_df_tech[selected_xaxis_tech], errors='coerce')
